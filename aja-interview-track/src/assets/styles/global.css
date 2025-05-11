@@ -147,3 +147,44 @@
       padding: 1rem;
     }
   }
+  /* Add these styles to your global.css or App.css */
+.app-container {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--background-color);
+    color: var(--text-color);
+  }
+  
+  .content-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0; /* Prevents content overflow */
+  }
+  
+  .page-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    transition: margin-left 0.3s ease;
+  }
+  
+  /* Dark mode variables */
+  :root {
+    --background-color: #f8f9fa;
+    --text-color: #333;
+    --sidebar-width: 250px;
+    --sidebar-collapsed-width: 70px;
+  }
+  
+  .dark {
+    --background-color: #1a202c;
+    --text-color: #f7fafc;
+  }
+  
+  /* Ensure body takes full height */
+  body, #root {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+  }

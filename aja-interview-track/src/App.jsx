@@ -30,14 +30,19 @@ function AppContent() {
 
   return (
     <div className={`app-container ${darkMode ? 'dark' : ''}`}>
-      <Sidebar darkMode={darkMode} isCollapsed={sidebarCollapsed} />
-      <div className="main-content">
+      <Sidebar 
+        darkMode={darkMode} 
+        toggleDarkMode={toggleDarkMode} 
+        isCollapsed={sidebarCollapsed} 
+        setIsCollapsed={setSidebarCollapsed}
+      />
+      <div className="content-wrapper">
         <Navbar 
           toggleSidebar={toggleSidebar} 
           darkMode={darkMode} 
           toggleDarkMode={toggleDarkMode} 
         />
-        <main>
+        <main className="page-content">
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<LandingPage />} />

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   FaHome,
@@ -12,16 +12,16 @@ import {
   FaSignInAlt,
   FaUserPlus,
   FaCog,
-  FaSignOutAlt
+  FaSignOutAlt,
+  FaMoon,
+  FaSun
 } from "react-icons/fa";
 import { FiHome, FiBarChart2, FiTruck, FiShoppingCart, FiInfo, FiLogIn, FiUserPlus, FiSettings, FiLogOut } from "react-icons/fi";
 import styles from './Sidebar.module.css';
 
-const Sidebar = ({ darkMode }) => {
+const Sidebar = ({ darkMode, toggleDarkMode }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
 
   const menuItems = [
     { path: "/", icon: <FiHome size={20} />, activeIcon: <FaHome size={20} />, label: "Home" },
@@ -41,24 +41,19 @@ const Sidebar = ({ darkMode }) => {
     { action: () => { /* handle logout */ }, icon: <FiLogOut size={20} />, activeIcon: <FaSignOutAlt size={20} />, label: "Logout" }
   ];
 
-  const expanded = isCollapsed ? false : isHovered;
-
   return (
     <motion.div 
       className={`${styles.sidebar} ${darkMode ? styles.dark : ''} ${isCollapsed ? styles.collapsed : ''}`}
-      initial={{ x: -300 }}
-      animate={{ x: 0 }}
+      initial={{ width: 250 }}
+      animate={{ width: isCollapsed ? 70 : 250 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       <div className={styles.header}>
-        {(!isCollapsed || isHovered) && (
+        {!isCollapsed && (
           <motion.div 
             className={styles.logo}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
           >
             AJA Interview Prep
           </motion.div>
@@ -66,13 +61,14 @@ const Sidebar = ({ darkMode }) => {
         <button
           className={styles.toggleButton}
           onClick={() => setIsCollapsed(!isCollapsed)}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {isCollapsed ? <FaChevronRight /> : <FaChevronLeft />}
+          {isCollapsed ? <FaChevronRight size={14} /> : <FaChevronLeft size={14} />}
         </button>
       </div>
       
       <div className={styles.menuSection}>
-        <p className={styles.menuTitle}>Navigation</p>
+        {!isCollapsed && <p className={styles.menuTitle}>Navigation</p>}
         <ul className={styles.menu}>
           {menuItems.map((item) => (
             <motion.li
@@ -85,15 +81,7 @@ const Sidebar = ({ darkMode }) => {
                 <span className={styles.menuIcon}>
                   {location.pathname === item.path ? item.activeIcon : item.icon}
                 </span>
-                {(!isCollapsed || isHovered) && (
-                  <motion.span 
-                    className={styles.menuLabel}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
+                {!isCollapsed && <span className={styles.menuLabel}>{item.label}</span>}
               </Link>
             </motion.li>
           ))}
@@ -101,7 +89,7 @@ const Sidebar = ({ darkMode }) => {
       </div>
       
       <div className={styles.menuSection}>
-        <p className={styles.menuTitle}>Account</p>
+        {!isCollapsed && <p className={styles.menuTitle}>Account</p>}
         <ul className={styles.menu}>
           {authItems.map((item) => (
             <motion.li
@@ -114,15 +102,7 @@ const Sidebar = ({ darkMode }) => {
                 <span className={styles.menuIcon}>
                   {location.pathname === item.path ? item.activeIcon : item.icon}
                 </span>
-                {(!isCollapsed || isHovered) && (
-                  <motion.span 
-                    className={styles.menuLabel}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
+                {!isCollapsed && <span className={styles.menuLabel}>{item.label}</span>}
               </Link>
             </motion.li>
           ))}
@@ -131,6 +111,23 @@ const Sidebar = ({ darkMode }) => {
       
       <div className={styles.bottomMenu}>
         <ul className={styles.menu}>
+          <motion.li
+            className={styles.menuItem}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <button onClick={toggleDarkMode} className={styles.menuLink}>
+              <span className={styles.menuIcon}>
+                {darkMode ? <FaSun size={20} /> : <FaMoon size={20} />}
+              </span>
+              {!isCollapsed && (
+                <span className={styles.menuLabel}>
+                  {darkMode ? "Light Mode" : "Dark Mode"}
+                </span>
+              )}
+            </button>
+          </motion.li>
+          
           {bottomItems.map((item, index) => (
             <motion.li
               key={index}
@@ -143,28 +140,12 @@ const Sidebar = ({ darkMode }) => {
                   <span className={styles.menuIcon}>
                     {location.pathname === item.path ? item.activeIcon : item.icon}
                   </span>
-                  {(!isCollapsed || isHovered) && (
-                    <motion.span 
-                      className={styles.menuLabel}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                    >
-                      {item.label}
-                    </motion.span>
-                  )}
+                  {!isCollapsed && <span className={styles.menuLabel}>{item.label}</span>}
                 </Link>
               ) : (
                 <button onClick={item.action} className={styles.menuLink}>
                   <span className={styles.menuIcon}>{item.icon}</span>
-                  {(!isCollapsed || isHovered) && (
-                    <motion.span 
-                      className={styles.menuLabel}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                    >
-                      {item.label}
-                    </motion.span>
-                  )}
+                  {!isCollapsed && <span className={styles.menuLabel}>{item.label}</span>}
                 </button>
               )}
             </motion.li>
