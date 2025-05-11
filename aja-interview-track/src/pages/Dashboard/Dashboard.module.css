@@ -1,0 +1,378 @@
+/* Common styles for all dashboards */
+.dashboardContainer {
+    padding: 2rem;
+    background-color: #f5f7fa;
+    min-height: 100vh;
+  }
+  
+  .dashboardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e1e5eb;
+  }
+  
+  .dashboardHeader h2 {
+    color: #2c3e50;
+    margin: 0;
+  }
+  
+  .tabs {
+    display: flex;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid #e1e5eb;
+  }
+  
+  .tab {
+    padding: 0.75rem 1.5rem;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-weight: 500;
+    color: #7f8c8d;
+    transition: all 0.3s ease;
+  }
+  
+  .tab:hover {
+    color: #3498db;
+  }
+  
+  .tab.active {
+    color: #3498db;
+    border-bottom-color: #3498db;
+  }
+  
+  .tabContent {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  }
+  
+  /* Card styles */
+  .cardGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s ease;
+    cursor: pointer;
+  }
+  
+  .card h3 {
+    margin-top: 0;
+    color: #2c3e50;
+  }
+  
+  /* Button styles */
+  .primaryButton {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .primaryButton:hover {
+    background-color: #2980b9;
+  }
+  
+  .secondaryButton {
+    background-color: #ecf0f1;
+    color: #7f8c8d;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .secondaryButton:hover {
+    background-color: #d5dbdb;
+  }
+  
+  .successButton {
+    background-color: #2ecc71;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .successButton:hover {
+    background-color: #27ae60;
+  }
+  
+  .dangerButton {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .dangerButton:hover {
+    background-color: #c0392b;
+  }
+  
+  /* Status indicators */
+  .status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: capitalize;
+  }
+  
+  .status.profile_received {
+    background-color: #f39c12;
+    color: white;
+  }
+  
+  .status.resume_sent {
+    background-color: #3498db;
+    color: white;
+  }
+  
+  .status.interview_scheduled {
+    background-color: #9b59b6;
+    color: white;
+  }
+  
+  .status.hired {
+    background-color: #2ecc71;
+    color: white;
+  }
+  
+  .status.completed {
+    background-color: #2ecc71;
+    color: white;
+  }
+  
+  .status.scheduled {
+    background-color: #f39c12;
+    color: white;
+  }
+  
+  .status.pending {
+    background-color: #7f8c8d;
+    color: white;
+  }
+  
+  /* Modal styles */
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  
+  .modalContent {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .modalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  
+  /* Form elements */
+  .formGroup {
+    margin-bottom: 1rem;
+  }
+  
+  .formGroup label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+  
+  .formGroup input,
+  .formGroup select,
+  .formGroup textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+  
+  .formGroup textarea {
+    min-height: 100px;
+  }
+  
+  /* Chart containers */
+  .chartContainer {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  }
+  
+  .chartRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  
+  .statsGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+  }
+  
+  .statCard {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  }
+  
+  .statCard h5 {
+    margin-top: 0;
+    color: #7f8c8d;
+    font-size: 1rem;
+  }
+  
+  .statValue {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2c3e50;
+    margin: 0.5rem 0;
+  }
+  
+  .statLabel {
+    color: #7f8c8d;
+    font-size: 0.875rem;
+    margin: 0;
+  }
+  
+  /* Employee Dashboard specific */
+  .resumeSection {
+    margin-top: 2rem;
+  }
+  
+  .uploadArea {
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    margin-top: 1rem;
+    cursor: pointer;
+  }
+  
+  .uploadArea:hover {
+    border-color: #3498db;
+  }
+  
+  .uploadButton {
+    display: inline-block;
+    background-color: #3498db;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    margin-top: 1rem;
+    cursor: pointer;
+  }
+  
+  .statusIndicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+  
+  .statusIndicator.pending {
+    background-color: #fff3cd;
+    color: #856404;
+  }
+  
+  .statusIndicator.submitted {
+    background-color: #d4edda;
+    color: #155724;
+  }
+  
+  .statusIndicator.rejected {
+    background-color: #f8d7da;
+    color: #721c24;
+  }
+  
+  /* Interview lists */
+  .interviewList {
+    display: grid;
+    gap: 1rem;
+  }
+  
+  .interviewCard {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  }
+  
+  .interviewHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  
+  .interviewActions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .chartRow {
+      grid-template-columns: 1fr;
+    }
+    
+    .statsGrid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .statsGrid {
+      grid-template-columns: 1fr;
+    }
+    
+    .modalContent {
+      width: 95%;
+      padding: 1rem;
+    }
+  }
