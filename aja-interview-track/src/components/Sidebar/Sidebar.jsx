@@ -2,24 +2,17 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  FaHome,
-  FaChartLine,
-  FaTruck,
-  FaShoppingCart,
-  FaInfoCircle,
-  FaChevronLeft,
-  FaChevronRight,
-  FaSignInAlt,
-  FaUserPlus,
-  FaCog,
-  FaSignOutAlt,
-  FaMoon,
-  FaSun
+  FaHome, FaChartLine, FaTruck, FaShoppingCart, FaInfoCircle,
+  FaChevronLeft, FaChevronRight, FaSignInAlt, FaUserPlus, FaCog,
+  FaSignOutAlt, FaMoon, FaSun
 } from "react-icons/fa";
-import { FiHome, FiBarChart2, FiTruck, FiShoppingCart, FiInfo, FiLogIn, FiUserPlus, FiSettings, FiLogOut } from "react-icons/fi";
+import {
+  FiHome, FiBarChart2, FiTruck, FiShoppingCart, FiInfo,
+  FiLogIn, FiUserPlus, FiSettings, FiLogOut
+} from "react-icons/fi";
 import styles from './Sidebar.module.css';
 
-const Sidebar = ({ darkMode, toggleDarkMode }) => {
+const Sidebar = ({ darkMode, toggleDarkMode, onToggle }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
 
@@ -28,7 +21,9 @@ const Sidebar = ({ darkMode, toggleDarkMode }) => {
     { path: "/dashboard/employee", icon: <FiBarChart2 size={20} />, activeIcon: <FaChartLine size={20} />, label: "Employee" },
     { path: "/dashboard/delivery-team", icon: <FiTruck size={20} />, activeIcon: <FaTruck size={20} />, label: "Delivery" },
     { path: "/dashboard/sales-team", icon: <FiShoppingCart size={20} />, activeIcon: <FaShoppingCart size={20} />, label: "Sales" },
-    { path: "/about", icon: <FiInfo size={20} />, activeIcon: <FaInfoCircle size={20} />, label: "About" }
+    { path: "/about", icon: <FiInfo size={20} />, activeIcon: <FaInfoCircle size={20} />, label: "About" },
+    { path: "/dashboard/admin", icon: <FiBarChart2 size={20} />, activeIcon: <FaChartLine size={20} />, label: "Admin" }
+
   ];
 
   const authItems = [
@@ -40,6 +35,14 @@ const Sidebar = ({ darkMode, toggleDarkMode }) => {
     { path: "/settings", icon: <FiSettings size={20} />, activeIcon: <FaCog size={20} />, label: "Settings" },
     { action: () => { /* handle logout */ }, icon: <FiLogOut size={20} />, activeIcon: <FaSignOutAlt size={20} />, label: "Logout" }
   ];
+
+  const handleToggle = () => {
+    const newCollapsedState = !isCollapsed;
+    setIsCollapsed(newCollapsedState);
+    if (onToggle) {
+      onToggle(newCollapsedState);
+    }
+  };
 
   return (
     <motion.div 
@@ -60,13 +63,13 @@ const Sidebar = ({ darkMode, toggleDarkMode }) => {
         )}
         <button
           className={styles.toggleButton}
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={handleToggle}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {isCollapsed ? <FaChevronRight size={14} /> : <FaChevronLeft size={14} />}
         </button>
       </div>
-      
+
       <div className={styles.menuSection}>
         {!isCollapsed && <p className={styles.menuTitle}>Navigation</p>}
         <ul className={styles.menu}>
@@ -87,7 +90,7 @@ const Sidebar = ({ darkMode, toggleDarkMode }) => {
           ))}
         </ul>
       </div>
-      
+
       <div className={styles.menuSection}>
         {!isCollapsed && <p className={styles.menuTitle}>Account</p>}
         <ul className={styles.menu}>
@@ -108,7 +111,7 @@ const Sidebar = ({ darkMode, toggleDarkMode }) => {
           ))}
         </ul>
       </div>
-      
+
       <div className={styles.bottomMenu}>
         <ul className={styles.menu}>
           <motion.li
@@ -127,7 +130,7 @@ const Sidebar = ({ darkMode, toggleDarkMode }) => {
               )}
             </button>
           </motion.li>
-          
+
           {bottomItems.map((item, index) => (
             <motion.li
               key={index}
@@ -146,7 +149,7 @@ const Sidebar = ({ darkMode, toggleDarkMode }) => {
                 <button onClick={item.action} className={styles.menuLink}>
                   <span className={styles.menuIcon}>{item.icon}</span>
                   {!isCollapsed && <span className={styles.menuLabel}>{item.label}</span>}
-                </button>
+                  </button>
               )}
             </motion.li>
           ))}

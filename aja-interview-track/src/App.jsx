@@ -12,6 +12,7 @@ import About from "./pages/About";
 import EmployeeDashboard from "./pages/Dashboard/EmployeeDashboard";
 import DeliveryTeamDashboard from "./pages/Dashboard/DeliveryTeamDashboard";
 import SalesTeamDashboard from "./pages/Dashboard/SalesTeamDashboard";
+import AdminDashboard from "./pages/Dashboard/AdminDashboard";
 import "./assets/styles/global.css";
 
 function AppContent() {
@@ -19,30 +20,35 @@ function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
-
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
     document.body.classList.toggle('dark-mode');
   };
 
+  const handleSidebarToggle = (isCollapsed) => {
+    setSidebarCollapsed(isCollapsed);
+  };
+
   return (
-    <div className={`app-container ${darkMode ? 'dark' : ''}`}>
-      <Sidebar 
-        darkMode={darkMode} 
-        toggleDarkMode={toggleDarkMode} 
-        isCollapsed={sidebarCollapsed} 
-        setIsCollapsed={setSidebarCollapsed}
+    <div className={`app ${darkMode ? 'dark' : 'light'}`}>
+      <Sidebar
+        darkMode={darkMode}
+        toggleDarkMode={toggleDarkMode}
+        onToggle={handleSidebarToggle}
       />
-      <div className="content-wrapper">
-        <Navbar 
-          toggleSidebar={toggleSidebar} 
-          darkMode={darkMode} 
-          toggleDarkMode={toggleDarkMode} 
+      <main
+        className="main-content"
+        style={{
+          marginLeft: sidebarCollapsed ? '70px' : '250px',
+          transition: 'margin-left 0.3s ease',
+        }}
+      >
+        <Navbar
+          toggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+          darkMode={darkMode}
+          toggleDarkMode={toggleDarkMode}
         />
-        <main className="page-content">
+        <div className="page-content">
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<LandingPage />} />
@@ -53,11 +59,12 @@ function AppContent() {
               <Route path="/dashboard/employee" element={<EmployeeDashboard />} />
               <Route path="/dashboard/delivery-team" element={<DeliveryTeamDashboard />} />
               <Route path="/dashboard/sales-team" element={<SalesTeamDashboard />} />
+              <Route path="/dashboard/admin" element={<AdminDashboard />} />
             </Routes>
           </AnimatePresence>
-        </main>
+        </div>
         <Footer darkMode={darkMode} />
-      </div>
+      </main>
     </div>
   );
 }

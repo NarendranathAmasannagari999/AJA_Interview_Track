@@ -188,3 +188,29 @@
     padding: 0;
     min-height: 100vh;
   }
+
+  .app {
+    display: flex;
+    min-height: 100vh;
+  }
+  
+  .main-content {
+    flex: 1;
+    padding: 20px;
+    transition: margin-left 0.3s ease;
+  }
+  
+  .page-content {
+    min-height: calc(100vh - 120px); /* Adjust based on Navbar/Footer height */
+  }
+  
+  /* Dark mode styles */
+  .dark {
+    background-color: #1a202c;
+    color: #f7fafc;
+  }
+  
+  .light {
+    background-color: #ffffff;
+    color: #1a202c;
+  }
