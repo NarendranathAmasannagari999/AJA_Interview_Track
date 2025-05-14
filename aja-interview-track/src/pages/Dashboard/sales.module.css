@@ -234,6 +234,16 @@
   color: #991b1b;
 }
 
+.statusBadge.shortlisted {
+  background-color: #ecfdf5;
+  color: #065f46;
+}
+
+.statusBadge.in_process {
+  background-color: #e0f2fe;
+  color: #075985;
+}
+
 .profileDetails p {
   margin: 0.5rem 0;
   font-size: 0.9rem;
@@ -299,6 +309,12 @@
   background-color: #dc2626;
 }
 
+/* New style for small buttons */
+.button.small {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+}
+
 .interviewCard {
   background: white;
   border-radius: 12px;
@@ -334,6 +350,75 @@
 
 .interviewDetails {
   margin: 1rem 0;
+}
+
+/* New styles for interview levels */
+.interviewLevels {
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.level {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  background-color: #f8fafc;
+}
+
+.level.scheduled {
+  border-left: 4px solid #3b82f6;
+}
+
+.level.completed {
+  border-left: 4px solid #10b981;
+}
+
+.levelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.levelNumber {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.9rem;
+}
+
+.levelDate {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.levelStatus {
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-transform: capitalize;
+  color: #475569;
+  display: flex \;
+}
+
+.levelDetails {
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.levelDetails p {
+  margin: 0.25rem 0;
+}
+
+.levelDetails a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.levelDetails a:hover {
+  text-decoration: underline;
 }
 
 .scoreMeter {
@@ -379,6 +464,16 @@
   background-color: #ef4444;
 }
 
+/* New style for feedback display */
+.feedback {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #475569;
+  background-color: #f8fafc;
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
 .feedbackSection {
   margin-top: 1rem;
   padding-top: 1rem;
@@ -390,6 +485,32 @@
   margin-bottom: 0.5rem;
   font-size: 0.9rem;
   color: #475569;
+}
+
+/* New styles for interview outcome */
+.interviewOutcome {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.outcomeHired, .outcomeRejected {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
+.outcomeHired {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.outcomeRejected {
+  background-color: #fee2e2;
+  color: #991b1b;
 }
 
 .clientCard {
@@ -522,10 +643,10 @@
   z-index: 1000;
 }
 
-.modalContent {
+/* New style for modal */
+.modal {
   background: white;
   border-radius: 16px;
-  padding: 2rem;
   width: 90%;
   max-width: 600px;
   max-height: 90vh;
@@ -533,11 +654,48 @@
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
-.modalContent h3 {
-  margin-top: 0;
+/* New style for modal header */
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modalHeader h3 {
+  margin: 0;
   color: #1e293b;
   font-size: 1.5rem;
-  margin-bottom: 1.5rem;
+}
+
+/* New style for close button */
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
+.closeButton:hover {
+  background-color: #f1f5f9;
+}
+
+/* New style for modal content */
+.modalContent {
+  padding: 2rem;
+}
+
+/* New style for modal footer */
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.5rem 2rem;
+  border-top: 1px solid #e2e8f0;
 }
 
 .formGroup {
@@ -700,4 +858,11 @@
 
 .resultFailure {
   color: #ef4444;
+}
+
+/* New style for notified icon */
+.notifiedIcon {
+  margin-left: 0.5rem;
+  color: #10b981;
+  font-size: 0.9rem;
 }

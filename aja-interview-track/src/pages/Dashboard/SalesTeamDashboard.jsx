@@ -1,690 +1,1157 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  FiUsers, 
-  FiCalendar, 
-  FiFileText, 
-  FiCheck, 
-  FiX, 
-  FiSend, 
-  FiDollarSign,
-  FiFilter,
-  FiSearch,
-  FiChevronDown,
-  FiChevronUp,
-  FiBarChart2,
-  FiPieChart,
-  FiUpload,
-  FiDownload,
-  FiMessageSquare,
-  FiMail,
-  FiUserPlus,
-  FiBriefcase,
-  FiAward,
-  FiClock
+  FiUsers, FiCalendar, FiFileText, FiCheck, FiX, FiSend, 
+  FiDollarSign, FiFilter, FiSearch, FiChevronDown, FiChevronUp,
+  FiBarChart2, FiPieChart, FiUpload, FiDownload, FiMessageSquare,
+  FiMail, FiUserPlus, FiBriefcase, FiAward, FiClock, FiLayers,
+  FiBook, FiUserCheck, FiUserX, FiShare2, FiToggleLeft, FiToggleRight
 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
+  ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line 
+} from 'recharts';
 import styles from './sales.module.css';
 
 const SalesTeamDashboard = () => {
-  const [activeTab, setActiveTab] = useState('profiles');
-  const [candidates, setCandidates] = useState([]);
-  const [clientInterviews, setClientInterviews] = useState([]);
-  const [clients, setClients] = useState([]);
+  // Main state
+  const [activeTab, setActiveTab] = useState('jds');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [selectedClient, setSelectedClient] = useState('');
-  const [jd, setJd] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedJD, setSelectedJD] = useState(null);
+  const [sendFeedback, setSendFeedback] = useState(false);
+  
+  // Filter states
   const [filterTech, setFilterTech] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterResourceType, setFilterResourceType] = useState('all');
-  const [showFilters, setShowFilters] = useState(false);
+  const [filterInterviewLevel, setFilterInterviewLevel] = useState('all');
+  
+  // Data states
+  const [candidates, setCandidates] = useState([]);
+  const [clientInterviews, setClientInterviews] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [jobDescriptions, setJobDescriptions] = useState([]);
+  const [resumePool, setResumePool] = useState([]);
+  const [shortlistedCandidates, setShortlistedCandidates] = useState([]);
+  
+  // Deployment statistics
+  const [deploymentStats, setDeploymentStats] = useState({
+    profilesSent: 0,
+    resumesSent: 0,
+    interviewsScheduled: 0,
+    deployed: 0,
+    rejected: 0
+  });
 
+  // New state for interview scheduling
+  const [showInterviewScheduler, setShowInterviewScheduler] = useState(false);
+  const [selectedForInterview, setSelectedForInterview] = useState([]);
+  const [interviewDetails, setInterviewDetails] = useState({
+    level: 1,
+    date: '',
+    time: '',
+    mode: 'virtual',
+    link: '',
+    location: '',
+    notes: ''
+  });
+
+  // Initialize with sample data
   useEffect(() => {
+    // Candidates with mock interview scores and contact info
     setCandidates([
       { 
         id: 1, 
         name: 'John Doe', 
-        skill: 'Java', 
+        technology: 'Java', 
         level: 'Intermediate', 
         resourceType: 'TT',
         mockTechScore: 8,
         mockCommScore: 7,
         status: 'profile_received',
         resume: 'John_Doe_Java.pdf',
-        lastUpdated: '2023-05-20'
+        lastUpdated: '2023-05-20',
+        jdsReceived: [101],
+        resumeSent: false,
+        email: 'john.doe@example.com',
+        phone: '555-123-4567'
       },
       { 
         id: 2, 
         name: 'Jane Smith', 
-        skill: 'Python', 
+        technology: 'Python', 
         level: 'Senior',
         resourceType: 'TT',
         mockTechScore: 9,
         mockCommScore: 8,
         status: 'resume_sent',
         resume: 'Jane_Smith_Python.pdf',
-        lastUpdated: '2023-05-18'
+        lastUpdated: '2023-05-18',
+        jdsReceived: [102],
+        resumeSent: true,
+        email: 'jane.smith@example.com',
+        phone: '555-987-6543'
       },
       { 
         id: 3, 
         name: 'Mike Johnson', 
-        skill: '.NET', 
-        level: 'Junior',
-        resourceType: 'TCT',
-        mockTechScore: 7,
-        mockCommScore: 6,
-        status: 'interview_scheduled',
-        resume: 'Mike_Johnson_NET.pdf',
-        lastUpdated: '2023-05-15'
-      },
-      { 
-        id: 4, 
-        name: 'Sarah Williams', 
-        skill: 'DevOps', 
-        level: 'Intermediate',
-        resourceType: 'TT',
-        mockTechScore: 8,
-        mockCommScore: 9,
-        status: 'hired',
-        resume: 'Sarah_Williams_DevOps.pdf',
-        lastUpdated: '2023-05-10'
-      },
-      { 
-        id: 5, 
-        name: 'David Lee', 
-        skill: 'SalesForce', 
+        technology: '.NET', 
         level: 'Senior',
         resourceType: 'TT',
-        mockTechScore: 9,
-        mockCommScore: 8,
-        status: 'resume_sent',
-        resume: 'David_Lee_SalesForce.pdf',
-        lastUpdated: '2023-05-17'
-      },
-      { 
-        id: 6, 
-        name: 'Emma Wilson', 
-        skill: 'UI', 
-        level: 'Intermediate',
-        resourceType: 'TCT',
         mockTechScore: 7,
-        mockCommScore: 8,
-        status: 'rejected',
-        resume: 'Emma_Wilson_UI.pdf',
-        lastUpdated: '2023-05-12'
+        mockCommScore: 6,
+        status: 'resume_sent',
+        resume: 'Mike_Johnson_NET.pdf',
+        lastUpdated: '2023-05-19',
+        jdsReceived: [103],
+        resumeSent: true,
+        email: 'mike.johnson@example.com',
+        phone: '555-456-7890'
       }
     ]);
 
+    // Client interviews with detailed level information
     setClientInterviews([
       { 
         id: 1, 
         candidateId: 1, 
         candidateName: 'John Doe', 
         client: 'Tech Corp', 
-        date: '2023-05-25', 
-        level: 1, 
-        status: 'scheduled',
-        jd: 'Java Developer Position',
-        feedback: 'Strong technical skills but needs improvement in communication',
-        techScore: 8,
-        commScore: 6
+        jdId: 101,
+        levels: [
+          {
+            number: 1,
+            date: '2023-05-25',
+            time: '14:00',
+            mode: 'virtual',
+            link: 'https://meet.techcorp.com/jd-interview',
+            status: 'scheduled',
+            techScore: null,
+            commScore: null,
+            feedback: '',
+            notified: false
+          }
+        ],
+        overallStatus: 'in_process',
+        jd: 'Java Developer Position'
       },
       { 
         id: 2, 
         candidateId: 3, 
         candidateName: 'Mike Johnson', 
         client: 'Data Systems', 
-        date: '2023-05-28', 
-        level: 2, 
-        status: 'completed',
-        result: 'passed',
-        jd: '.NET Engineer',
-        feedback: 'Excellent problem-solving skills and good communication',
-        techScore: 9,
-        commScore: 8
-      },
-      { 
-        id: 3, 
-        candidateId: 5, 
-        candidateName: 'David Lee', 
-        client: 'Cloud Solutions', 
-        date: '2023-06-02', 
-        level: 1, 
-        status: 'completed',
-        result: 'rejected',
-        jd: 'SalesForce Consultant',
-        feedback: 'Technical knowledge good but lacked depth in some areas',
-        techScore: 7,
-        commScore: 7
+        jdId: 103,
+        levels: [
+          {
+            number: 1,
+            date: '2023-05-20',
+            time: '10:00',
+            mode: 'virtual',
+            link: 'https://meet.datasystems.com/interview',
+            status: 'completed',
+            techScore: 7,
+            commScore: 6,
+            feedback: 'Good technical knowledge but needs improvement in communication',
+            notified: true
+          },
+          {
+            number: 2,
+            date: '2023-05-28',
+            time: '15:00',
+            mode: 'virtual',
+            link: 'https://meet.datasystems.com/interview2',
+            status: 'scheduled',
+            techScore: null,
+            commScore: null,
+            feedback: '',
+            notified: false
+          }
+        ],
+        overallStatus: 'in_process',
+        jd: '.NET Engineer'
       }
     ]);
 
+    // Clients data
     setClients([
-      { id: 1, name: 'Tech Corp', contact: 'hr@techcorp.com', activePositions: 5, technologies: ['Java', 'Python', 'DevOps'] },
-      { id: 2, name: 'Data Systems', contact: 'recruiting@datasystems.com', activePositions: 3, technologies: ['.NET', 'UI'] },
-      { id: 3, name: 'Cloud Solutions', contact: 'hiring@cloudsolutions.com', activePositions: 2, technologies: ['SalesForce', 'DevOps'] },
-      { id: 4, name: 'Digital Innovations', contact: 'talent@digitalinnov.com', activePositions: 4, technologies: ['Java', 'Python', 'UI'] },
-      { id: 5, name: 'Global Tech', contact: 'careers@globaltech.com', activePositions: 3, technologies: ['.NET', 'Testing'] }
+      { 
+        id: 1, 
+        name: 'Tech Corp', 
+        contact: 'hr@techcorp.com', 
+        activePositions: 5, 
+        technologies: ['Java', 'Python', 'DevOps'],
+        interviewProcess: {
+          levels: 3,
+          requirements: 'Technical and communication assessment at each level'
+        }
+      },
+      { 
+        id: 2, 
+        name: 'Data Systems', 
+        contact: 'hr@datasystems.com', 
+        activePositions: 3, 
+        technologies: ['.NET', 'Azure'],
+        interviewProcess: {
+          levels: 2,
+          requirements: 'Technical assessment and client presentation'
+        }
+      }
     ]);
+
+    // Job Descriptions
+    setJobDescriptions([
+      {
+        id: 101,
+        clientId: 1,
+        clientName: 'Tech Corp',
+        title: 'Java Developer Position',
+        technology: 'Java',
+        resourceType: 'TT',
+        description: 'Looking for Java developer with Spring Boot experience...',
+        receivedDate: '2023-05-15',
+        status: 'active'
+      },
+      {
+        id: 103,
+        clientId: 2,
+        clientName: 'Data Systems',
+        title: '.NET Engineer',
+        technology: '.NET',
+        resourceType: 'TT',
+        description: 'Looking for .NET developer with Azure experience...',
+        receivedDate: '2023-05-16',
+        status: 'active'
+      }
+    ]);
+
+    // Resume pool
+    setResumePool([
+      {
+        id: 1,
+        candidateId: 1,
+        candidateName: 'John Doe',
+        technology: 'Java',
+        resourceType: 'TT',
+        fileName: 'John_Doe_Java.pdf',
+        receivedDate: '2023-05-18',
+        status: 'received'
+      },
+      {
+        id: 2,
+        candidateId: 3,
+        candidateName: 'Mike Johnson',
+        technology: '.NET',
+        resourceType: 'TT',
+        fileName: 'Mike_Johnson_NET.pdf',
+        receivedDate: '2023-05-19',
+        status: 'received'
+      }
+    ]);
+
+    // Shortlisted candidates
+    setShortlistedCandidates([
+      {
+        id: 1,
+        candidateId: 1,
+        candidateName: 'John Doe',
+        technology: 'Java',
+        resourceType: 'TT',
+        status: 'shortlisted',
+        jdId: 101,
+        clientId: 1,
+        clientName: 'Tech Corp',
+        jdTitle: 'Java Developer Position'
+      },
+      {
+        id: 2,
+        candidateId: 3,
+        candidateName: 'Mike Johnson',
+        technology: '.NET',
+        resourceType: 'TT',
+        status: 'shortlisted',
+        jdId: 103,
+        clientId: 2,
+        clientName: 'Data Systems',
+        jdTitle: '.NET Engineer'
+      }
+    ]);
+
+    // Deployment stats
+    setDeploymentStats({
+      profilesSent: 24,
+      resumesSent: 18,
+      interviewsScheduled: 12,
+      deployed: 8,
+      rejected: 4
+    });
   }, []);
 
-  const filteredCandidates = candidates.filter(candidate => {
-    const matchesSearch = candidate.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         candidate.skill.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTech = filterTech === 'all' || candidate.skill === filterTech;
-    const matchesStatus = filterStatus === 'all' || candidate.status === filterStatus;
-    const matchesResourceType = filterResourceType === 'all' || candidate.resourceType === filterResourceType;
-    
-    return matchesSearch && matchesTech && matchesStatus && matchesResourceType;
-  });
+  // New function to handle shortlisted resumes notification
+  const notifyShortlistedCandidates = (candidateIds, interviewDetails) => {
+    // Update the interview status for these candidates
+    const updatedInterviews = clientInterviews.map(interview => {
+      if (candidateIds.includes(interview.candidateId)) {
+        const updatedLevels = interview.levels.map(level => {
+          if (level.number === interviewDetails.level) {
+            return {
+              ...level,
+              date: interviewDetails.date,
+              time: interviewDetails.time,
+              mode: interviewDetails.mode,
+              link: interviewDetails.link,
+              location: interviewDetails.location,
+              notified: true
+            };
+          }
+          return level;
+        });
+        
+        return {
+          ...interview,
+          levels: updatedLevels
+        };
+      }
+      return interview;
+    });
 
-  const filteredInterviews = clientInterviews.filter(interview => {
-    return interview.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-           interview.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           interview.jd.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+    setClientInterviews(updatedInterviews);
 
-  const filteredClients = clients.filter(client => {
-    return client.name.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+    // Send notification to candidates (in a real app, this would be an API call)
+    candidateIds.forEach(id => {
+      const candidate = candidates.find(c => c.id === id);
+      if (candidate) {
+        console.log(`Notification sent to ${candidate.name} at ${candidate.email}`);
+        // This would be replaced with actual email/sms sending logic
+      }
+    });
 
-  const conversionData = [
-    { name: 'Hired', value: 65 },
-    { name: 'In Process', value: 20 },
-    { name: 'Rejected', value: 15 }
-  ];
-
-  const revenueData = [
-    { name: 'Jan', revenue: 4000 },
-    { name: 'Feb', revenue: 3000 },
-    { name: 'Mar', revenue: 5000 },
-    { name: 'Apr', revenue: 6000 },
-    { name: 'May', revenue: 4500 }
-  ];
-
-  const placementTrendData = [
-    { name: 'Jan', placements: 5 },
-    { name: 'Feb', placements: 8 },
-    { name: 'Mar', placements: 12 },
-    { name: 'Apr', placements: 10 },
-    { name: 'May', placements: 7 }
-  ];
-
-  const techPlacementData = [
-    { name: 'Java', placements: 15 },
-    { name: 'Python', placements: 12 },
-    { name: '.NET', placements: 8 },
-    { name: 'DevOps', placements: 10 },
-    { name: 'SalesForce', placements: 5 },
-    { name: 'UI', placements: 7 },
-    { name: 'Testing', placements: 3 }
-  ];
-
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28'];
-
-  const getTotalPlacements = () => {
-    return candidates.filter(c => c.status === 'hired').length;
+    // Close the scheduler
+    setShowInterviewScheduler(false);
+    setSelectedForInterview([]);
+    setInterviewDetails({
+      level: 1,
+      date: '',
+      time: '',
+      mode: 'virtual',
+      link: '',
+      location: '',
+      notes: ''
+    });
   };
 
-  const getPlacementRate = () => {
-    const totalInterviews = clientInterviews.length;
-    const successfulInterviews = clientInterviews.filter(i => i.result === 'passed').length;
-    return totalInterviews > 0 ? Math.round((successfulInterviews / totalInterviews) * 100) : 0;
+  // New function to open the interview scheduler
+  const openInterviewScheduler = (candidateIds) => {
+    setSelectedForInterview(candidateIds);
+    setShowInterviewScheduler(true);
   };
 
-  const getAvgTimeToHire = () => {
-    return '22 days';
+  // Filter functions
+  const filterCandidates = (candidates) => {
+    return candidates.filter(candidate => {
+      const matchesSearch = candidate.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          candidate.technology.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesTech = filterTech === 'all' || candidate.technology === filterTech;
+      const matchesStatus = filterStatus === 'all' || candidate.status === filterStatus;
+      const matchesResourceType = filterResourceType === 'all' || candidate.resourceType === filterResourceType;
+      
+      return matchesSearch && matchesTech && matchesStatus && matchesResourceType;
+    });
+  };
+
+  const filterInterviews = (interviews) => {
+    return interviews.filter(interview => {
+      const matchesSearch = interview.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          interview.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          interview.jd.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesLevel = filterInterviewLevel === 'all' || 
+                         interview.levels.some(level => level.number.toString() === filterInterviewLevel);
+      
+      return matchesSearch && matchesLevel;
+    });
+  };
+
+  // Tab components
+  const JDTab = () => {
+    const filteredJDs = jobDescriptions.filter(jd => 
+      jd.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      jd.clientName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className={styles.contentSection}
+      >
+        <div className={styles.filterSection}>
+          <div className={styles.searchBox}>
+            <FiSearch className={styles.searchIcon} />
+            <input 
+              type="text" 
+              placeholder="Search JDs..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
+          <button 
+            className={`${styles.button} ${styles.primary}`}
+            onClick={() => setSelectedJD('new')}
+          >
+            <FiFileText /> Add New JD
+          </button>
+        </div>
+
+        {filteredJDs.length > 0 ? (
+          <div className={styles.cardGrid}>
+            {filteredJDs.map(jd => (
+              <motion.div
+                key={jd.id}
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className={styles.jdCard}
+                onClick={() => setSelectedJD(jd)}
+              >
+                <div className={styles.jdHeader}>
+                  <h3 className={styles.jdTitle}>{jd.title}</h3>
+                  <span className={styles.jdClient}>{jd.clientName}</span>
+                </div>
+
+                <div className={styles.jdDetails}>
+                  <p>
+                    <strong>Technology:</strong> 
+                    <span className={`${styles.techBadge} ${styles[jd.technology.toLowerCase()]}`}>
+                      {jd.technology}
+                    </span>
+                    <span className={`${styles.resourceBadge} ${styles[jd.resourceType.toLowerCase()]}`}>
+                      {jd.resourceType}
+                    </span>
+                  </p>
+                  <p><strong>Received:</strong> {jd.receivedDate}</p>
+                  <p><strong>Status:</strong> 
+                    <span className={`${styles.statusBadge} ${styles[jd.status]}`}>
+                      {jd.status}
+                    </span>
+                  </p>
+                </div>
+
+                <div className={styles.jdActions}>
+                  <button 
+                    className={`${styles.button} ${styles.primary}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Open JD sharing modal
+                    }}
+                  >
+                    <FiShare2 /> Share JD
+                  </button>
+                  <button className={`${styles.button} ${styles.secondary}`}>
+                    <FiUsers /> View Candidates
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.emptyState}>
+            <FiBook size={48} />
+            <h4>No Job Descriptions found</h4>
+            <p>Add new JDs received from clients or adjust your search.</p>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  const ResumePoolTab = () => {
+    const filteredResumes = resumePool.filter(resume => 
+      resume.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      resume.technology.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className={styles.contentSection}
+      >
+        <div className={styles.filterSection}>
+          <div className={styles.searchBox}>
+            <FiSearch className={styles.searchIcon} />
+            <input 
+              type="text" 
+              placeholder="Search resumes..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
+          <button 
+            className={`${styles.button} ${styles.primary}`}
+            onClick={() => {/* Open bulk upload modal */}}
+          >
+            <FiUpload /> Bulk Upload
+          </button>
+        </div>
+
+        {filteredResumes.length > 0 ? (
+          <div className={styles.tableContainer}>
+            <table className={styles.resumeTable}>
+              <thead>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Technology</th>
+                  <th>Resource Type</th>
+                  <th>Received</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredResumes.map(resume => (
+                  <tr key={resume.id}>
+                    <td>{resume.candidateName}</td>
+                    <td>
+                      <span className={`${styles.techBadge} ${styles[resume.technology.toLowerCase()]}`}>
+                        {resume.technology}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`${styles.resourceBadge} ${styles[resume.resourceType.toLowerCase()]}`}>
+                        {resume.resourceType}
+                      </span>
+                    </td>
+                    <td>{resume.receivedDate}</td>
+                    <td>
+                      <span className={`${styles.statusBadge} ${styles[resume.status]}`}>
+                        {resume.status}
+                      </span>
+                    </td>
+                    <td>
+                      <button className={`${styles.button} ${styles.small}`}>
+                        <FiDownload /> Download
+                      </button>
+                      <button className={`${styles.button} ${styles.small} ${styles.primary}`}>
+                        <FiCheck /> Shortlist
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className={styles.emptyState}>
+            <FiUpload size={48} />
+            <h4>No resumes in pool</h4>
+            <p>Upload resumes received from candidates or adjust your search.</p>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  const ShortlistedTab = () => {
+    const filteredShortlisted = shortlistedCandidates.filter(candidate => 
+      candidate.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      candidate.technology.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className={styles.contentSection}
+      >
+        <div className={styles.filterSection}>
+          <div className={styles.searchBox}>
+            <FiSearch className={styles.searchIcon} />
+            <input 
+              type="text" 
+              placeholder="Search shortlisted..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
+        </div>
+
+        {filteredShortlisted.length > 0 ? (
+          <div className={styles.cardGrid}>
+            {filteredShortlisted.map(candidate => (
+              <motion.div
+                key={candidate.id}
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className={styles.profileCard}
+              >
+                <div className={styles.profileHeader}>
+                  <h3 className={styles.profileName}>{candidate.candidateName}</h3>
+                  <span className={`${styles.statusBadge} ${styles.shortlisted}`}>
+                    Shortlisted
+                  </span>
+                </div>
+
+                <div className={styles.profileDetails}>
+                  <p>
+                    <strong>Technology:</strong> 
+                    <span className={`${styles.techBadge} ${styles[candidate.technology.toLowerCase()]}`}>
+                      {candidate.technology}
+                    </span>
+                    <span className={`${styles.resourceBadge} ${styles[candidate.resourceType.toLowerCase()]}`}>
+                      {candidate.resourceType}
+                    </span>
+                  </p>
+                  <p><strong>For JD:</strong> {candidate.jdTitle}</p>
+                </div>
+
+                <div className={styles.profileActions}>
+                  <button className={`${styles.button} ${styles.secondary}`}>
+                    <FiFileText /> View Resume
+                  </button>
+                  <button 
+                    className={`${styles.button} ${styles.primary}`}
+                    onClick={() => openInterviewScheduler([candidate.candidateId])}
+                  >
+                    <FiCalendar /> Schedule Interview
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.emptyState}>
+            <FiUserCheck size={48} />
+            <h4>No shortlisted candidates</h4>
+            <p>Shortlist candidates from the resume pool to proceed with client submission.</p>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  const InterviewsTab = () => {
+    const filteredInterviews = filterInterviews(clientInterviews);
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className={styles.contentSection}
+      >
+        <div className={styles.filterSection}>
+          <div className={styles.searchBox}>
+            <FiSearch className={styles.searchIcon} />
+            <input 
+              type="text" 
+              placeholder="Search interviews..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
+          <div className={styles.filterGroup}>
+            <label>Interview Level</label>
+            <select 
+              value={filterInterviewLevel} 
+              onChange={(e) => setFilterInterviewLevel(e.target.value)}
+              className={styles.filterSelect}
+            >
+              <option value="all">All Levels</option>
+              <option value="1">Level 1</option>
+              <option value="2">Level 2</option>
+              <option value="3">Level 3</option>
+            </select>
+          </div>
+        </div>
+
+        {filteredInterviews.length > 0 ? (
+          <div>
+            {filteredInterviews.map(interview => (
+              <motion.div
+                key={interview.id}
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className={styles.interviewCard}
+              >
+                <div className={styles.interviewHeader}>
+                  <div>
+                    <h4 className={styles.interviewTitle}>
+                      {interview.client} - {interview.candidateName}
+                    </h4>
+                    <div className={styles.interviewMeta}>
+                      <span><FiFileText /> {interview.jd}</span>
+                      <span className={`${styles.statusBadge} ${styles[interview.overallStatus]}`}>
+                        {interview.overallStatus.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.interviewLevels}>
+                  {interview.levels.map(level => (
+                    <div 
+                      key={level.number} 
+                      className={`${styles.level} ${styles[level.status]}`}
+                    >
+                      <div className={styles.levelHeader}>
+                        <span className={styles.levelNumber}>Level {level.number}</span>
+                        <span className={styles.levelDate}>{level.date} at {level.time}</span>
+                        <span className={styles.levelStatus}>
+                          {level.status}
+                          {level.notified && <FiCheck className={styles.notifiedIcon} title="Candidate notified" />}
+                        </span>
+                      </div>
+                      
+                      {level.status === 'scheduled' && (
+                        <div className={styles.levelDetails}>
+                          <p><strong>Mode:</strong> {level.mode}</p>
+                          {level.mode === 'virtual' && (
+                            <p><strong>Link:</strong> <a href={level.link} target="_blank" rel="noopener noreferrer">{level.link}</a></p>
+                          )}
+                          {level.mode === 'in-person' && (
+                            <p><strong>Location:</strong> {level.location}</p>
+                          )}
+                          {!level.notified && (
+                            <button 
+                              className={`${styles.button} ${styles.small} ${styles.primary}`}
+                              onClick={() => openInterviewScheduler([interview.candidateId])}
+                            >
+                              <FiMail /> Send Schedule to Candidate
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      
+                      {level.status === 'completed' && (
+                        <div className={styles.levelDetails}>
+                          <div className={styles.scoreMeter}>
+                            <span>Technical: {level.techScore}/10</span>
+                            <div className={styles.scoreBar}>
+                              <div 
+                                className={styles.scoreFill}
+                                style={{ width: `${level.techScore * 10}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div className={styles.scoreMeter}>
+                            <span>Communication: {level.commScore}/10</span>
+                            <div className={styles.scoreBar}>
+                              <div 
+                                className={styles.scoreFill}
+                                style={{ width: `${level.commScore * 10}%` }}
+                              />
+                            </div>
+                          </div>
+                          {level.feedback && (
+                            <div className={styles.feedback}>
+                              <strong>Feedback:</strong> {level.feedback}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {interview.overallStatus === 'completed' && (
+                  <div className={styles.interviewOutcome}>
+                    <h5>Final Outcome</h5>
+                    {interview.result === 'hired' ? (
+                      <div className={styles.outcomeHired}>
+                        <FiUserCheck /> Candidate Hired
+                      </div>
+                    ) : (
+                      <div className={styles.outcomeRejected}>
+                        <FiUserX /> Candidate Rejected
+                        <FeedbackSection 
+                          candidate={interview.candidateName} 
+                          interview={interview} 
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className={styles.interviewActions}>
+                  {interview.levels.some(l => l.status === 'scheduled') && (
+                    <>
+                      <button className={`${styles.button} ${styles.primary}`}>
+                        Confirm Interview
+                      </button>
+                      <button className={`${styles.button} ${styles.secondary}`}>
+                        Reschedule
+                      </button>
+                    </>
+                  )}
+                  
+                  {interview.overallStatus === 'in_process' && (
+                    <button className={`${styles.button} ${styles.success}`}>
+                      Mark as Completed
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.emptyState}>
+            <FiCalendar size={48} />
+            <h4>No interviews scheduled</h4>
+            <p>When candidates are sent to clients, their interviews will appear here.</p>
+          </div>
+        )}
+
+        {/* Interview Scheduler Modal */}
+        {showInterviewScheduler && (
+          <div className={styles.modalOverlay}>
+            <motion.div 
+              className={styles.modal}
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+            >
+              <div className={styles.modalHeader}>
+                <h3>Schedule Client Interview</h3>
+                <button 
+                  className={styles.closeButton}
+                  onClick={() => setShowInterviewScheduler(false)}
+                >
+                  <FiX />
+                </button>
+              </div>
+              
+              <div className={styles.modalContent}>
+                <div className={styles.formGroup}>
+                  <label>Interview Level</label>
+                  <select
+                    value={interviewDetails.level}
+                    onChange={(e) => setInterviewDetails({
+                      ...interviewDetails,
+                      level: parseInt(e.target.value)
+                    })}
+                  >
+                    <option value={1}>Level 1</option>
+                    <option value={2}>Level 2</option>
+                    <option value={3}>Level 3</option>
+                  </select>
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label>Date</label>
+                  <input
+                    type="date"
+                    value={interviewDetails.date}
+                    onChange={(e) => setInterviewDetails({
+                      ...interviewDetails,
+                      date: e.target.value
+                    })}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label>Time</label>
+                  <input
+                    type="time"
+                    value={interviewDetails.time}
+                    onChange={(e) => setInterviewDetails({
+                      ...interviewDetails,
+                      time: e.target.value
+                    })}
+                  />
+                </div>
+                
+                <div className={styles.formGroup}>
+                  <label>Mode</label>
+                  <select
+                    value={interviewDetails.mode}
+                    onChange={(e) => setInterviewDetails({
+                      ...interviewDetails,
+                      mode: e.target.value
+                    })}
+                  >
+                    <option value="virtual">Virtual</option>
+                    <option value="in-person">In-Person</option>
+                  </select>
+                </div>
+                
+                {interviewDetails.mode === 'virtual' && (
+                  <div className={styles.formGroup}>
+                    <label>Meeting Link</label>
+                    <input
+                      type="text"
+                      placeholder="https://meet.example.com/interview"
+                      value={interviewDetails.link}
+                      onChange={(e) => setInterviewDetails({
+                        ...interviewDetails,
+                        link: e.target.value
+                      })}
+                    />
+                  </div>
+                )}
+                
+                {interviewDetails.mode === 'in-person' && (
+                  <div className={styles.formGroup}>
+                    <label>Location</label>
+                    <input
+                      type="text"
+                      placeholder="Company Address"
+                      value={interviewDetails.location}
+                      onChange={(e) => setInterviewDetails({
+                        ...interviewDetails,
+                        location: e.target.value
+                      })}
+                    />
+                  </div>
+                )}
+                
+                <div className={styles.formGroup}>
+                  <label>Additional Notes</label>
+                  <textarea
+                    placeholder="Any special instructions for the candidate..."
+                    value={interviewDetails.notes}
+                    onChange={(e) => setInterviewDetails({
+                      ...interviewDetails,
+                      notes: e.target.value
+                    })}
+                  />
+                </div>
+                
+                <div className={styles.modalFooter}>
+                  <button 
+                    className={`${styles.button} ${styles.secondary}`}
+                    onClick={() => setShowInterviewScheduler(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className={`${styles.button} ${styles.primary}`}
+                    onClick={() => notifyShortlistedCandidates(selectedForInterview, interviewDetails)}
+                  >
+                    <FiSend /> Send Schedule to Candidates
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  const DeploymentsTab = () => {
+    const deploymentData = [
+      { name: 'Profiles Sent', value: deploymentStats.profilesSent, color: '#6366F1' },
+      { name: 'Resumes Sent', value: deploymentStats.resumesSent, color: '#8B5CF6' },
+      { name: 'Interviews', value: deploymentStats.interviewsScheduled, color: '#EC4899' },
+      { name: 'Deployed', value: deploymentStats.deployed, color: '#10B981' },
+      { name: 'Rejected', value: deploymentStats.rejected, color: '#EF4444' }
+    ];
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className={styles.contentSection}
+      >
+        <div className={styles.deploymentOverview}>
+          <h3>Deployment Pipeline</h3>
+          
+          <div className={styles.pipeline}>
+            {deploymentData.map((stage, index) => (
+              <motion.div 
+                key={stage.name}
+                className={styles.pipelineStage}
+                whileHover={{ scale: 1.05 }}
+              >
+                <div 
+                  className={styles.stageIndicator}
+                  style={{ backgroundColor: stage.color }}
+                />
+                <div className={styles.stageContent}>
+                  <div className={styles.stageName}>{stage.name}</div>
+                  <div className={styles.stageValue}>{stage.value}</div>
+                </div>
+                {index < deploymentData.length - 1 && (
+                  <div className={styles.stageConnector} />
+                )}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.chartGrid}>
+          <div className={styles.chartContainer}>
+            <h4>Deployment Conversion</h4>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={deploymentData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                >
+                  {deploymentData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className={styles.chartContainer}>
+            <h4>Monthly Placements</h4>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart
+                data={[
+                  { name: 'Jan', deployed: 5, rejected: 2 },
+                  { name: 'Feb', deployed: 8, rejected: 3 },
+                  { name: 'Mar', deployed: 12, rejected: 4 },
+                  { name: 'Apr', deployed: 10, rejected: 3 },
+                  { name: 'May', deployed: 7, rejected: 1 }
+                ]}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="deployed" fill="#10B981" name="Deployed" />
+                <Bar dataKey="rejected" fill="#EF4444" name="Rejected" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className={styles.techPlacementContainer}>
+          <h4>Placements by Technology</h4>
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart
+              data={[
+                { name: 'Java', deployed: 15, rejected: 5 },
+                { name: 'Python', deployed: 12, rejected: 4 },
+                { name: '.NET', deployed: 8, rejected: 3 },
+                { name: 'DevOps', deployed: 10, rejected: 2 },
+                { name: 'SalesForce', deployed: 5, rejected: 2 },
+                { name: 'UI', deployed: 7, rejected: 3 },
+                { name: 'Testing', deployed: 3, rejected: 1 }
+              ]}
+              layout="vertical"
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" />
+              <YAxis dataKey="name" type="category" width={100} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="deployed" fill="#10B981" name="Deployed" />
+              <Bar dataKey="rejected" fill="#EF4444" name="Rejected" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </motion.div>
+    );
+  };
+
+  const FeedbackSection = ({ candidate, interview }) => {
+    const [techScore, setTechScore] = useState(0);
+    const [commScore, setCommScore] = useState(0);
+    const [feedback, setFeedback] = useState('');
+
+    return (
+      <div className={styles.feedbackForm}>
+        <div className={styles.feedbackToggle}>
+          <span>Send feedback to candidate</span>
+          <label className={styles.toggleSwitch}>
+            <input 
+              type="checkbox" 
+              checked={sendFeedback}
+              onChange={() => setSendFeedback(!sendFeedback)}
+            />
+            <span className={styles.slider}></span>
+          </label>
+        </div>
+
+        {sendFeedback && (
+          <div className={styles.feedbackFields}>
+            <div className={styles.scoreInput}>
+              <label>Technical Score (1-10)</label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={techScore}
+                onChange={(e) => setTechScore(e.target.value)}
+              />
+            </div>
+            
+            <div className={styles.scoreInput}>
+              <label>Communication Score (1-10)</label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={commScore}
+                onChange={(e) => setCommScore(e.target.value)}
+              />
+            </div>
+            
+            <div className={styles.feedbackInput}>
+              <label>Detailed Feedback</label>
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Provide constructive feedback for the candidate..."
+              />
+            </div>
+            
+            <button 
+              className={`${styles.button} ${styles.primary}`}
+              onClick={() => {
+                // Save feedback
+                alert(`Feedback sent to ${candidate}`);
+                setSendFeedback(false);
+              }}
+            >
+              Send Feedback
+            </button>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'profiles':
-        return (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            className={styles.contentSection}
-          >
-            <div className={styles.filterSection}>
-              <div className={styles.searchBox}>
-                <FiSearch className={styles.searchIcon} />
-                <input 
-                  type="text" 
-                  placeholder="Search candidates..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className={styles.searchInput}
-                />
-              </div>
-              <button 
-                className={`${styles.button} ${styles.secondary}`}
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <FiFilter /> {showFilters ? 'Hide Filters' : 'Show Filters'}
-              </button>
-            </div>
-
-            <AnimatePresence>
-              {showFilters && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className={styles.filterControls}
-                >
-                  <div className={styles.filterGroup}>
-                    <label className={styles.filterLabel}>Technology</label>
-                    <select 
-                      value={filterTech} 
-                      onChange={(e) => setFilterTech(e.target.value)}
-                      className={styles.filterSelect}
-                    >
-                      <option value="all">All Technologies</option>
-                      <option value="Java">Java</option>
-                      <option value="Python">Python</option>
-                      <option value=".NET">.NET</option>
-                      <option value="DevOps">DevOps</option>
-                      <option value="SalesForce">SalesForce</option>
-                      <option value="UI">UI</option>
-                      <option value="Testing">Testing</option>
-                    </select>
-                  </div>
-
-                  <div className={styles.filterGroup}>
-                    <label className={styles.filterLabel}>Status</label>
-                    <select 
-                      value={filterStatus} 
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                      className={styles.filterSelect}
-                    >
-                      <option value="all">All Statuses</option>
-                      <option value="profile_received">Profile Received</option>
-                      <option value="resume_sent">Resume Sent</option>
-                      <option value="interview_scheduled">Interview Scheduled</option>
-                      <option value="hired">Hired</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                  </div>
-
-                  <div className={styles.filterGroup}>
-                    <label className={styles.filterLabel}>Resource Type</label>
-                    <select 
-                      value={filterResourceType} 
-                      onChange={(e) => setFilterResourceType(e.target.value)}
-                      className={styles.filterSelect}
-                    >
-                      <option value="all">All Types</option>
-                      <option value="TCT">TCT</option>
-                      <option value="TT">TT</option>
-                    </select>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {filteredCandidates.length > 0 ? (
-              <div className={styles.cardGrid}>
-                {filteredCandidates.map(candidate => (
-                  <motion.div
-                    key={candidate.id}
-                    layout
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className={styles.profileCard}
-                    onClick={() => setSelectedCandidate(candidate)}
-                  >
-                    <div className={styles.profileHeader}>
-                      <h3 className={styles.profileName}>{candidate.name}</h3>
-                      <span className={`${styles.statusBadge} ${styles[candidate.status]}`}>
-                        {candidate.status.replace('_', ' ')}
-                      </span>
-                    </div>
-
-                    <div className={styles.profileDetails}>
-                      <p>
-                        <strong>Technology:</strong> 
-                        <span className={`${styles.techBadge} ${styles[candidate.skill.toLowerCase()]}`}>{candidate.skill}</span>
-                        <span className={`${styles.resourceBadge} ${styles[candidate.resourceType.toLowerCase()]}`}>{candidate.resourceType}</span>
-                      </p>
-                      <p><strong>Level:</strong> {candidate.level}</p>
-                      <p><strong>Mock Scores:</strong> Tech: {candidate.mockTechScore}/10, Comm: {candidate.mockCommScore}/10</p>
-                      <p><strong>Last Updated:</strong> {candidate.lastUpdated}</p>
-                    </div>
-
-                    <div className={styles.profileActions}>
-                      <button className={`${styles.button} ${styles.secondary}`}>
-                        <FiFileText /> View Resume
-                      </button>
-                      {candidate.status === 'profile_received' && (
-                        <button 
-                          className={`${styles.button} ${styles.primary}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            alert(`Resume of ${candidate.name} sent to clients`);
-                          }}
-                        >
-                          <FiSend /> Send to Client
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.emptyState}>
-                <FiUsers size={48} />
-                <h4>No candidates found</h4>
-                <p>Adjust your search or filters to find candidates for client placement.</p>
-              </div>
-            )}
-          </motion.div>
-        );
+      case 'jds':
+        return <JDTab />;
+      case 'resumePool':
+        return <ResumePoolTab />;
+      case 'shortlisted':
+        return <ShortlistedTab />;
       case 'interviews':
-        return (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            className={styles.contentSection}
-          >
-            <div className={styles.filterSection}>
-              <div className={styles.searchBox}>
-                <FiSearch className={styles.searchIcon} />
-                <input 
-                  type="text" 
-                  placeholder="Search interviews..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className={styles.searchInput}
-                />
-              </div>
-            </div>
-
-            {filteredInterviews.length > 0 ? (
-              <div>
-                {filteredInterviews.map(interview => (
-                  <motion.div
-                    key={interview.id}
-                    layout
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className={styles.interviewCard}
-                  >
-                    <div className={styles.interviewHeader}>
-                      <div>
-                        <h4 className={styles.interviewTitle}>
-                          {interview.client} - {interview.candidateName}
-                        </h4>
-                        <div className={styles.interviewMeta}>
-                          <span><FiCalendar /> {interview.date}</span>
-                          <span>Level: {interview.level}</span>
-                          <span className={`${styles.statusBadge} ${styles[interview.status]}`}>
-                            {interview.status}
-                          </span>
-                          {interview.result && (
-                            <span className={interview.result === 'passed' ? styles.resultSuccess : styles.resultFailure}>
-                              {interview.result === 'passed' ? 'Passed' : 'Rejected'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className={styles.interviewDetails}>
-                      <p><strong>For JD:</strong> {interview.jd}</p>
-                      
-                      {interview.status === 'completed' && (
-                        <div>
-                          <div className={styles.scoreMeter}>
-                            <div className={styles.scoreLabel}>
-                              <span>Technical: {interview.techScore}/10</span>
-                            </div>
-                            <div className={styles.scoreBar}>
-                              <div 
-                                className={styles.scoreFill}
-                                data-score={interview.techScore}
-                                style={{ width: `${interview.techScore * 10}%` }}
-                              />
-                            </div>
-                          </div>
-
-                          <div className={styles.scoreMeter}>
-                            <div className={styles.scoreLabel}>
-                              <span>Communication: {interview.commScore}/10</span>
-                            </div>
-                            <div className={styles.scoreBar}>
-                              <div 
-                                className={styles.scoreFill}
-                                data-score={interview.commScore}
-                                style={{ width: `${interview.commScore * 10}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {interview.feedback && (
-                      <div className={styles.feedbackSection}>
-                        <h5>Client Feedback</h5>
-                        <p>{interview.feedback}</p>
-                      </div>
-                    )}
-
-                    <div className={styles.profileActions}>
-                      {interview.status === 'scheduled' && (
-                        <>
-                          <button className={`${styles.button} ${styles.primary}`}>
-                            Confirm
-                          </button>
-                          <button className={`${styles.button} ${styles.secondary}`}>
-                            Reschedule
-                          </button>
-                        </>
-                      )}
-                      
-                      {interview.status === 'completed' && (
-                        <button 
-                          className={`${styles.button} ${interview.result === 'passed' ? styles.success : styles.danger}`}
-                          onClick={() => {
-                            alert(`Candidate ${interview.candidateName} marked as hired`);
-                          }}
-                        >
-                          {interview.result === 'passed' ? 'Mark as Hired' : 'Rejected'}
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.emptyState}>
-                <FiCalendar size={48} />
-                <h4>No interviews scheduled</h4>
-                <p>When candidates are sent to clients, their interviews will appear here.</p>
-              </div>
-            )}
-          </motion.div>
-        );
-      case 'clients':
-        return (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            className={styles.contentSection}
-          >
-            <div className={styles.filterSection}>
-              <div className={styles.searchBox}>
-                <FiSearch className={styles.searchIcon} />
-                <input 
-                  type="text" 
-                  placeholder="Search clients..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className={styles.searchInput}
-                />
-              </div>
-              <button 
-                className={`${styles.button} ${styles.primary}`}
-                onClick={() => setSelectedClient('new')}
-              >
-                <FiUserPlus /> Add New Client
-              </button>
-            </div>
-
-            {filteredClients.length > 0 ? (
-              <div className={styles.cardGrid}>
-                {filteredClients.map(client => (
-                  <motion.div
-                    key={client.id}
-                    layout
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className={styles.clientCard}
-                    onClick={() => setSelectedClient(client.name)}
-                  >
-                    <h4 className={styles.clientName}>{client.name}</h4>
-                    <div className={styles.clientDetails}>
-                      <p><strong>Contact:</strong> {client.contact}</p>
-                      <p><strong>Active Positions:</strong> {client.activePositions}</p>
-                      <p>
-                        <strong>Technologies:</strong> 
-                        {client.technologies.map(tech => (
-                          <span key={tech} className={`${styles.techBadge} ${styles[tech.toLowerCase()]}`}>{tech}</span>
-                        ))}
-                      </p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.emptyState}>
-                <FiBriefcase size={48} />
-                <h4>No clients found</h4>
-                <p>Add new clients or adjust your search to view client information.</p>
-              </div>
-            )}
-          </motion.div>
-        );
-      case 'reports':
-        return (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            className={styles.contentSection}
-          >
-            <div className={styles.statsGrid}>
-              <motion.div whileHover={{ scale: 1.05 }} className={styles.statCard}>
-                <h5><FiUsers /> Total Placements</h5>
-                <div className={styles.statValue}>{getTotalPlacements()}</div>
-                <div className={`${styles.statLabel} ${styles.up}`}>
-                  <FiBarChart2 /> 12% increase from last month
-                </div>
-              </motion.div>
-
-              <motion.div whileHover={{ scale: 1.05 }} className={styles.statCard}>
-                <h5><FiAward /> Placement Rate</h5>
-                <div className={styles.statValue}>{getPlacementRate()}%</div>
-                <div className={`${styles.statLabel} ${styles.up}`}>
-                  <FiBarChart2 /> 5% increase from last quarter
-                </div>
-              </motion.div>
-
-              <motion.div whileHover={{ scale: 1.05 }} className={styles.statCard}>
-                <h5><FiDollarSign /> Revenue</h5>
-                <div className={styles.statValue}>$125K</div>
-                <div className={`${styles.statLabel} ${styles.up}`}>
-                  <FiBarChart2 /> 18% increase YTD
-                </div>
-              </motion.div>
-
-              <motion.div whileHover={{ scale: 1.05 }} className={styles.statCard}>
-                <h5><FiClock /> Avg Time to Hire</h5>
-                <div className={styles.statValue}>{getAvgTimeToHire()}</div>
-                <div className={`${styles.statLabel} ${styles.down}`}>
-                  <FiBarChart2 /> 3 days longer than last quarter
-                </div>
-              </motion.div>
-            </div>
-
-            <div className={styles.chartContainer}>
-              <h4><FiBarChart2 /> Placement Trend</h4>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={placementTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="name" stroke="#64748b" />
-                  <YAxis stroke="#64748b" />
-                  <Tooltip />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="placements" 
-                    stroke="#3b82f6" 
-                    strokeWidth={2}
-                    activeDot={{ r: 8 }} 
-                    name="Placements" 
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className={styles.chartGrid}>
-              <div className={styles.chartContainer}>
-                <h4><FiPieChart /> Placement by Technology</h4>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={techPlacementData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="name" stroke="#64748b" />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip />
-                    <Bar 
-                      dataKey="placements" 
-                      name="Placements" 
-                      fill="#8884d8" 
-                      radius={[4, 4, 0, 0]}
-                    >
-                      {techPlacementData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className={styles.chartContainer}>
-                <h4><FiPieChart /> Conversion Rate</h4>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={conversionData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {conversionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </motion.div>
-        );
+        return <InterviewsTab />;
+      case 'deployments':
+        return <DeploymentsTab />;
       default:
         return null;
     }
@@ -694,14 +1161,14 @@ const SalesTeamDashboard = () => {
     <div className={styles.dashboardContainer}>
       <div className={styles.dashboardHeader}>
         <h1 className={styles.headerTitle}>
-          <FiBriefcase /> Sales Team Dashboard
+          <FiBriefcase /> AJA Sales Team Dashboard
         </h1>
         <div className={styles.headerStats}>
           <div className={styles.statBadge}>
             <FiUsers /> <span>{candidates.length}</span> Candidates
           </div>
           <div className={styles.statBadge}>
-            <FiCheck /> <span>{candidates.filter(c => c.status === 'hired').length}</span> Hired
+            <FiCheck /> <span>{deploymentStats.deployed}</span> Deployed
           </div>
           <div className={styles.statBadge}>
             <FiDollarSign /> <span>$125K</span> Revenue
@@ -711,10 +1178,22 @@ const SalesTeamDashboard = () => {
       
       <div className={styles.tabsContainer}>
         <button 
-          className={`${styles.tabButton} ${activeTab === 'profiles' ? styles.active : ''}`}
-          onClick={() => setActiveTab('profiles')}
+          className={`${styles.tabButton} ${activeTab === 'jds' ? styles.active : ''}`}
+          onClick={() => setActiveTab('jds')}
         >
-          <FiUsers /> Candidate Profiles
+          <FiFileText /> Job Descriptions
+        </button>
+        <button 
+          className={`${styles.tabButton} ${activeTab === 'resumePool' ? styles.active : ''}`}
+          onClick={() => setActiveTab('resumePool')}
+        >
+          <FiUpload /> Resume Pool
+        </button>
+        <button 
+          className={`${styles.tabButton} ${activeTab === 'shortlisted' ? styles.active : ''}`}
+          onClick={() => setActiveTab('shortlisted')}
+        >
+          <FiCheck /> Shortlisted
         </button>
         <button 
           className={`${styles.tabButton} ${activeTab === 'interviews' ? styles.active : ''}`}
@@ -723,16 +1202,10 @@ const SalesTeamDashboard = () => {
           <FiCalendar /> Client Interviews
         </button>
         <button 
-          className={`${styles.tabButton} ${activeTab === 'clients' ? styles.active : ''}`}
-          onClick={() => setActiveTab('clients')}
+          className={`${styles.tabButton} ${activeTab === 'deployments' ? styles.active : ''}`}
+          onClick={() => setActiveTab('deployments')}
         >
-          <FiBriefcase /> Clients
-        </button>
-        <button 
-          className={`${styles.tabButton} ${activeTab === 'reports' ? styles.active : ''}`}
-          onClick={() => setActiveTab('reports')}
-        >
-          <FiBarChart2 /> Reports
+          <FiSend /> Deployments
         </button>
       </div>
       
@@ -740,186 +1213,7 @@ const SalesTeamDashboard = () => {
         {renderTabContent()}
       </div>
       
-      <AnimatePresence>
-        {selectedCandidate && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={styles.modalOverlay}
-            onClick={() => setSelectedCandidate(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className={styles.modalContent}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3>{selectedCandidate.name}'s Profile</h3>
-              
-              <div className={styles.formGroup}>
-                <label>Candidate Information</label>
-                <div className={styles.candidateInfo}>
-                  <p><strong>Technology:</strong> 
-                    <span className={`${styles.techBadge} ${styles[selectedCandidate.skill.toLowerCase()]}`}>
-                      {selectedCandidate.skill}
-                    </span>
-                    <span className={`${styles.resourceBadge} ${styles[selectedCandidate.resourceType.toLowerCase()]}`}>
-                      {selectedCandidate.resourceType}
-                    </span>
-                  </p>
-                  <p><strong>Level:</strong> {selectedCandidate.level}</p>
-                  <p><strong>Mock Interview Scores:</strong> Technical: {selectedCandidate.mockTechScore}/10, Communication: {selectedCandidate.mockCommScore}/10</p>
-                  <p><strong>Status:</strong> 
-                    <span className={`${styles.statusBadge} ${styles[selectedCandidate.status]}`}>
-                      {selectedCandidate.status.replace('_', ' ')}
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              <div className={styles.formGroup}>
-                <label>Resume</label>
-                <div className={styles.resumeContainer}>
-                  <FiFileText size={32} color="#94a3b8" />
-                  <p>{selectedCandidate.resume}</p>
-                  <button className={`${styles.button} ${styles.secondary}`}>
-                    <FiDownload /> Download Resume
-                  </button>
-                </div>
-              </div>
-
-              <div className={styles.formGroup}>
-                <label>Send to Client</label>
-                <select 
-                  value={selectedClient}
-                  onChange={(e) => setSelectedClient(e.target.value)}
-                  className={styles.formSelect}
-                >
-                  <option value="">Select Client</option>
-                  {clients.map(client => (
-                    <option key={client.id} value={client.name}>{client.name}</option>
-                  ))}
-                </select>
-                
-                {selectedClient && (
-                  <>
-                    <label>Job Description</label>
-                    <textarea 
-                      placeholder="Paste job description here..."
-                      value={jd}
-                      onChange={(e) => setJd(e.target.value)}
-                      className={styles.formTextarea}
-                    />
-                  </>
-                )}
-              </div>
-
-              <div className={styles.modalActions}>
-                <button 
-                  className={`${styles.button} ${styles.primary}`}
-                  disabled={!selectedClient || !jd}
-                  onClick={() => {
-                    alert(`Profile of ${selectedCandidate.name} sent to ${selectedClient}`);
-                    setSelectedCandidate(null);
-                    setSelectedClient('');
-                    setJd('');
-                  }}
-                >
-                  <FiSend /> Send to Client
-                </button>
-                <button 
-                  className={`${styles.button} ${styles.secondary}`}
-                  onClick={() => setSelectedCandidate(null)}
-                >
-                  <FiX /> Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {selectedClient === 'new' && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={styles.modalOverlay}
-            onClick={() => setSelectedClient('')}
-          >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className={styles.modalContent}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3>Add New Client</h3>
-              
-              <div className={styles.formGroup}>
-                <label>Client Name</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g., Tech Solutions Inc." 
-                  className={styles.formInput}
-                />
-              </div>
-              
-              <div className={styles.formGroup}>
-                <label>Contact Email</label>
-                <input 
-                  type="email" 
-                  placeholder="e.g., hr@techsolutions.com" 
-                  className={styles.formInput}
-                />
-              </div>
-              
-              <div className={styles.formGroup}>
-                <label>Technologies Needed</label>
-                <div className={styles.techBadgeContainer}>
-                  {['Java', 'Python', '.NET', 'DevOps', 'SalesForce', 'UI', 'Testing'].map(tech => (
-                    <span 
-                      key={tech} 
-                      className={`${styles.techBadge} ${styles[tech.toLowerCase()]}`}
-                    >
-                      {tech}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              
-              <div className={styles.formGroup}>
-                <label>Notes</label>
-                <textarea 
-                  placeholder="Any additional information about the client..." 
-                  className={styles.formTextarea}
-                />
-              </div>
-
-              <div className={styles.modalActions}>
-                <button 
-                  className={`${styles.button} ${styles.primary}`}
-                  onClick={() => {
-                    alert('New client added successfully');
-                    setSelectedClient('');
-                  }}
-                >
-                  <FiCheck /> Save Client
-                </button>
-                <button 
-                  className={`${styles.button} ${styles.secondary}`}
-                  onClick={() => setSelectedClient('')}
-                >
-                  <FiX /> Cancel
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Modals would go here */}
     </div>
   );
 };
