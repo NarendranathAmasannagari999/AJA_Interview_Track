@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FiUser, FiMail, FiLock, FiChevronDown } from "react-icons/fi";
+import { FiUser, FiMail, FiLock, FiPhone, FiChevronDown } from "react-icons/fi";
+import { registerUser } from "../API/RegisterApi";
 import styles from "./Register.module.css";
 
 const Register = () => {
@@ -11,12 +12,15 @@ const Register = () => {
     email: "",
     password: "",
     confirmPassword: "",
+    phone: "",
     role: "employee",
+    empid: "", // Added for employee-specific field
   });
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSelectOpen, setIsSelectOpen] = useState(false);
+  const [apiError, setApiError] = useState(null);
 
   const userRoles = [
     { value: "employee", label: "Employee" },
@@ -37,6 +41,7 @@ const Register = () => {
         [name]: null,
       });
     }
+    setApiError(null); // Clear API error on input change
   };
 
   const validateForm = () => {
@@ -55,21 +60,45 @@ const Register = () => {
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match";
     }
+    if (formData.role === "employee" && !formData.empid.trim()) {
+      newErrors.empid = "Employee ID is required for employees";
+    }
+    if (formData.role !== "employee" && !formData.phone.trim()) {
+      newErrors.phone = "Phone number is required for team members";
+    } else if (formData.role !== "employee" && !/^\d{10}$/.test(formData.phone)) {
+      newErrors.phone = "Phone number must be 10 digits";
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (validateForm()) {
-      setIsSubmitting(true);
-      // Simulate API call
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    setApiError(null);
+
+    try {
+      const userData = {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        ...(formData.role === "employee" ? { empid: formData.empid } : { phone: formData.phone }),
+      };
+
+      const response = await registerUser(userData);
+      console.log("Registration successful:", response.data);
       setTimeout(() => {
-        console.log("Registration data:", formData);
-        setIsSubmitting(false);
         navigate("/login");
-      }, 1500);
+      }, 500);
+    } catch (error) {
+      console.error("Registration failed:", error);
+      setApiError(error.response?.data?.error || "Registration failed. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -105,6 +134,17 @@ const Register = () => {
             Join AJA Interview Preparation Track
           </motion.p>
         </div>
+
+        {apiError && (
+          <motion.div
+            className={styles.apiError}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {apiError}
+          </motion.div>
+        )}
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <motion.div
@@ -171,11 +211,79 @@ const Register = () => {
             )}
           </motion.div>
 
+          {formData.role === "employee" && (
+            <motion.div
+              className={styles.formGroup}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <label htmlFor="empid" className={styles.label}>
+                Employee ID
+              </label>
+              <div className={`${styles.inputContainer} ${errors.empid ? styles.error : ""}`}>
+                <FiUser className={styles.inputIcon} />
+                <input
+                  type="text"
+                  id="empid"
+                  name="empid"
+                  value={formData.empid}
+                  onChange={handleChange}
+                  placeholder="Enter your employee ID"
+                  className={styles.input}
+                />
+              </div>
+              {errors.empid && (
+                <motion.span 
+                  className={styles.errorMessage}
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  {errors.empid}
+                </motion.span>
+              )}
+            </motion.div>
+          )}
+
+          {formData.role !== "employee" && (
+            <motion.div
+              className={styles.formGroup}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <label htmlFor="phone" className={styles.label}>
+                Phone Number
+              </label>
+              <div className={`${styles.inputContainer} ${errors.phone ? styles.error : ""}`}>
+                <FiPhone className={styles.inputIcon} />
+                <input
+                  type="text"
+                  id="phone"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="Enter your phone number"
+                  className={styles.input}
+                />
+              </div>
+              {errors.phone && (
+                <motion.span 
+                  className={styles.errorMessage}
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  {errors.phone}
+                </motion.span>
+              )}
+            </motion.div>
+          )}
+
           <motion.div
             className={styles.formGroup}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
+            transition={{ delay: 0.7 }}
           >
             <label htmlFor="password" className={styles.label}>
               Password
@@ -207,7 +315,7 @@ const Register = () => {
             className={styles.formGroup}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
+            transition={{ delay: 0.8 }}
           >
             <label htmlFor="confirmPassword" className={styles.label}>
               Confirm Password
@@ -239,7 +347,7 @@ const Register = () => {
             className={styles.formGroup}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
+            transition={{ delay: 0.9 }}
           >
             <label htmlFor="role" className={styles.label}>
               Select Your Role
@@ -248,7 +356,7 @@ const Register = () => {
               className={styles.selectContainer}
               onClick={() => setIsSelectOpen(!isSelectOpen)}
             >
-              <div className={styles.selectedOption}>
+              <div classNamezzly={styles.selectedOption}>
                 {userRoles.find(r => r.value === formData.role)?.label}
                 <FiChevronDown className={`${styles.chevron} ${isSelectOpen ? styles.open : ''}`} />
               </div>
@@ -283,7 +391,7 @@ const Register = () => {
             whileTap={{ scale: 0.98 }}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9 }}
+            transition={{ delay: 1.0 }}
           >
             {isSubmitting ? (
               <span className={styles.spinner}></span>
@@ -297,7 +405,7 @@ const Register = () => {
           className={styles.loginLink}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1 }}
+          transition={{ delay: 1.1 }}
         >
           Already have an account?{" "}
           <span onClick={() => navigate("/login")}>Log in</span>
