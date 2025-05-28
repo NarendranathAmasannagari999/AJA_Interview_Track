@@ -1,417 +1,308 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { FiUser, FiMail, FiLock, FiPhone, FiChevronDown } from "react-icons/fi";
-import { registerUser } from "../API/RegisterApi";
-import styles from "./Register.module.css";
+import React, { useState } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import styles from './Register.module.css';
+import { registerUser, loginUser } from '../API/RegisterApi';
 
 const Register = () => {
-  const navigate = useNavigate();
+  const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    phone: "",
-    role: "employee",
-    empid: "", // Added for employee-specific field
+    name: '',
+    email: '',
+    password: '',
+    role: 'employee',
+    technology: '',
+    resourceType: '',
+    employeeId: ''
   });
-
   const [errors, setErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSelectOpen, setIsSelectOpen] = useState(false);
-  const [apiError, setApiError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiError, setApiError] = useState('');
+  const navigate = useNavigate();
 
-  const userRoles = [
-    { value: "employee", label: "Employee" },
-    { value: "delivery_team", label: "Delivery Team" },
-    { value: "sales_team", label: "Sales Team" },
-  ];
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const toggleAuth = () => {
+    setIsLogin(!isLogin);
+    setErrors({});
+    setApiError('');
     setFormData({
-      ...formData,
-      [name]: value,
+      name: '',
+      email: '',
+      password: '',
+      role: 'employee',
+      technology: '',
+      resourceType: '',
+      employeeId: ''
     });
-
-    if (errors[name]) {
-      setErrors({
-        ...errors,
-        [name]: null,
-      });
-    }
-    setApiError(null); // Clear API error on input change
   };
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = "Name is required";
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
+
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Email is invalid";
+      newErrors.email = 'Email is invalid';
     }
+
     if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
-    if (formData.role === "employee" && !formData.empid.trim()) {
-      newErrors.empid = "Employee ID is required for employees";
-    }
-    if (formData.role !== "employee" && !formData.phone.trim()) {
-      newErrors.phone = "Phone number is required for team members";
-    } else if (formData.role !== "employee" && !/^\d{10}$/.test(formData.phone)) {
-      newErrors.phone = "Phone number must be 10 digits";
+
+    if (!isLogin) {
+      if (!formData.name) {
+        newErrors.name = 'Name is required';
+      }
+      if (!formData.role) {
+        newErrors.role = 'Role is required';
+      }
+      if (!formData.technology) {
+        newErrors.technology = 'Technology is required';
+      }
+      if (!formData.resourceType) {
+        newErrors.resourceType = 'Resource Type is required';
+      }
+      if (!formData.employeeId) {
+        newErrors.employeeId = 'Employee ID is required';
+      }
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+    if (apiError) setApiError('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    setIsSubmitting(true);
-    setApiError(null);
+    setIsLoading(true);
+    setApiError('');
 
     try {
-      const userData = {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        role: formData.role,
-        ...(formData.role === "employee" ? { empid: formData.empid } : { phone: formData.phone }),
-      };
-
-      const response = await registerUser(userData);
-      console.log("Registration successful:", response.data);
-      setTimeout(() => {
-        navigate("/login");
-      }, 500);
+      if (isLogin) {
+        // Handle login
+        const token = await loginUser({
+          email: formData.email,
+          password: formData.password
+        });
+        
+        localStorage.setItem('token', token);
+        // Fetch user data to get role
+        const userResponse = await axios.get('/api/auth/user', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        localStorage.setItem('user', JSON.stringify(userResponse.data));
+        const redirectPath = userResponse.data.role === 'admin' ? '/admin' : '/dashboard';
+        navigate(redirectPath);
+      } else {
+        // Handle registration
+        const userData = await registerUser(formData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        // Generate token by logging in after registration
+        const token = await loginUser({
+          email: formData.email,
+          password: formData.password
+        });
+        localStorage.setItem('token', token);
+        
+        const redirectPath = userData.role === 'admin' ? '/admin' : '/dashboard';
+        navigate(redirectPath);
+      }
     } catch (error) {
-      console.error("Registration failed:", error);
-      setApiError(error.response?.data?.error || "Registration failed. Please try again.");
+      console.error('Auth error:', error);
+      setApiError(
+        error.message ||
+          (isLogin ? 'Invalid email or password' : 'Registration failed: Email may already exist')
+      );
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <motion.div
-      className={styles.registerContainer}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <motion.div 
-        className={styles.registerForm}
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.1 }}
-      >
-        <div className={styles.formHeader}>
-          <motion.h1 
-            className={styles.title}
-            initial={{ y: -10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-          >
-            Create Your Account
-          </motion.h1>
-          <motion.p
-            className={styles.subtitle}
-            initial={{ y: -10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            Join AJA Interview Preparation Track
-          </motion.p>
-        </div>
+    <div className={styles.authWrapper}>
+      {/* Register Form */}
+      <div className={`${styles.formSide} ${isLogin ? '' : styles.active}`} id="registerSide">
+        <h2>Register</h2>
+        <form onSubmit={handleSubmit}>
+          <div className={styles.formGroup}>
+            <input
+              type="text"
+              name="name"
+              placeholder="Full Name"
+              value={formData.name}
+              onChange={handleChange}
+              className={errors.name ? styles.errorInput : ''}
+            />
+            {errors.name && <span className={styles.errorText}>{errors.name}</span>}
+          </div>
 
-        {apiError && (
-          <motion.div
-            className={styles.apiError}
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            {apiError}
-          </motion.div>
-        )}
+          <div className={styles.formGroup}>
+            <input
+              type="text"
+              name="employeeId"
+              placeholder="Employee ID"
+              value={formData.employeeId}
+              onChange={handleChange}
+              className={errors.employeeId ? styles.errorInput : ''}
+            />
+            {errors.employeeId && <span className={styles.errorText}>{errors.employeeId}</span>}
+          </div>
 
-        <form onSubmit={handleSubmit} className={styles.form}>
-          <motion.div
-            className={styles.formGroup}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <label htmlFor="name" className={styles.label}>
-              Full Name
-            </label>
-            <div className={`${styles.inputContainer} ${errors.name ? styles.error : ""}`}>
-              <FiUser className={styles.inputIcon} />
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="Enter your full name"
-                className={styles.input}
-              />
-            </div>
-            {errors.name && (
-              <motion.span 
-                className={styles.errorMessage}
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {errors.name}
-              </motion.span>
-            )}
-          </motion.div>
+          <div className={styles.formGroup}>
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={handleChange}
+              className={errors.email ? styles.errorInput : ''}
+            />
+            {errors.email && <span className={styles.errorText}>{errors.email}</span>}
+          </div>
 
-          <motion.div
-            className={styles.formGroup}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            <label htmlFor="email" className={styles.label}>
-              Email Address
-            </label>
-            <div className={`${styles.inputContainer} ${errors.email ? styles.error : ""}`}>
-              <FiMail className={styles.inputIcon} />
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter your email"
-                className={styles.input}
-              />
-            </div>
-            {errors.email && (
-              <motion.span 
-                className={styles.errorMessage}
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {errors.email}
-              </motion.span>
-            )}
-          </motion.div>
+          <div className={styles.formGroup}>
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              value={formData.password}
+              onChange={handleChange}
+              className={errors.password ? styles.errorInput : ''}
+            />
+            {errors.password && <span className={styles.errorText}>{errors.password}</span>}
+          </div>
 
-          {formData.role === "employee" && (
-            <motion.div
-              className={styles.formGroup}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
+          <div className={styles.formGroup}>
+            <select
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              className={`${styles.roleSelect} ${errors.role ? styles.errorInput : ''}`}
             >
-              <label htmlFor="empid" className={styles.label}>
-                Employee ID
-              </label>
-              <div className={`${styles.inputContainer} ${errors.empid ? styles.error : ""}`}>
-                <FiUser className={styles.inputIcon} />
-                <input
-                  type="text"
-                  id="empid"
-                  name="empid"
-                  value={formData.empid}
-                  onChange={handleChange}
-                  placeholder="Enter your employee ID"
-                  className={styles.input}
-                />
-              </div>
-              {errors.empid && (
-                <motion.span 
-                  className={styles.errorMessage}
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  {errors.empid}
-                </motion.span>
-              )}
-            </motion.div>
-          )}
+              <option value="employee">Employee</option>
+              <option value="delivery_team">Delivery Team</option>
+              <option value="sales_team">Sales Team</option>
+              <option value="admin">Admin</option>
+            </select>
+            {errors.role && <span className={styles.errorText}>{errors.role}</span>}
+          </div>
 
-          {formData.role !== "employee" && (
-            <motion.div
-              className={styles.formGroup}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
+          <div className={styles.formGroup}>
+            <input
+              type="text"
+              name="technology"
+              placeholder="Technology"
+              value={formData.technology}
+              onChange={handleChange}
+              className={errors.technology ? styles.errorInput : ''}
+            />
+            {errors.technology && <span className={styles.errorText}>{errors.technology}</span>}
+          </div>
+
+          <div className={styles.formGroup}>
+            <select
+              name="resourceType"
+              value={formData.resourceType}
+              onChange={handleChange}
+              className={`${styles.roleSelect} ${errors.resourceType ? styles.errorInput : ''}`}
             >
-              <label htmlFor="phone" className={styles.label}>
-                Phone Number
-              </label>
-              <div className={`${styles.inputContainer} ${errors.phone ? styles.error : ""}`}>
-                <FiPhone className={styles.inputIcon} />
-                <input
-                  type="text"
-                  id="phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  placeholder="Enter your phone number"
-                  className={styles.input}
-                />
-              </div>
-              {errors.phone && (
-                <motion.span 
-                  className={styles.errorMessage}
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  {errors.phone}
-                </motion.span>
-              )}
-            </motion.div>
-          )}
+              <option value="">Select Resource Type</option>
+              <option value="TT">TT</option>
+              <option value="TCT">TCT</option>
+              <option value="ALT">ALT</option>
+              <option value="SALES">SALES</option>
+            </select>
+            {errors.resourceType && <span className={styles.errorText}>{errors.resourceType}</span>}
+          </div>
 
-          <motion.div
-            className={styles.formGroup}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-          >
-            <label htmlFor="password" className={styles.label}>
-              Password
-            </label>
-            <div className={`${styles.inputContainer} ${errors.password ? styles.error : ""}`}>
-              <FiLock className={styles.inputIcon} />
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Create a password"
-                className={styles.input}
-              />
-            </div>
-            {errors.password && (
-              <motion.span 
-                className={styles.errorMessage}
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {errors.password}
-              </motion.span>
-            )}
-          </motion.div>
+          {apiError && !isLogin && <div className={styles.apiError}>{apiError}</div>}
 
-          <motion.div
-            className={styles.formGroup}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
-          >
-            <label htmlFor="confirmPassword" className={styles.label}>
-              Confirm Password
-            </label>
-            <div className={`${styles.inputContainer} ${errors.confirmPassword ? styles.error : ""}`}>
-              <FiLock className={styles.inputIcon} />
-              <input
-                type="password"
-                id="confirmPassword"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="Confirm your password"
-                className={styles.input}
-              />
-            </div>
-            {errors.confirmPassword && (
-              <motion.span 
-                className={styles.errorMessage}
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {errors.confirmPassword}
-              </motion.span>
-            )}
-          </motion.div>
-
-          <motion.div
-            className={styles.formGroup}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9 }}
-          >
-            <label htmlFor="role" className={styles.label}>
-              Select Your Role
-            </label>
-            <div 
-              className={styles.selectContainer}
-              onClick={() => setIsSelectOpen(!isSelectOpen)}
-            >
-              <div classNamezzly={styles.selectedOption}>
-                {userRoles.find(r => r.value === formData.role)?.label}
-                <FiChevronDown className={`${styles.chevron} ${isSelectOpen ? styles.open : ''}`} />
-              </div>
-              {isSelectOpen && (
-                <motion.div 
-                  className={styles.options}
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  {userRoles.map((role) => (
-                    <div
-                      key={role.value}
-                      className={styles.option}
-                      onClick={() => {
-                        setFormData({ ...formData, role: role.value });
-                        setIsSelectOpen(false);
-                      }}
-                    >
-                      {role.label}
-                    </div>
-                  ))}
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
-
-          <motion.button
-            type="submit"
-            className={styles.submitButton}
-            disabled={isSubmitting}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.0 }}
-          >
-            {isSubmitting ? (
-              <span className={styles.spinner}></span>
-            ) : (
-              "Create Account"
-            )}
-          </motion.button>
+          <button type="submit" className={styles.submitButton} disabled={isLoading}>
+            {isLoading ? 'Processing...' : 'Register'}
+          </button>
         </form>
+      </div>
 
-        <motion.div
-          className={styles.loginLink}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.1 }}
+      {/* Login Form */}
+      <div className={`${styles.formSide} ${isLogin ? styles.active : ''}`} id="loginSide">
+        <h2>Login</h2>
+        <form onSubmit={handleSubmit}>
+          <div className={styles.formGroup}>
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={handleChange}
+              className={errors.email ? styles.errorInput : ''}
+            />
+            {errors.email && <span className={styles.errorText}>{errors.email}</span>}
+          </div>
+
+          <div className={styles.formGroup}>
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              value={formData.password}
+              onChange={handleChange}
+              className={errors.password ? styles.errorInput : ''}
+            />
+            {errors.password && <span className={styles.errorText}>{errors.password}</span>}
+          </div>
+
+          {apiError && isLogin && <div className={styles.apiError}>{apiError}</div>}
+
+          <button type="submit" className={styles.submitButton} disabled={isLoading}>
+            {isLoading ? 'Processing...' : 'Login'}
+          </button>
+        </form>
+      </div>
+
+      {/* Overlay with toggle buttons */}
+      <div className={`${styles.overlay} ${isLogin ? '' : styles.left}`} id="mainOverlay">
+        <button
+          className={styles.overlayBtn}
+          id="loginBtn"
+          style={{ marginLeft: '10vw', display: isLogin ? 'block' : 'none' }}
+          onClick={toggleAuth}
+          disabled={isLoading}
         >
-          Already have an account?{" "}
-          <span onClick={() => navigate("/login")}>Log in</span>
-        </motion.div>
-      </motion.div>
-    </motion.div>
+          Register
+        </button>
+        <span style={{ flex: 1 }}></span>
+        <button
+          className={styles.overlayBtn}
+          id="registerBtn"
+          style={{
+            marginRight: '10vw',
+            display: isLogin ? 'none' : 'block',
+            transform: 'rotate(180deg)',
+          }}
+          onClick={toggleAuth}
+          disabled={isLoading}
+        >
+          Login 
+        </button>
+      </div>
+    </div>
   );
 };
 
