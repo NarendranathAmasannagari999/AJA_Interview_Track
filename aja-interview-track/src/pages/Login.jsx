@@ -13,6 +13,9 @@ import {
 } from 'react-icons/fa';
 import { FiMail, FiKey } from 'react-icons/fi';
 import styles from './Login.module.css';
+import { jwtDecode } from 'jwt-decode';
+import { loginUser } from '../API/login'; // your real login API
+import axios from 'axios';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -26,8 +29,14 @@ const Login = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.email) newErrors.email = 'Email is required';
-    if (!formData.password) newErrors.password = 'Password is required';
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -55,20 +64,17 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { token, role } = await loginUser(formData.email.trim(), formData.password);
       
-      // For demo purposes, simulate different user roles
-      let role = 'employee'; // default
-      if (formData.email.includes('delivery')) role = 'delivery_team';
-      if (formData.email.includes('sales')) role = 'sales_team';
-      if (formData.email.includes('admin')) role = 'admin';
-      
+      // Store authentication data
+      localStorage.setItem('jwt_token', token);
       localStorage.setItem('userRole', role);
-      localStorage.setItem('token', 'simulated-token');
+      
+      // Normalize role for routing (remove 'ROLE_' prefix and convert to lowercase)
+      const normalizedRole = role.replace('ROLE_', '').toLowerCase();
       
       // Redirect based on role
-      switch(role) {
+      switch(normalizedRole) {
         case 'employee':
           navigate('/dashboard/employee');
           break;
@@ -86,7 +92,8 @@ const Login = () => {
       }
       
     } catch (err) {
-      setLoginError('Invalid email or password. Please try again.');
+      // Display the error message from the backend
+      setLoginError(err.message || 'Invalid email or password. Please try again.');
       console.error('Login error:', err);
     } finally {
       setIsLoading(false);

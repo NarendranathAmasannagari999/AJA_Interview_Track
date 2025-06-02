@@ -4,14 +4,132 @@ import {
   FiDollarSign, FiFilter, FiSearch, FiChevronDown, FiChevronUp,
   FiBarChart2, FiPieChart, FiUpload, FiDownload, FiMessageSquare,
   FiMail, FiUserPlus, FiBriefcase, FiAward, FiClock, FiLayers,
-  FiBook, FiUserCheck, FiUserX, FiShare2, FiToggleLeft, FiToggleRight
+  FiBook, FiUserCheck, FiUserX, FiShare2, FiToggleLeft, FiToggleRight,
+  FiRefreshCw
 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
   ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line 
 } from 'recharts';
-import styles from './sales.module.css';
+import styles from './Sales.module.css';
+import {
+  getCandidates,
+  getClientInterviews,
+  getClients,
+  addClient,
+  addJobDescription,
+  downloadJobDescription,
+  deleteJobDescription,
+  scheduleClientInterview,
+  updateClientInterview
+} from '../../API/sales';
+
+const ClientModal = ({
+  show,
+  onClose,
+  onSubmit,
+  fields,
+  onFieldChange,
+  error,
+  success,
+  loading,
+  onTechChange
+}) => {
+  if (!show) return null;
+  return (
+    <div className={styles.modalOverlay}>
+      <motion.div 
+        className={styles.modal}
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+      >
+        <form onSubmit={onSubmit}>
+          <div className={styles.modalHeader}>
+            <h3>Add New Client</h3>
+            <button 
+              className={styles.closeButton}
+              type="button"
+              onClick={onClose}
+            >
+              <FiX />
+            </button>
+          </div>
+          <div className={styles.modalContent}>
+            {error && (
+              <div className={styles.errorMessage}>{error}</div>
+            )}
+            {success && (
+              <div className={styles.successMessage}>{success}</div>
+            )}
+            <div className={styles.formGroup}>
+              <label>Client Name *</label>
+              <input
+                type="text"
+                value={fields.name}
+                onChange={e => onFieldChange('name', e.target.value)}
+                placeholder="Enter client name"
+                className={styles.input}
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label>Contact Email *</label>
+              <input
+                type="email"
+                value={fields.contactEmail}
+                onChange={e => onFieldChange('contactEmail', e.target.value)}
+                placeholder="Enter contact email"
+                className={styles.input}
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label>Active Positions</label>
+              <input
+                type="number"
+                min="0"
+                value={fields.activePositions}
+                onChange={e => onFieldChange('activePositions', parseInt(e.target.value) || 0)}
+                className={styles.input}
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label>Technologies *</label>
+              <div className={styles.technologyGrid}>
+                {['Java', 'Python', '.NET', 'DevOps', 'SalesForce', 'UI', 'Testing'].map(tech => (
+                  <label key={tech} className={styles.technologyCheckbox}>
+                    <input
+                      type="checkbox"
+                      checked={fields.technologies.includes(tech)}
+                      onChange={() => onTechChange(tech)}
+                    />
+                    <span>{tech}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className={styles.modalFooter}>
+              <button 
+                className={`${styles.button} ${styles.secondary}`}
+                type="button"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button 
+                className={`${styles.button} ${styles.primary}`}
+                type="submit"
+                disabled={loading}
+              >
+                {loading ? 'Adding...' : 'Add Client'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
 
 const SalesTeamDashboard = () => {
   // Main state
@@ -59,274 +177,220 @@ const SalesTeamDashboard = () => {
     notes: ''
   });
 
-  // Initialize with sample data
+  // Add loading and error states
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Add new state for pagination and search
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [searchTimeout, setSearchTimeout] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Add new state for client management
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [clientModalFields, setClientModalFields] = useState({
+    name: '',
+    contactEmail: '',
+    activePositions: 0,
+    technologies: [],
+  });
+  const [clientModalError, setClientModalError] = useState('');
+  const [clientModalSuccess, setClientModalSuccess] = useState('');
+  const [clientModalLoading, setClientModalLoading] = useState(false);
+
+  // Add new state for JD modal
+  const [jdModalFields, setJDModalFields] = useState({
+    title: '',
+    client: '',
+    technology: '',
+    resourceType: '',
+    description: '',
+    receivedDate: '',
+    deadline: '',
+  });
+  const [jdModalFile, setJDModalFile] = useState(null);
+  const [jdModalError, setJDModalError] = useState('');
+  const [jdModalSuccess, setJDModalSuccess] = useState('');
+  const [jdModalLoading, setJDModalLoading] = useState(false);
+
+  // Add debounced search function
+  const handleSearch = (value) => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    setSearchTimeout(setTimeout(() => {
+      setSearchTerm(value);
+      setCurrentPage(1); // Reset to first page on new search
+    }, 500));
+  };
+
+  // Add refresh function
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchData();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Fetch all data on component mount
   useEffect(() => {
-    // Candidates with mock interview scores and contact info
-    setCandidates([
-      { 
-        id: 1, 
-        name: 'John Doe', 
-        technology: 'Java', 
-        level: 'Intermediate', 
-        resourceType: 'TT',
-        mockTechScore: 8,
-        mockCommScore: 7,
-        status: 'profile_received',
-        resume: 'John_Doe_Java.pdf',
-        lastUpdated: '2023-05-20',
-        jdsReceived: [101],
-        resumeSent: false,
-        email: 'john.doe@example.com',
-        phone: '555-123-4567'
-      },
-      { 
-        id: 2, 
-        name: 'Jane Smith', 
-        technology: 'Python', 
-        level: 'Senior',
-        resourceType: 'TT',
-        mockTechScore: 9,
-        mockCommScore: 8,
-        status: 'resume_sent',
-        resume: 'Jane_Smith_Python.pdf',
-        lastUpdated: '2023-05-18',
-        jdsReceived: [102],
-        resumeSent: true,
-        email: 'jane.smith@example.com',
-        phone: '555-987-6543'
-      },
-      { 
-        id: 3, 
-        name: 'Mike Johnson', 
-        technology: '.NET', 
-        level: 'Senior',
-        resourceType: 'TT',
-        mockTechScore: 7,
-        mockCommScore: 6,
-        status: 'resume_sent',
-        resume: 'Mike_Johnson_NET.pdf',
-        lastUpdated: '2023-05-19',
-        jdsReceived: [103],
-        resumeSent: true,
-        email: 'mike.johnson@example.com',
-        phone: '555-456-7890'
+    fetchData();
+  }, [filterTech, filterStatus, filterResourceType]);
+
+  const fetchData = async (retryCount = 0) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [candidatesData, interviewsData, clientsData] = await Promise.all([
+        getCandidates(filterTech, filterStatus, filterResourceType),
+        getClientInterviews(),
+        getClients()
+      ]);
+
+      // Validate and transform data
+      const validatedCandidates = candidatesData.map(candidate => ({
+        ...candidate,
+        status: candidate.status || 'pending',
+        technology: candidate.technology || 'Unknown',
+        resourceType: candidate.resourceType || 'TT'
+      }));
+
+      const validatedInterviews = interviewsData.map(interview => ({
+        ...interview,
+        overallStatus: interview.overallStatus || 'pending',
+        levels: interview.levels || []
+      }));
+
+      setCandidates(validatedCandidates);
+      setClientInterviews(validatedInterviews);
+      setClients(clientsData);
+
+      // Calculate deployment stats with validation
+      const stats = {
+        profilesSent: validatedCandidates.filter(c => c.status === 'profile_sent').length,
+        resumesSent: validatedCandidates.filter(c => c.status === 'resume_sent').length,
+        interviewsScheduled: validatedInterviews.filter(i => i.overallStatus === 'in_process').length,
+        deployed: validatedInterviews.filter(i => i.result === 'hired').length,
+        rejected: validatedInterviews.filter(i => i.result === 'rejected').length
+      };
+      setDeploymentStats(stats);
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      if (retryCount < 3) {
+        // Retry with exponential backoff
+        setTimeout(() => {
+          fetchData(retryCount + 1);
+        }, Math.pow(2, retryCount) * 1000);
+      } else {
+        setError(error.message || 'Failed to load dashboard data');
       }
-    ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    // Client interviews with detailed level information
-    setClientInterviews([
-      { 
-        id: 1, 
-        candidateId: 1, 
-        candidateName: 'John Doe', 
-        client: 'Tech Corp', 
-        jdId: 101,
-        levels: [
-          {
-            number: 1,
-            date: '2023-05-25',
-            time: '14:00',
-            mode: 'virtual',
-            link: 'https://meet.techcorp.com/jd-interview',
-            status: 'scheduled',
-            techScore: null,
-            commScore: null,
-            feedback: '',
-            notified: false
-          }
-        ],
-        overallStatus: 'in_process',
-        jd: 'Java Developer Position'
-      },
-      { 
-        id: 2, 
-        candidateId: 3, 
-        candidateName: 'Mike Johnson', 
-        client: 'Data Systems', 
-        jdId: 103,
-        levels: [
-          {
-            number: 1,
-            date: '2023-05-20',
-            time: '10:00',
-            mode: 'virtual',
-            link: 'https://meet.datasystems.com/interview',
-            status: 'completed',
-            techScore: 7,
-            commScore: 6,
-            feedback: 'Good technical knowledge but needs improvement in communication',
-            notified: true
-          },
-          {
-            number: 2,
-            date: '2023-05-28',
-            time: '15:00',
-            mode: 'virtual',
-            link: 'https://meet.datasystems.com/interview2',
-            status: 'scheduled',
-            techScore: null,
-            commScore: null,
-            feedback: '',
-            notified: false
-          }
-        ],
-        overallStatus: 'in_process',
-        jd: '.NET Engineer'
-      }
-    ]);
+  // Refactor handleFileChange to accept form values
+  const handleFileChange = async (e, jdFormValues) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    // Clients data
-    setClients([
-      { 
-        id: 1, 
-        name: 'Tech Corp', 
-        contact: 'hr@techcorp.com', 
-        activePositions: 5, 
-        technologies: ['Java', 'Python', 'DevOps'],
-        interviewProcess: {
-          levels: 3,
-          requirements: 'Technical and communication assessment at each level'
-        }
-      },
-      { 
-        id: 2, 
-        name: 'Data Systems', 
-        contact: 'hr@datasystems.com', 
-        activePositions: 3, 
-        technologies: ['.NET', 'Azure'],
-        interviewProcess: {
-          levels: 2,
-          requirements: 'Technical assessment and client presentation'
-        }
-      }
-    ]);
+    // Validate file type and size
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
 
-    // Job Descriptions
-    setJobDescriptions([
-      {
-        id: 101,
-        clientId: 1,
-        clientName: 'Tech Corp',
-        title: 'Java Developer Position',
-        technology: 'Java',
-        resourceType: 'TT',
-        description: 'Looking for Java developer with Spring Boot experience...',
-        receivedDate: '2023-05-15',
-        status: 'active'
-      },
-      {
-        id: 103,
-        clientId: 2,
-        clientName: 'Data Systems',
-        title: '.NET Engineer',
-        technology: '.NET',
-        resourceType: 'TT',
-        description: 'Looking for .NET developer with Azure experience...',
-        receivedDate: '2023-05-16',
-        status: 'active'
-      }
-    ]);
+    if (!allowedTypes.includes(file.type)) {
+      setError('Invalid file type. Please upload a PDF or Word document.');
+      return;
+    }
 
-    // Resume pool
-    setResumePool([
-      {
-        id: 1,
-        candidateId: 1,
-        candidateName: 'John Doe',
-        technology: 'Java',
-        resourceType: 'TT',
-        fileName: 'John_Doe_Java.pdf',
-        receivedDate: '2023-05-18',
-        status: 'received'
-      },
-      {
-        id: 2,
-        candidateId: 3,
-        candidateName: 'Mike Johnson',
-        technology: '.NET',
-        resourceType: 'TT',
-        fileName: 'Mike_Johnson_NET.pdf',
-        receivedDate: '2023-05-19',
-        status: 'received'
-      }
-    ]);
+    if (file.size > maxSize) {
+      setError('File size too large. Maximum size is 5MB.');
+      return;
+    }
 
-    // Shortlisted candidates
-    setShortlistedCandidates([
-      {
-        id: 1,
-        candidateId: 1,
-        candidateName: 'John Doe',
-        technology: 'Java',
-        resourceType: 'TT',
-        status: 'shortlisted',
-        jdId: 101,
-        clientId: 1,
-        clientName: 'Tech Corp',
-        jdTitle: 'Java Developer Position'
-      },
-      {
-        id: 2,
-        candidateId: 3,
-        candidateName: 'Mike Johnson',
-        technology: '.NET',
-        resourceType: 'TT',
-        status: 'shortlisted',
-        jdId: 103,
-        clientId: 2,
-        clientName: 'Data Systems',
-        jdTitle: '.NET Engineer'
-      }
-    ]);
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('title', jdFormValues.title || 'New Job Description');
+      formData.append('client', jdFormValues.client || '');
+      formData.append('technology', jdFormValues.technology || '');
+      formData.append('resourceType', jdFormValues.resourceType || '');
+      formData.append('description', jdFormValues.description || 'Job description details...');
+      formData.append('receivedDate', jdFormValues.receivedDate || new Date().toISOString().split('T')[0]);
+      formData.append('deadline', jdFormValues.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
-    // Deployment stats
-    setDeploymentStats({
-      profilesSent: 24,
-      resumesSent: 18,
-      interviewsScheduled: 12,
-      deployed: 8,
-      rejected: 4
-    });
-  }, []);
+      const response = await addJobDescription(
+        formData.get('title'),
+        formData.get('client'),
+        formData.get('receivedDate'),
+        formData.get('deadline'),
+        formData.get('technology'),
+        formData.get('resourceType'),
+        formData.get('description'),
+        file
+      );
 
-  // New function to handle shortlisted resumes notification
-  const notifyShortlistedCandidates = (candidateIds, interviewDetails) => {
-    // Update the interview status for these candidates
-    const updatedInterviews = clientInterviews.map(interview => {
-      if (candidateIds.includes(interview.candidateId)) {
-        const updatedLevels = interview.levels.map(level => {
-          if (level.number === interviewDetails.level) {
-            return {
-              ...level,
-              date: interviewDetails.date,
-              time: interviewDetails.time,
-              mode: interviewDetails.mode,
-              link: interviewDetails.link,
-              location: interviewDetails.location,
-              notified: true
-            };
-          }
-          return level;
-        });
-        
-        return {
-          ...interview,
-          levels: updatedLevels
-        };
-      }
-      return interview;
-    });
+      setJobDescriptions(prev => [...prev, response]);
+      setResumeStatus('submitted');
+      
+      // Show success message
+      alert('Job description uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setError(error.message || 'Failed to upload file');
+      setResumeStatus('rejected');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-    setClientInterviews(updatedInterviews);
+  // Enhanced interview scheduling with validation
+  const notifyShortlistedCandidates = async (candidateIds, interviewDetails) => {
+    // Validate interview details
+    if (!interviewDetails.date || !interviewDetails.time) {
+      setError('Please select both date and time for the interview.');
+      return;
+    }
 
-    // Send notification to candidates (in a real app, this would be an API call)
-    candidateIds.forEach(id => {
-      const candidate = candidates.find(c => c.id === id);
-      if (candidate) {
-        console.log(`Notification sent to ${candidate.name} at ${candidate.email}`);
-        // This would be replaced with actual email/sms sending logic
-      }
-    });
+    if (interviewDetails.mode === 'virtual' && !interviewDetails.link) {
+      setError('Please provide a meeting link for virtual interviews.');
+      return;
+    }
+
+    if (interviewDetails.mode === 'in-person' && !interviewDetails.location) {
+      setError('Please provide a location for in-person interviews.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const interviewPromises = candidateIds.map(candidateId => 
+        scheduleClientInterview(
+          candidateId,
+          selectedClient,
+          interviewDetails.date,
+          interviewDetails.time,
+          interviewDetails.level,
+          selectedJD?.title,
+          interviewDetails.link
+        )
+      );
+
+      const results = await Promise.all(interviewPromises);
+      
+      // Update the interviews state with the new interviews
+      setClientInterviews(prev => [...prev, ...results]);
+
+      // Show success message
+      alert(`Successfully scheduled interviews for ${candidateIds.length} candidate(s)!`);
 
     // Close the scheduler
     setShowInterviewScheduler(false);
@@ -340,6 +404,68 @@ const SalesTeamDashboard = () => {
       location: '',
       notes: ''
     });
+    } catch (error) {
+      console.error('Error scheduling interviews:', error);
+      setError(error.message || 'Failed to schedule interviews');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Add function to handle interview feedback submission
+  const handleInterviewFeedback = async (interviewId, result, feedback, technicalScore, communicationScore) => {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const updatedInterview = await updateClientInterview(
+        interviewId,
+        result,
+        feedback,
+        technicalScore,
+        communicationScore
+      );
+
+      // Update the interviews state with the updated interview
+      setClientInterviews(prev => 
+        prev.map(interview => 
+          interview.id === interviewId ? updatedInterview : interview
+        )
+      );
+    } catch (error) {
+      console.error('Error updating interview feedback:', error);
+      setError(error.message || 'Failed to update interview feedback');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Add function to handle job description download
+  const handleDownloadJD = async (jdId) => {
+    try {
+      const blob = await downloadJobDescription(jdId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `job_description_${jdId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading job description:', error);
+      setError(error.message || 'Failed to download job description');
+    }
+  };
+
+  // Add function to handle job description deletion
+  const handleDeleteJD = async (jdId) => {
+    try {
+      await deleteJobDescription(jdId);
+      setJobDescriptions(prev => prev.filter(jd => jd.id !== jdId));
+    } catch (error) {
+      console.error('Error deleting job description:', error);
+      setError(error.message || 'Failed to delete job description');
+    }
   };
 
   // New function to open the interview scheduler
@@ -1140,29 +1266,92 @@ const SalesTeamDashboard = () => {
     );
   };
 
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'jds':
-        return <JDTab />;
-      case 'resumePool':
-        return <ResumePoolTab />;
-      case 'shortlisted':
-        return <ShortlistedTab />;
-      case 'interviews':
-        return <InterviewsTab />;
-      case 'deployments':
-        return <DeploymentsTab />;
-      default:
-        return null;
-    }
-  };
+  // Add pagination component
+  const Pagination = ({ totalItems, currentPage, onPageChange }) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   return (
-    <div className={styles.dashboardContainer}>
+      <div className={styles.pagination}>
+        <button
+          className={styles.pageButton}
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          Previous
+        </button>
+        {pages.map(page => (
+          <button
+            key={page}
+            className={`${styles.pageButton} ${currentPage === page ? styles.active : ''}`}
+            onClick={() => onPageChange(page)}
+          >
+            {page}
+          </button>
+        ))}
+        <button
+          className={styles.pageButton}
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+        >
+          Next
+        </button>
+      </div>
+    );
+  };
+
+  // Enhanced loading state component
+  const LoadingState = () => (
+    <div className={styles.loadingContainer}>
+      <div className={styles.spinner}></div>
+      <p>{isRefreshing ? 'Refreshing data...' : 'Loading dashboard data...'}</p>
+      {isRefreshing && (
+        <div className={styles.progressBar}>
+          <div className={styles.progressFill}></div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Enhanced error state component
+  const ErrorState = ({ message, onRetry }) => (
+    <div className={styles.errorContainer}>
+      <h3>Error</h3>
+      <p>{message}</p>
+      <div className={styles.errorActions}>
+        {onRetry && (
+          <button 
+            className={`${styles.button} ${styles.primary}`}
+            onClick={onRetry}
+          >
+            Try Again
+          </button>
+        )}
+        <button 
+          className={`${styles.button} ${styles.secondary}`}
+          onClick={() => window.location.reload()}
+        >
+          Refresh Page
+        </button>
+      </div>
+    </div>
+  );
+
+  // Add refresh button to header
+  const renderHeader = () => (
       <div className={styles.dashboardHeader}>
         <h1 className={styles.headerTitle}>
           <FiBriefcase /> AJA Sales Team Dashboard
         </h1>
+      <div className={styles.headerActions}>
+        <button 
+          className={`${styles.button} ${styles.secondary}`}
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+        >
+          <FiRefreshCw className={isRefreshing ? styles.spinning : ''} />
+          {isRefreshing ? 'Refreshing...' : 'Refresh'}
+        </button>
         <div className={styles.headerStats}>
           <div className={styles.statBadge}>
             <FiUsers /> <span>{candidates.length}</span> Candidates
@@ -1175,8 +1364,394 @@ const SalesTeamDashboard = () => {
           </div>
         </div>
       </div>
+    </div>
+  );
+
+  // Add function to handle client creation
+  const handleAddClient = async () => {
+    // Validate client data
+    if (!clientModalFields.name.trim()) {
+      setClientModalError('Client name is required');
+      return;
+    }
+    if (!clientModalFields.contactEmail.trim()) {
+      setClientModalError('Contact email is required');
+      return;
+    }
+    if (!clientModalFields.contactEmail.includes('@')) {
+      setClientModalError('Invalid email format');
+      return;
+    }
+    if (clientModalFields.technologies.length === 0) {
+      setClientModalError('At least one technology must be selected');
+      return;
+    }
+
+    setClientModalLoading(true);
+    try {
+      const response = await addClient(
+        clientModalFields.name,
+        clientModalFields.contactEmail,
+        clientModalFields.activePositions,
+        clientModalFields.technologies
+      );
+
+      // Update clients list
+      setClients(prev => [...prev, response]);
       
+      // Show success message
+      alert('Client added successfully!');
+
+      // Reset form and close modal
+      setClientModalFields({
+        name: '',
+        contactEmail: '',
+        activePositions: 0,
+        technologies: [],
+      });
+      setShowClientModal(false);
+    } catch (error) {
+      console.error('Error adding client:', error);
+      setClientModalError(error.message || 'Failed to add client');
+    } finally {
+      setClientModalLoading(false);
+    }
+  };
+
+  // Add client management tab
+  const ClientsTab = () => {
+    const filteredClients = clients.filter(client => 
+      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.contactEmail.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className={styles.contentSection}
+      >
+        <div className={styles.filterSection}>
+          <div className={styles.searchBox}>
+            <FiSearch className={styles.searchIcon} />
+            <input 
+              type="text" 
+              placeholder="Search clients..." 
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
+          <button 
+            className={`${styles.button} ${styles.primary}`}
+            onClick={() => setShowClientModal(true)}
+          >
+            <FiUserPlus /> Add New Client
+          </button>
+        </div>
+
+        {filteredClients.length > 0 ? (
+          <div className={styles.cardGrid}>
+            {filteredClients.map(client => (
+              <motion.div
+                key={client.id}
+                layout
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className={styles.clientCard}
+              >
+                <div className={styles.clientHeader}>
+                  <h3 className={styles.clientName}>{client.name}</h3>
+                  <span className={styles.clientEmail}>{client.contactEmail}</span>
+                </div>
+
+                <div className={styles.clientDetails}>
+                  <p>
+                    <strong>Active Positions:</strong> {client.activePositions}
+                  </p>
+                  <div className={styles.technologyTags}>
+                    {client.technologies.map(tech => (
+                      <span 
+                        key={tech} 
+                        className={`${styles.techBadge} ${styles[tech.toLowerCase()]}`}
+                      >
+                        {tech}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={styles.clientActions}>
+                  <button className={`${styles.button} ${styles.secondary}`}>
+                    <FiMail /> Contact
+                  </button>
+                  <button className={`${styles.button} ${styles.primary}`}>
+                    <FiFileText /> View JDs
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.emptyState}>
+            <FiUsers size={48} />
+            <h4>No clients found</h4>
+            <p>Add new clients or adjust your search.</p>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  // Update renderTabContent to include clients tab
+  const renderTabContent = () => {
+    if (isLoading) {
+      return <LoadingState />;
+    }
+
+    if (error) {
+      return <ErrorState message={error} onRetry={fetchData} />;
+    }
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+
+    switch (activeTab) {
+      case 'clients':
+        return (
+          <>
+            <ClientsTab />
+            <Pagination
+              totalItems={clients.length}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        );
+      case 'jds':
+        return (
+          <>
+            <JDTab />
+            <Pagination
+              totalItems={jobDescriptions.length}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        );
+      case 'resumePool':
+        return (
+          <>
+            <ResumePoolTab />
+            <Pagination
+              totalItems={resumePool.length}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        );
+      case 'shortlisted':
+        return (
+          <>
+            <ShortlistedTab />
+            <Pagination
+              totalItems={shortlistedCandidates.length}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        );
+      case 'interviews':
+        return (
+          <>
+            <InterviewsTab />
+            <Pagination
+              totalItems={clientInterviews.length}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        );
+      case 'deployments':
+        return <DeploymentsTab />;
+      default:
+        return null;
+    }
+  };
+
+  // Add reset function for JD modal
+  const resetJDModal = () => {
+    setJDModalFields({
+      title: '',
+      client: '',
+      technology: '',
+      resourceType: '',
+      description: '',
+      receivedDate: '',
+      deadline: '',
+    });
+    setJDModalFile(null);
+    setJDModalError('');
+    setJDModalSuccess('');
+    setJDModalLoading(false);
+    setSelectedJD(null);
+    setSelectedClient('');
+    setFilterTech('all');
+    setFilterResourceType('all');
+  };
+
+  // Add handleJDModalFieldChange function
+  const handleJDModalFieldChange = (field, value) => {
+    setJDModalFields(prev => ({ ...prev, [field]: value }));
+    if (field === 'client') setSelectedClient(value);
+    if (field === 'technology') setFilterTech(value);
+    if (field === 'resourceType') setFilterResourceType(value);
+  };
+
+  // Add handleJDModalFileChange function
+  const handleJDModalFileChange = (e) => {
+    const file = e.target.files[0];
+    setJDModalFile(file);
+  };
+
+  // Add handleJDModalSubmit function
+  const handleJDModalSubmit = async (e) => {
+    e.preventDefault();
+    setJDModalError('');
+    setJDModalSuccess('');
+    // Validation
+    if (!jdModalFields.title.trim() || !jdModalFields.client || !jdModalFields.technology || !jdModalFields.resourceType || !jdModalFile) {
+      setJDModalError('Please fill all required fields and select a file.');
+      return;
+    }
+    // File validation
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (!allowedTypes.includes(jdModalFile.type)) {
+      setJDModalError('Invalid file type. Please upload a PDF or Word document.');
+      return;
+    }
+    if (jdModalFile.size > maxSize) {
+      setJDModalError('File size too large. Maximum size is 5MB.');
+      return;
+    }
+    setJDModalLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', jdModalFile);
+      formData.append('title', jdModalFields.title);
+      formData.append('client', jdModalFields.client);
+      formData.append('technology', jdModalFields.technology);
+      formData.append('resourceType', jdModalFields.resourceType);
+      formData.append('description', jdModalFields.description);
+      formData.append('receivedDate', jdModalFields.receivedDate || new Date().toISOString().split('T')[0]);
+      formData.append('deadline', jdModalFields.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+      const response = await addJobDescription(
+        formData.get('title'),
+        formData.get('client'),
+        formData.get('receivedDate'),
+        formData.get('deadline'),
+        formData.get('technology'),
+        formData.get('resourceType'),
+        formData.get('description'),
+        jdModalFile
+      );
+      setJobDescriptions(prev => [...prev, response]);
+      setResumeStatus('submitted');
+      setJDModalSuccess('Job description uploaded successfully!');
+      setJDModalLoading(false);
+      setTimeout(() => {
+        resetJDModal();
+      }, 1500);
+    } catch (error) {
+      setJDModalError(error.message || 'Failed to upload file');
+      setJDModalLoading(false);
+    }
+  };
+
+  // Add reset function for client modal
+  const resetClientModal = () => {
+    setClientModalFields({
+      name: '',
+      contactEmail: '',
+      activePositions: 0,
+      technologies: [],
+    });
+    setClientModalError('');
+    setClientModalSuccess('');
+    setClientModalLoading(false);
+    setShowClientModal(false);
+  };
+
+  // Add handleClientModalFieldChange function
+  const handleClientModalFieldChange = (field, value) => {
+    setClientModalFields(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Add handleClientModalTechChange function
+  const handleClientModalTechChange = (tech) => {
+    setClientModalFields(prev => ({
+      ...prev,
+      technologies: prev.technologies.includes(tech)
+        ? prev.technologies.filter(t => t !== tech)
+        : [...prev.technologies, tech],
+    }));
+  };
+
+  // Add handleClientModalSubmit function
+  const handleClientModalSubmit = async (e) => {
+    e.preventDefault();
+    setClientModalError('');
+    setClientModalSuccess('');
+    // Validation
+    if (!clientModalFields.name.trim()) {
+      setClientModalError('Client name is required');
+      return;
+    }
+    if (!clientModalFields.contactEmail.trim()) {
+      setClientModalError('Contact email is required');
+      return;
+    }
+    if (!clientModalFields.contactEmail.includes('@')) {
+      setClientModalError('Invalid email format');
+      return;
+    }
+    if (clientModalFields.technologies.length === 0) {
+      setClientModalError('At least one technology must be selected');
+      return;
+    }
+    setClientModalLoading(true);
+    try {
+      const response = await addClient(
+        clientModalFields.name,
+        clientModalFields.contactEmail,
+        clientModalFields.activePositions,
+        clientModalFields.technologies
+      );
+      setClients(prev => [...prev, response]);
+      setClientModalSuccess('Client added successfully!');
+      setClientModalLoading(false);
+      setTimeout(() => {
+        resetClientModal();
+      }, 1500);
+    } catch (error) {
+      setClientModalError(error.message || 'Failed to add client');
+      setClientModalLoading(false);
+    }
+  };
+
+  return (
+    <div className={styles.dashboardContainer}>
+      {renderHeader()}
       <div className={styles.tabsContainer}>
+        <button 
+          className={`${styles.tabButton} ${activeTab === 'clients' ? styles.active : ''}`}
+          onClick={() => setActiveTab('clients')}
+        >
+          <FiUsers /> Clients
+        </button>
         <button 
           className={`${styles.tabButton} ${activeTab === 'jds' ? styles.active : ''}`}
           onClick={() => setActiveTab('jds')}
@@ -1208,12 +1783,157 @@ const SalesTeamDashboard = () => {
           <FiSend /> Deployments
         </button>
       </div>
-      
       <div className={styles.contentContainer}>
         {renderTabContent()}
       </div>
-      
-      {/* Modals would go here */}
+      <ClientModal
+        show={showClientModal}
+        onClose={() => {
+          setShowClientModal(false);
+          setClientModalError('');
+          setClientModalSuccess('');
+        }}
+        onSubmit={handleAddClient}
+        fields={clientModalFields}
+        onFieldChange={handleClientModalFieldChange}
+        error={clientModalError}
+        success={clientModalSuccess}
+        loading={clientModalLoading}
+        onTechChange={handleClientModalTechChange}
+      />
+      {selectedJD === 'new' && (
+        <div className={styles.modalOverlay}>
+          <motion.div 
+            className={styles.modal}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+          >
+            <form onSubmit={handleJDModalSubmit}>
+              <div className={styles.modalHeader}>
+                <h3>Add New Job Description</h3>
+                <button 
+                  className={styles.closeButton}
+                  type="button"
+                  onClick={resetJDModal}
+                >
+                  <FiX />
+                </button>
+              </div>
+              <div className={styles.modalContent}>
+                {jdModalError && <div className={styles.errorMessage}>{jdModalError}</div>}
+                {jdModalSuccess && <div className={styles.successMessage}>{jdModalSuccess}</div>}
+                <div className={styles.formGroup}>
+                  <label>Title *</label>
+                  <input
+                    type="text"
+                    value={jdModalFields.title}
+                    onChange={e => handleJDModalFieldChange('title', e.target.value)}
+                    placeholder="Enter JD title"
+                    className={styles.input}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Client *</label>
+                  <select
+                    value={jdModalFields.client}
+                    onChange={e => handleJDModalFieldChange('client', e.target.value)}
+                    className={styles.input}
+                  >
+                    <option value="">Select client</option>
+                    {clients.map(client => (
+                      <option key={client.id} value={client.name}>{client.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Technology *</label>
+                  <select
+                    value={jdModalFields.technology}
+                    onChange={e => handleJDModalFieldChange('technology', e.target.value)}
+                    className={styles.input}
+                  >
+                    <option value="">Select technology</option>
+                    <option value="Java">Java</option>
+                    <option value="Python">Python</option>
+                    <option value=".NET">.NET</option>
+                    <option value="DevOps">DevOps</option>
+                    <option value="SalesForce">SalesForce</option>
+                    <option value="UI">UI</option>
+                    <option value="Testing">Testing</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Resource Type *</label>
+                  <select
+                    value={jdModalFields.resourceType}
+                    onChange={e => handleJDModalFieldChange('resourceType', e.target.value)}
+                    className={styles.input}
+                  >
+                    <option value="">Select type</option>
+                    <option value="TT">TT</option>
+                    <option value="TCT">TCT</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Description</label>
+                  <textarea
+                    value={jdModalFields.description}
+                    onChange={e => handleJDModalFieldChange('description', e.target.value)}
+                    placeholder="Enter JD description"
+                    className={styles.input}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Received Date</label>
+                  <input
+                    type="date"
+                    value={jdModalFields.receivedDate}
+                    onChange={e => handleJDModalFieldChange('receivedDate', e.target.value)}
+                    className={styles.input}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Deadline</label>
+                  <input
+                    type="date"
+                    value={jdModalFields.deadline}
+                    onChange={e => handleJDModalFieldChange('deadline', e.target.value)}
+                    className={styles.input}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Upload JD File *</label>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleJDModalFileChange}
+                    className={styles.input}
+                  />
+                  {jdModalFile && <span style={{fontSize:'0.9em'}}>{jdModalFile.name}</span>}
+                </div>
+                <div className={styles.modalFooter}>
+                  <button 
+                    className={`${styles.button} ${styles.secondary}`}
+                    type="button"
+                    onClick={resetJDModal}
+                    disabled={jdModalLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className={`${styles.button} ${styles.primary}`}
+                    type="submit"
+                    disabled={jdModalLoading}
+                  >
+                    {jdModalLoading ? 'Uploading...' : 'Submit'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

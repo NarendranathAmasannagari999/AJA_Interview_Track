@@ -11,6 +11,14 @@ import {
   PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, LineChart, Line
 } from 'recharts';
 import styles from './DeliveryTeamDashboard.module.css';
+import { 
+  getEmployees, 
+  scheduleMockInterview, 
+  scheduleInterview,
+  updateMockInterviewFeedback,
+  getUpcomingInterviews,
+  getCompletedInterviews 
+} from '../../API/delivery';
 
 const DeliveryTeamDashboard = () => {
   const [activeTab, setActiveTab] = useState('employees');
@@ -28,147 +36,147 @@ const DeliveryTeamDashboard = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [profilesSentToSales, setProfilesSentToSales] = useState([]);
   const [deployedEmployees, setDeployedEmployees] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [interviewType, setInterviewType] = useState('mock');
+  const [client, setClient] = useState('');
+  const [level, setLevel] = useState('');
+  const [jobDescriptionTitle, setJobDescriptionTitle] = useState('');
+  const [meetingLink, setMeetingLink] = useState('');
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const technologies = ['Java', 'Python', '.NET', 'DevOps', 'SalesForce', 'UI Development', 'Testing'];
-  const resourceTypes = ['TCT', 'TT'];
+  const resourceTypes = ['OM', 'TCT1', 'TCT2'];
+
+  const LoadingSpinner = () => (
+    <div className={styles.loadingContainer}>
+      <div className={styles.spinner}></div>
+      <p>Loading dashboard data...</p>
+    </div>
+  );
+
+  const ErrorMessage = ({ message }) => (
+    <div className={styles.errorContainer}>
+      <h3>Error</h3>
+      <p>{message}</p>
+      <button 
+        className={styles.primaryButton}
+        onClick={fetchData}
+        disabled={isLoading}
+      >
+        {isLoading ? 'Loading...' : 'Try Again'}
+      </button>
+    </div>
+  );
+
+  const validateEmployeeData = (employee) => {
+    return employee && typeof employee === 'object' && 
+           typeof employee.id === 'string' &&
+           typeof employee.name === 'string' &&
+           typeof employee.technology === 'string' &&
+           typeof employee.resourceType === 'string';
+  };
+
+  const validateInterviewData = (interview) => {
+    return interview && typeof interview === 'object' &&
+           typeof interview.id === 'string' &&
+           typeof interview.employeeId === 'string' &&
+           typeof interview.status === 'string' &&
+           (!interview.ratings || (
+             typeof interview.ratings === 'object' &&
+             typeof interview.ratings.technical === 'number' &&
+             typeof interview.ratings.communication === 'number'
+           ));
+  };
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Fetch employees
+      const employeesData = await getEmployees(technologyFilter, resourceTypeFilter);
+      setEmployees(Array.isArray(employeesData) ? employeesData : []);
+
+      // Fetch interviews
+      const [upcomingData, completedData] = await Promise.all([
+        getUpcomingInterviews(),
+        getCompletedInterviews()
+      ]);
+
+      const allInterviews = [
+        ...(Array.isArray(upcomingData) ? upcomingData : []),
+        ...(Array.isArray(completedData) ? completedData : [])
+      ];
+      setMockInterviews(allInterviews);
+
+      // Update profiles sent to sales and deployed employees
+      const sentToSales = Array.isArray(completedData) 
+        ? completedData
+            .filter(i => i && i.sentToSales)
+            .map(i => i.employeeId)
+        : [];
+      setProfilesSentToSales(sentToSales);
+
+      const deployed = Array.isArray(completedData)
+        ? completedData
+            .filter(i => i && i.deployed)
+            .map(i => i.employeeId)
+        : [];
+      setDeployedEmployees(deployed);
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setError('Failed to load dashboard data. Please try again.');
+      
+      // Set empty arrays for all data
+      setEmployees([]);
+      setMockInterviews([]);
+      setProfilesSentToSales([]);
+      setDeployedEmployees([]);
+    } finally {
+      setIsLoading(false);
+      setIsInitialLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Mock data - in real app, this would come from API
-    const mockEmployees = [
-      { id: 1, name: 'John Doe', technology: 'Java', resourceType: 'TCT', level: 'Intermediate', status: 'active' },
-      { id: 2, name: 'Jane Smith', technology: 'Python', resourceType: 'TT', level: 'Senior', status: 'active' },
-      { id: 3, name: 'Mike Johnson', technology: '.NET', resourceType: 'TCT', level: 'Junior', status: 'active' },
-      { id: 4, name: 'Sarah Williams', technology: 'DevOps', resourceType: 'TT', level: 'Intermediate', status: 'active' },
-      { id: 5, name: 'David Brown', technology: 'SalesForce', resourceType: 'TT', level: 'Senior', status: 'active' },
-      { id: 6, name: 'Emily Davis', technology: 'UI Development', resourceType: 'TCT', level: 'Intermediate', status: 'active' },
-      { id: 7, name: 'Robert Wilson', technology: 'Testing', resourceType: 'TT', level: 'Junior', status: 'active' },
-      { id: 8, name: 'Lisa Ray', technology: 'Java', resourceType: 'TT', level: 'Senior', status: 'active' },
-      { id: 9, name: 'Mark Taylor', technology: 'Python', resourceType: 'TCT', level: 'Intermediate', status: 'active' },
-    ];
+    fetchData();
+  }, [technologyFilter, resourceTypeFilter]);
 
-    const mockInterviewsData = [
-      { 
-        id: 1, 
-        employeeId: 1, 
-        employeeName: 'John Doe', 
-        date: '2023-06-15', 
-        interviewer: 'Alex Johnson', 
-        status: 'completed', 
-        ratings: { technical: 8, communication: 7 },
-        feedback: { 
-          technical: 'Strong core Java skills but needs improvement in Spring Boot', 
-          communication: 'Good communication but could improve clarity in explanations' 
-        },
-        sentToSales: true,
-        deployed: false
-      },
-      { 
-        id: 2, 
-        employeeId: 2, 
-        employeeName: 'Jane Smith', 
-        date: '2023-06-16', 
-        interviewer: 'Alex Johnson', 
-        status: 'completed', 
-        ratings: { technical: 9, communication: 8 },
-        feedback: { 
-          technical: 'Excellent Python skills with strong problem-solving abilities', 
-          communication: 'Clear and concise communicator' 
-        },
-        sentToSales: true,
-        deployed: true
-      },
-      { 
-        id: 3, 
-        employeeId: 3, 
-        employeeName: 'Mike Johnson', 
-        date: '2023-06-10', 
-        interviewer: 'Sam Wilson', 
-        status: 'completed', 
-        ratings: { technical: 7, communication: 6 },
-        feedback: { 
-          technical: 'Good understanding of .NET basics but needs more practice with Entity Framework', 
-          communication: 'Needs to work on technical vocabulary' 
-        },
-        sentToSales: false,
-        deployed: false
-      },
-      { 
-        id: 4, 
-        employeeId: 4, 
-        employeeName: 'Sarah Williams', 
-        date: '2023-06-17', 
-        interviewer: 'Alex Johnson', 
-        status: 'completed', 
-        ratings: { technical: 9, communication: 8 },
-        feedback: { 
-          technical: 'Excellent DevOps knowledge, especially in CI/CD pipelines', 
-          communication: 'Very good at explaining complex concepts' 
-        },
-        sentToSales: true,
-        deployed: true
-      },
-      { 
-        id: 5, 
-        employeeId: 5, 
-        employeeName: 'David Brown', 
-        date: '2023-06-20', 
-        interviewer: 'Sam Wilson', 
-        status: 'completed', 
-        ratings: { technical: 10, communication: 9 },
-        feedback: { 
-          technical: 'Exceptional Salesforce knowledge with practical implementation skills', 
-          communication: 'Excellent client-facing communication skills' 
-        },
-        sentToSales: true,
-        deployed: true
-      },
-      { 
-        id: 6, 
-        employeeId: 6, 
-        employeeName: 'Emily Davis', 
-        date: '2023-06-25', 
-        interviewer: 'Sam Wilson', 
-        status: 'scheduled' 
-      },
-      { 
-        id: 7, 
-        employeeId: 7, 
-        employeeName: 'Robert Wilson', 
-        date: '2023-06-28', 
-        interviewer: 'Alex Johnson', 
-        status: 'scheduled' 
-      },
-    ];
+  const filteredEmployees = Array.isArray(employees) 
+    ? employees.filter(employee => {
+        if (!employee) return false;
+        
+        const matchesSearch = employee.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false;
+        const matchesTechnology = technologyFilter === 'all' || employee.technology === technologyFilter;
+        const matchesResourceType = resourceTypeFilter === 'all' || employee.resourceType === resourceTypeFilter;
+        
+        return matchesSearch && matchesTechnology && matchesResourceType;
+      })
+    : [];
 
-    setEmployees(mockEmployees);
-    setMockInterviews(mockInterviewsData);
-    setProfilesSentToSales(mockInterviewsData.filter(i => i.sentToSales).map(i => i.employeeId));
-    setDeployedEmployees(mockInterviewsData.filter(i => i.deployed).map(i => i.employeeId));
-  }, []);
+  const upcomingInterviews = Array.isArray(mockInterviews) 
+    ? mockInterviews.filter(i => i && i.status === 'scheduled')
+    : [];
 
-  const filteredEmployees = employees.filter(employee => {
-    const matchesSearch = employee.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTechnology = technologyFilter === 'all' || employee.technology === technologyFilter;
-    const matchesResourceType = resourceTypeFilter === 'all' || employee.resourceType === resourceTypeFilter;
-    return matchesSearch && matchesTechnology && matchesResourceType;
-  });
-
-  const upcomingInterviews = mockInterviews.filter(i => i.status === 'scheduled');
-  const completedInterviews = mockInterviews.filter(i => i.status === 'completed');
+  const completedInterviews = Array.isArray(mockInterviews)
+    ? mockInterviews.filter(i => i && i.status === 'completed')
+    : [];
 
   // Calculate average ratings by technology
   const techPerformanceData = technologies.map(tech => {
     const techInterviews = completedInterviews.filter(i => {
-      const emp = employees.find(e => e.id === i.employeeId);
+      const emp = (employees || []).find(e => e && e.id === i.employeeId);
       return emp && emp.technology === tech;
     });
     
     const avgTechnical = techInterviews.length > 0 
-      ? techInterviews.reduce((sum, i) => sum + i.ratings.technical, 0) / techInterviews.length
+      ? techInterviews.reduce((sum, i) => sum + (i.ratings?.technical || 0), 0) / techInterviews.length
       : 0;
       
     const avgCommunication = techInterviews.length > 0 
-      ? techInterviews.reduce((sum, i) => sum + i.ratings.communication, 0) / techInterviews.length
+      ? techInterviews.reduce((sum, i) => sum + (i.ratings?.communication || 0), 0) / techInterviews.length
       : 0;
       
     return { 
@@ -182,16 +190,16 @@ const DeliveryTeamDashboard = () => {
   // Calculate average ratings by resource type
   const resourcePerformanceData = resourceTypes.map(type => {
     const typeInterviews = completedInterviews.filter(i => {
-      const emp = employees.find(e => e.id === i.employeeId);
+      const emp = (employees || []).find(e => e && e.id === i.employeeId);
       return emp && emp.resourceType === type;
     });
     
     const avgTechnical = typeInterviews.length > 0 
-      ? typeInterviews.reduce((sum, i) => sum + i.ratings.technical, 0) / typeInterviews.length
+      ? typeInterviews.reduce((sum, i) => sum + (i.ratings?.technical || 0), 0) / typeInterviews.length
       : 0;
       
     const avgCommunication = typeInterviews.length > 0 
-      ? typeInterviews.reduce((sum, i) => sum + i.ratings.communication, 0) / typeInterviews.length
+      ? typeInterviews.reduce((sum, i) => sum + (i.ratings?.communication || 0), 0) / typeInterviews.length
       : 0;
       
     return { 
@@ -204,13 +212,13 @@ const DeliveryTeamDashboard = () => {
 
   // Top performers (average of technical and communication >= 8)
   const topPerformers = completedInterviews
-    .filter(i => (i.ratings.technical + i.ratings.communication) / 2 >= 8)
+    .filter(i => i && i.ratings && ((i.ratings.technical + i.ratings.communication) / 2 >= 8))
     .map(i => {
-      const emp = employees.find(e => e.id === i.employeeId);
+      const emp = (employees || []).find(e => e && e.id === i.employeeId);
       return {
         ...i,
-        technology: emp ? emp.technology : '',
-        resourceType: emp ? emp.resourceType : ''
+        technology: emp?.technology || '',
+        resourceType: emp?.resourceType || ''
       };
     });
 
@@ -249,16 +257,140 @@ const DeliveryTeamDashboard = () => {
     }));
   };
 
-  const sendToSales = (employeeId) => {
-    if (!profilesSentToSales.includes(employeeId)) {
-      setProfilesSentToSales([...profilesSentToSales, employeeId]);
-      alert(`Profile sent to Sales Team`);
+  const validateScheduleForm = () => {
+    if (!selectedEmployee) {
+      setError('Please select an employee');
+      return false;
+    }
+    if (!interviewDate) {
+      setError('Please select interview date and time');
+      return false;
+    }
+    if (!interviewer) {
+      setError('Please enter interviewer name');
+      return false;
+    }
+    if (interviewType !== 'mock') {
+      if (!client) {
+        setError('Please enter client name');
+        return false;
+      }
+      if (!level) {
+        setError('Please select job level');
+        return false;
+      }
+      if (!jobDescriptionTitle) {
+        setError('Please enter job description title');
+        return false;
+      }
+      if (!meetingLink) {
+        setError('Please enter meeting link');
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleScheduleInterview = async (empId, date, time, interviewer) => {
+    if (!validateScheduleForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const [interviewDate, interviewTime] = date.split('T');
+      
+      if (interviewType === 'mock') {
+        const interview = await scheduleMockInterview(empId, interviewDate, interviewTime, interviewer);
+        setMockInterviews(prev => [...prev, interview]);
     } else {
-      alert('Profile already sent to Sales Team');
+        const interview = await scheduleInterview({
+          empId,
+          interviewType,
+          date: interviewDate,
+          time: interviewTime,
+          client,
+          interviewer,
+          level,
+          jobDescriptionTitle,
+          meetingLink
+        });
+        setMockInterviews(prev => [...prev, interview]);
+      }
+      
+      // Show success message
+      setError(null);
+      setIsScheduling(false);
+      
+      // Reset form fields
+      setInterviewDate('');
+      setInterviewer('');
+      setSelectedEmployee(null);
+      setInterviewType('mock');
+      setClient('');
+      setLevel('');
+      setJobDescriptionTitle('');
+      setMeetingLink('');
+    } catch (error) {
+      console.error('Error scheduling interview:', error);
+      setError(error.response?.data?.message || 'Failed to schedule interview. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateFeedback = async (interviewId, feedback, technicalScore, communicationScore) => {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const updatedInterview = await updateMockInterviewFeedback(
+        interviewId,
+        feedback,
+        technicalScore,
+        communicationScore
+      );
+      
+      setMockInterviews(prev => 
+        prev.map(interview => 
+          interview.id === interviewId ? updatedInterview : interview
+        )
+      );
+      
+      setSelectedEmployee(null);
+      setFeedback({ technical: '', communication: '' });
+      setRatings({ technical: 0, communication: 0 });
+    } catch (error) {
+      console.error('Error updating feedback:', error);
+      setError('Failed to update feedback. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const sendToSales = async (employeeId) => {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      await sendToSales(employeeId);
+      setProfilesSentToSales(prev => [...prev, employeeId]);
+    } catch (error) {
+      console.error('Error sending to sales:', error);
+      setError('Failed to send profile to sales. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const renderTabContent = () => {
+    if (isLoading) {
+      return <LoadingSpinner />;
+    }
+
+    if (error) {
+      return <ErrorMessage message={error} />;
+    }
+
     switch (activeTab) {
       case 'employees':
         return (
@@ -750,8 +882,283 @@ const DeliveryTeamDashboard = () => {
     return '#ef4444';
   };
 
+  const renderModalActions = () => (
+    <div className={styles.modalActions}>
+      <button 
+        className={styles.primaryButton}
+        disabled={isSubmitting}
+        onClick={() => {
+          if (selectedEmployee) {
+            handleUpdateFeedback(
+              selectedEmployee.id,
+              feedback,
+              ratings.technical,
+              ratings.communication
+            );
+          }
+        }}
+      >
+        {isSubmitting ? (
+          <>
+            <div className={styles.spinner} style={{ width: '20px', height: '20px', margin: '0' }} />
+            Saving...
+          </>
+        ) : (
+          'Save Evaluation'
+        )}
+      </button>
+      <button 
+        className={styles.secondaryButton}
+        disabled={isSubmitting}
+        onClick={() => {
+          setSelectedEmployee(null);
+          setFeedback({ technical: '', communication: '' });
+          setRatings({ technical: 0, communication: 0 });
+        }}
+      >
+        Cancel
+      </button>
+    </div>
+  );
+
+  const renderScheduleForm = () => (
+    <div className={styles.scheduleForm}>
+      {selectedEmployee ? (
+        <div className={styles.employeeInfo}>
+          <h4>Employee: {selectedEmployee.name}</h4>
+          <div className={styles.employeeMeta}>
+            <span className={`${styles.techBadge} ${styles[selectedEmployee.technology.replace(' ', '')]}`}>
+              {selectedEmployee.technology}
+            </span>
+            <span className={`${styles.resourceBadge} ${styles[selectedEmployee.resourceType]}`}>
+              {selectedEmployee.resourceType}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className={styles.formGroup}>
+          <label>Select Employee</label>
+          <select
+            value={selectedEmployee?.id || ''}
+            onChange={(e) => {
+              const employee = employees.find(emp => emp.id === e.target.value);
+              setSelectedEmployee(employee);
+            }}
+          >
+            <option value="">Select an employee</option>
+            {employees.map(employee => (
+              <option key={employee.id} value={employee.id}>{employee.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      
+      <div className={styles.formGroup}>
+        <label>Interview Type</label>
+        <select
+          value={interviewType}
+          onChange={(e) => setInterviewType(e.target.value)}
+        >
+          <option value="mock">Mock Interview</option>
+          <option value="client">Client Interview</option>
+          <option value="technical">Technical Interview</option>
+          <option value="hr">HR Interview</option>
+        </select>
+      </div>
+      
+      <div className={styles.formGroup}>
+        <label>Interview Date & Time</label>
+        <input
+          type="datetime-local"
+          value={interviewDate}
+          onChange={(e) => setInterviewDate(e.target.value)}
+          min={new Date().toISOString().slice(0, 16)}
+        />
+      </div>
+      
+      <div className={styles.formGroup}>
+        <label>Interviewer</label>
+        <input
+          type="text"
+          placeholder="Enter interviewer name"
+          value={interviewer}
+          onChange={(e) => setInterviewer(e.target.value)}
+        />
+      </div>
+
+      {interviewType !== 'mock' && (
+        <>
+          <div className={styles.formGroup}>
+            <label>Client Name</label>
+            <input
+              type="text"
+              placeholder="Enter client name"
+              value={client}
+              onChange={(e) => setClient(e.target.value)}
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Level</label>
+            <select
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
+            >
+              <option value="">Select level</option>
+              <option value="1">Level 1</option>
+              <option value="2">Level 2</option>
+              <option value="3">Level 3</option>
+              <option value="4">Level 4</option>
+            </select>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Job Description Title</label>
+            <input
+              type="text"
+              placeholder="Enter job description title"
+              value={jobDescriptionTitle}
+              onChange={(e) => setJobDescriptionTitle(e.target.value)}
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>Meeting Link</label>
+            <input
+              type="url"
+              placeholder="Enter meeting link (e.g., https://meet.google.com/xxx-yyyy-zzz)"
+              value={meetingLink}
+              onChange={(e) => setMeetingLink(e.target.value)}
+              pattern="https?://.+"
+              title="Please enter a valid URL starting with http:// or https://"
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  const renderScheduleModal = () => (
+    <motion.div 
+      className={styles.modalContent}
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.9, opacity: 0 }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className={styles.modalHeader}>
+        <h3>Schedule Interview</h3>
+        <button 
+          className={styles.closeButton}
+          onClick={() => {
+            setIsScheduling(false);
+            setInterviewDate('');
+            setInterviewer('');
+            setSelectedEmployee(null);
+            setInterviewType('mock');
+            setClient('');
+            setLevel('');
+            setJobDescriptionTitle('');
+            setMeetingLink('');
+          }}
+        >
+          &times;
+        </button>
+      </div>
+      
+      {renderScheduleForm()}
+      
+      {renderScheduleModalActions()}
+    </motion.div>
+  );
+
+  const renderScheduleModalActions = () => (
+    <div className={styles.modalActions}>
+      <button 
+        className={styles.primaryButton}
+        disabled={isSubmitting}
+        onClick={() => {
+          if (selectedEmployee) {
+            handleScheduleInterview(
+              selectedEmployee.id,
+              interviewDate,
+              interviewDate.split('T')[1],
+              interviewer
+            );
+          }
+        }}
+      >
+        {isSubmitting ? (
+          <>
+            <div className={styles.spinner} style={{ width: '20px', height: '20px', margin: '0' }} />
+            Scheduling...
+          </>
+        ) : (
+          'Schedule Interview'
+        )}
+      </button>
+      <button 
+        className={styles.secondaryButton}
+        disabled={isSubmitting}
+        onClick={() => {
+          setIsScheduling(false);
+          setInterviewDate('');
+          setInterviewer('');
+          setSelectedEmployee(null);
+          setInterviewType('mock');
+          setClient('');
+          setLevel('');
+          setJobDescriptionTitle('');
+          setMeetingLink('');
+          setError(null);
+        }}
+      >
+        Cancel
+      </button>
+    </div>
+  );
+
+  // Add error boundary component
+  const ErrorBoundary = ({ children }) => {
+    const [hasError, setHasError] = useState(false);
+    const [errorInfo, setErrorInfo] = useState(null);
+
+    if (hasError) {
   return (
+        <div className={styles.errorContainer}>
+          <h3>Something went wrong</h3>
+          <p>Please try refreshing the page or contact support if the problem persists.</p>
+          <button 
+            className={styles.primaryButton}
+            onClick={() => window.location.reload()}
+          >
+            Refresh Page
+          </button>
+        </div>
+      );
+    }
+
+    return children;
+  };
+
+  // Add loading component
+  const LoadingState = () => (
+    <div className={styles.loadingContainer}>
+      <div className={styles.spinner}></div>
+      <p>{isInitialLoading ? 'Loading dashboard...' : 'Updating data...'}</p>
+    </div>
+  );
+
+  // Wrap the main content with error boundary
+  return (
+    <ErrorBoundary>
     <div className={styles.dashboardContainer}>
+        {isInitialLoading ? (
+          <LoadingState />
+        ) : error ? (
+          <ErrorMessage message={error} />
+        ) : (
+          <>
       <div className={styles.dashboardHeader}>
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -805,7 +1212,7 @@ const DeliveryTeamDashboard = () => {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
       >
-        {renderTabContent()}
+              {isLoading ? <LoadingState /> : renderTabContent()}
       </motion.div>
       
       <AnimatePresence>
@@ -938,30 +1345,7 @@ const DeliveryTeamDashboard = () => {
                 </div>
               </div>
               
-              <div className={styles.modalActions}>
-                <button 
-                  className={styles.primaryButton}
-                  onClick={() => {
-                    // Save feedback
-                    alert(`Feedback saved for ${selectedEmployee.name}`);
-                    setSelectedEmployee(null);
-                    setFeedback({ technical: '', communication: '' });
-                    setRatings({ technical: 0, communication: 0 });
-                  }}
-                >
-                  Save Evaluation
-                </button>
-                <button 
-                  className={styles.secondaryButton}
-                  onClick={() => {
-                    setSelectedEmployee(null);
-                    setFeedback({ technical: '', communication: '' });
-                    setRatings({ technical: 0, communication: 0 });
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
+                    {renderModalActions()}
             </motion.div>
           </motion.div>
         )}
@@ -976,109 +1360,14 @@ const DeliveryTeamDashboard = () => {
             exit={{ opacity: 0 }}
             onClick={() => setIsScheduling(false)}
           >
-            <motion.div 
-              className={styles.modalContent}
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className={styles.modalHeader}>
-                <h3>Schedule Mock Interview</h3>
-                <button 
-                  className={styles.closeButton}
-                  onClick={() => setIsScheduling(false)}
-                >
-                  &times;
-                </button>
-              </div>
-              
-              <div className={styles.scheduleForm}>
-                {selectedEmployee ? (
-                  <div className={styles.employeeInfo}>
-                    <h4>Employee: {selectedEmployee.name}</h4>
-                    <div className={styles.employeeMeta}>
-                      <span className={`${styles.techBadge} ${styles[selectedEmployee.technology.replace(' ', '')]}`}>
-                        {selectedEmployee.technology}
-                      </span>
-                      <span className={`${styles.resourceBadge} ${styles[selectedEmployee.resourceType]}`}>
-                        {selectedEmployee.resourceType}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className={styles.formGroup}>
-                    <label>Select Employee</label>
-                    <select>
-                      <option value="">Select an employee</option>
-                      {employees.map(employee => (
-                        <option key={employee.id} value={employee.id}>{employee.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                
-                <div className={styles.formGroup}>
-                  <label>Interview Date & Time</label>
-                  <input
-                    type="datetime-local"
-                    value={interviewDate}
-                    onChange={(e) => setInterviewDate(e.target.value)}
-                  />
-                </div>
-                
-                <div className={styles.formGroup}>
-                  <label>Interviewer</label>
-                  <input
-                    type="text"
-                    placeholder="Enter interviewer name"
-                    value={interviewer}
-                    onChange={(e) => setInterviewer(e.target.value)}
-                  />
-                </div>
-                
-                <div className={styles.formGroup}>
-                  <label>Interview Type</label>
-                  <select>
-                    <option value="technical">Technical Interview</option>
-                    <option value="behavioral">Behavioral Interview</option>
-                    <option value="system_design">System Design Interview</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className={styles.modalActions}>
-                <button 
-                  className={styles.primaryButton}
-                  disabled={!interviewDate || !interviewer}
-                  onClick={() => {
-                    // Schedule interview
-                    alert(`Interview scheduled for ${selectedEmployee?.name || 'selected employee'}`);
-                    setIsScheduling(false);
-                    setInterviewDate('');
-                    setInterviewer('');
-                    setSelectedEmployee(null);
-                  }}
-                >
-                  Schedule Interview
-                </button>
-                <button 
-                  className={styles.secondaryButton}
-                  onClick={() => {
-                    setIsScheduling(false);
-                    setInterviewDate('');
-                    setInterviewer('');
-                    setSelectedEmployee(null);
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.div>
+                  {renderScheduleModal()}
           </motion.div>
         )}
       </AnimatePresence>
+          </>
+        )}
     </div>
+    </ErrorBoundary>
   );
 };
 

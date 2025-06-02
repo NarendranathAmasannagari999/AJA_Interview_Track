@@ -20,6 +20,9 @@ function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
+  // Only show sidebar for dashboard pages
+  const sidebarVisible = !['/', '/login', '/register', '/about'].includes(location.pathname);
+
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
     document.body.classList.toggle('dark-mode');
@@ -31,15 +34,17 @@ function AppContent() {
 
   return (
     <div className={`app ${darkMode ? 'dark' : 'light'}`}>
-      <Sidebar
-        darkMode={darkMode}
-        toggleDarkMode={toggleDarkMode}
-        onToggle={handleSidebarToggle}
-      />
+      {sidebarVisible && (
+        <Sidebar
+          darkMode={darkMode}
+          toggleDarkMode={toggleDarkMode}
+          onToggle={handleSidebarToggle}
+        />
+      )}
       <main
         className="main-content"
         style={{
-          marginLeft: sidebarCollapsed ? '70px' : '250px',
+          marginLeft: sidebarVisible ? (sidebarCollapsed ? '70px' : '250px') : '0',
           transition: 'margin-left 0.3s ease',
         }}
       >

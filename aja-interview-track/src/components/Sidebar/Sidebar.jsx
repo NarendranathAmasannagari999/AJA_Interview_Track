@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   FaHome, FaChartLine, FaTruck, FaShoppingCart, FaInfoCircle,
@@ -15,15 +15,25 @@ import styles from './Sidebar.module.css';
 const Sidebar = ({ darkMode, toggleDarkMode, onToggle }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
+  // Get user role from localStorage
+  const userRole = localStorage.getItem('userRole');
+
+  // Filter menu items based on role
   const menuItems = [
-    { path: "/", icon: <FiHome size={20} />, activeIcon: <FaHome size={20} />, label: "Home" },
-    { path: "/dashboard/employee", icon: <FiBarChart2 size={20} />, activeIcon: <FaChartLine size={20} />, label: "Employee" },
-    { path: "/dashboard/delivery-team", icon: <FiTruck size={20} />, activeIcon: <FaTruck size={20} />, label: "Delivery" },
-    { path: "/dashboard/sales-team", icon: <FiShoppingCart size={20} />, activeIcon: <FaShoppingCart size={20} />, label: "Sales" },
-    { path: "/about", icon: <FiInfo size={20} />, activeIcon: <FaInfoCircle size={20} />, label: "About" },
+    // { path: "/", icon: <FiHome size={20} />, activeIcon: <FaHome size={20} />, label: "Home" },
+    // ...(userRole === 'ROLE_EMPLOYEE' ? [
+    //   { path: "/dashboard/employee", icon: <FiBarChart2 size={20} />, activeIcon: <FaChartLine size={20} />, label: "Employee" },
+    // ] : []),
+    ...(userRole === 'ROLE_DELIVERY_TEAM' ? [
+      { path: "/dashboard/delivery-team", icon: <FiTruck size={20} />, activeIcon: <FaTruck size={20} />, label: "Delivery" },
+    ] : []),
+    ...(userRole === 'ROLE_SALES_TEAM' ? [
+      { path: "/dashboard/sales-team", icon: <FiShoppingCart size={20} />, activeIcon: <FaShoppingCart size={20} />, label: "Sales" },
+    ] : []),
+    // { path: "/about", icon: <FiInfo size={20} />, activeIcon: <FaInfoCircle size={20} />, label: "About" },
     { path: "/dashboard/admin", icon: <FiBarChart2 size={20} />, activeIcon: <FaChartLine size={20} />, label: "Admin" }
-
   ];
 
   const authItems = [
@@ -31,9 +41,16 @@ const Sidebar = ({ darkMode, toggleDarkMode, onToggle }) => {
     { path: "/register", icon: <FiUserPlus size={20} />, activeIcon: <FaUserPlus size={20} />, label: "Register" }
   ];
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userRole');
+    // Remove any other user-related data if needed
+    navigate('/login');
+  };
+
   const bottomItems = [
     { path: "/settings", icon: <FiSettings size={20} />, activeIcon: <FaCog size={20} />, label: "Settings" },
-    { action: () => { /* handle logout */ }, icon: <FiLogOut size={20} />, activeIcon: <FaSignOutAlt size={20} />, label: "Logout" }
+    { action: handleLogout, icon: <FiLogOut size={20} />, activeIcon: <FaSignOutAlt size={20} />, label: "Logout" }
   ];
 
   const handleToggle = () => {
@@ -91,7 +108,7 @@ const Sidebar = ({ darkMode, toggleDarkMode, onToggle }) => {
         </ul>
       </div>
 
-      <div className={styles.menuSection}>
+      {/* <div className={styles.menuSection}>
         {!isCollapsed && <p className={styles.menuTitle}>Account</p>}
         <ul className={styles.menu}>
           {authItems.map((item) => (
@@ -110,7 +127,7 @@ const Sidebar = ({ darkMode, toggleDarkMode, onToggle }) => {
             </motion.li>
           ))}
         </ul>
-      </div>
+      </div> */}
 
       <div className={styles.bottomMenu}>
         <ul className={styles.menu}>

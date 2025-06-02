@@ -1,184 +1,76 @@
-.authWrapper {
-  position: relative;
-  width: 800px;
-  max-width: 98vw;
-  height: 480px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-  border-radius: 30px;
-  background: #fff;
-  overflow: hidden;
-  margin-top: 6%;
-  margin-left: 15%;
-}
-
-.formSide {
-  width: 50%;
-  height: 100%;
+.container {
+  min-height: 100vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  z-index: 1;
-  position: absolute;
-  top: 0;
-  transition: transform 1.5s cubic-bezier(0.77,0,0.175,1);
-  opacity: 0;
-  pointer-events: none;
+  background: #f9fafb;
+  padding: 2rem;
 }
 
-.formSide.active {
-  opacity: 1;
-  pointer-events: auto;
-  position: absolute;
+.formWrapper {
+  width: 100%;
+  max-width: 400px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  padding: 2rem 2rem 1.5rem 2rem;
 }
 
-#registerSide {
-  left: 0;
-  transform: translateY(-600px);
+.heading {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #22223b;
+  margin-bottom: 1.5rem;
 }
 
-#registerSide.active {
-  transform: translateY(0);
-  z-index: 2;
-}
-
-#loginSide {
-  left: 0;
-  transform: translateY(500px);
-}
-
-#loginSide.active {
-  transform: translateY(0);
-  z-index: 2;
-}
-
-.formSide h2 {
-  margin-bottom: 18px;
-  color: #0072ff;
-}
-
-.formSide form {
+.form {
   display: flex;
   flex-direction: column;
-  width: 80%;
-  max-width: 300px;
+  gap: 1.2rem;
 }
 
-.formGroup {
-  margin-bottom: 14px;
+.input, .select {
   width: 100%;
-}
-
-.formSide input {
-  width: 100%;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
+  padding: 0.75rem 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
   font-size: 1rem;
+  background: #f8fafc;
+  color: #22223b;
+  transition: border 0.2s;
 }
-
-.errorInput {
-  border-color: #ff3860 !important;
-}
-
-.errorText {
-  color: #ff3860;
-  font-size: 0.8rem;
-  margin-top: 4px;
-  display: block;
-}
-
-.apiError {
-  color: #ff3860;
-  background-color: #ffecef;
-  padding: 10px;
-  border-radius: 5px;
-  margin-bottom: 10px;
-  font-size: 0.9rem;
-  text-align: center;
-}
-
-.roleSelect {
-  width: 100%;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  font-size: 1rem;
-  background-color: white;
-  cursor: pointer;
-}
-
-.roleSelect:focus {
+.input:focus, .select:focus {
+  border-color: #6366f1;
   outline: none;
-  border-color: #0072ff;
 }
 
-.submitButton {
-  background: #0072ff;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 12px;
-  font-size: 1.1rem;
-  font-weight: bold;
-  cursor: pointer;
-  margin-top: 8px;
-  transition: background 0.2s;
+.button {
   width: 100%;
-}
-
-.submitButton:hover {
-  background: #005bb5;
-}
-
-.submitButton:disabled {
-  background: #cccccc;
-  cursor: not-allowed;
-}
-
-.overlay {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 150%;
-  height: 100%;
-  background: linear-gradient(120deg, #00c6ff, #0072ff);
-  border-radius: 3000px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-  display: flex;
-  align-items: center;
-  justify-content: start;
-  transform: rotate(0deg);
-  z-index: 2;
-  transition: transform 1s cubic-bezier(0.77,0,0.175,1);
-}
-
-.overlay.left {
-  transform: rotate(180deg);
-}
-
-.overlayBtn {
-  min-width: 140px;
-  padding: 20px 30px;
-  font-size: 1.3rem;
-  font-weight: bold;
-  border: none;
-  border-radius: 30px;
-  background: #fff;
-  color: #0072ff;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-  z-index: 3;
-}
-
-.overlayBtn:hover {
-  background: #0072ff;
+  padding: 0.75rem 1rem;
+  background: #6366f1;
   color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.button:hover {
+  background: #4f46e5;
 }
 
-.overlayBtn:disabled {
-  background: #f0f0f0;
-  color: #999;
-  cursor: not-allowed;
+.error {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  text-align: center;
+  font-size: 1rem;
 }
+
+
+

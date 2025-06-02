@@ -7,7 +7,17 @@ import {
   FiSearch, FiShare2, FiDownload, FiMessageSquare, FiHelpCircle
 } from 'react-icons/fi';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import styles from './Dashboard.module.css';
+import styles from './EmployeeDashboard.module.css';
+import {
+  getMockInterviews,
+  getClientInterviews,
+  getJobDescriptions,
+  uploadResume,
+  downloadResume,
+  deleteResume,
+  addInterviewQuestion,
+  getInterviewQuestions
+} from '../../API/employee';
 
 const EmployeeDashboard = () => {
   const [activeTab, setActiveTab] = useState('jd');
@@ -25,135 +35,102 @@ const EmployeeDashboard = () => {
   const [selectedTechnology, setSelectedTechnology] = useState('java');
   const [interviewQuestions, setInterviewQuestions] = useState([]);
   const [deployedEmployees, setDeployedEmployees] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  // Mock data - in real app, this would come from API
+  // Fetch all data on component mount
   useEffect(() => {
-    // Job Descriptions
-    setJobDescriptions([
-      { 
-        id: 1, 
-        title: 'Java Developer', 
-        client: 'Tech Corp', 
-        received: '2023-05-10', 
-        deadline: '2023-05-20',
-        technology: 'java',
-        resourceType: 'TT',
-        description: 'Looking for a Java developer with 3+ years experience in Spring Boot and microservices architecture.'
-      },
-      { 
-        id: 2, 
-        title: 'Senior Python Engineer', 
-        client: 'Data Systems', 
-        received: '2023-05-12', 
-        deadline: '2023-05-22',
-        technology: 'python',
-        resourceType: 'TT',
-        description: 'Python developer needed for data processing pipelines and machine learning applications.'
-      },
-      { 
-        id: 3, 
-        title: '.NET Developer', 
-        client: 'Enterprise Solutions', 
-        received: '2023-05-15', 
-        deadline: '2023-05-25',
-        technology: 'dotnet',
-        resourceType: 'TCT',
-        description: '.NET Core developer with experience in Azure cloud services and API development.'
-      }
-    ]);
+    fetchData();
+  }, [technologyFilter, resourceTypeFilter]);
 
-    // Mock Interviews
-    setMockInterviews([
-      { 
-        id: 1, 
-        date: '2023-05-15', 
-        interviewer: 'John Doe', 
-        technicalScore: 8, 
-        communicationScore: 7,
-        status: 'completed', 
-        feedback: 'Good technical skills but need improvement in system design',
-        technology: 'java',
-        resourceType: 'TT',
-        questions: [
-          'Explain Java memory model',
-          'Difference between ArrayList and LinkedList',
-          'How would you design a URL shortening service?'
-        ]
-      },
-      { 
-        id: 2, 
-        date: '2023-05-18', 
-        interviewer: 'Jane Smith', 
-        technicalScore: 7, 
-        communicationScore: 9,
-        status: 'completed',
-        technology: 'python',
-        resourceType: 'TT',
-        feedback: 'Excellent communication skills and good problem solving approach'
-      },
-      { 
-        id: 3, 
-        date: '2023-05-20', 
-        interviewer: 'Mike Johnson', 
-        status: 'scheduled',
-        technology: 'dotnet',
-        resourceType: 'TCT'
-      }
-    ]);
+  // Add data validation functions
+  const validateArrayData = (data, fallback = []) => {
+    return Array.isArray(data) ? data : fallback;
+  };
 
-    // Client Interviews
-    setClientInterviews([
-      { 
-        id: 1, 
-        client: 'Tech Corp', 
-        date: '2023-05-25', 
-        level: 1, 
-        status: 'scheduled', 
-        jd: 'Java Developer',
-        technology: 'java',
-        resourceType: 'TT',
-        meetingLink: 'https://meet.techcorp.com/interview-123'
-      },
-      { 
-        id: 2, 
-        client: 'Data Systems', 
-        date: '2023-05-28', 
-        level: 2, 
-        status: 'pending', 
-        jd: 'Senior Python Engineer',
-        technology: 'python',
-        resourceType: 'TT'
-      },
-      { 
-        id: 3, 
-        client: 'Enterprise Solutions', 
-        date: '2023-06-02', 
-        level: 1, 
-        status: 'completed', 
-        jd: '.NET Developer',
-        technology: 'dotnet',
-        resourceType: 'TCT',
-        result: 'selected',
-        feedback: 'Strong technical skills and good cultural fit'
-      }
-    ]);
+  const validateInterviewData = (interview) => {
+    return {
+      id: interview?.id || '',
+      employeeName: interview?.employeeName || 'Unknown',
+      technology: interview?.technology || 'Unknown',
+      resourceType: interview?.resourceType || 'TT',
+      client: interview?.client || 'Unknown',
+      date: interview?.date || new Date().toISOString(),
+      status: interview?.status || 'pending',
+      result: interview?.result || 'pending',
+      feedback: interview?.feedback || '',
+      level: interview?.level || 1,
+      jd: interview?.jd || 'Unknown',
+      meetingLink: interview?.meetingLink || ''
+    };
+  };
 
-    // Interview Questions
-    setInterviewQuestions([
-      { id: 1, technology: 'java', question: 'Explain the Java memory model', date: '2023-05-15', user: 'John D' },
-      { id: 2, technology: 'java', question: 'Difference between JDK, JRE and JVM', date: '2023-05-16', user: 'Alice M' },
-      { id: 3, technology: 'python', question: 'How does Python handle memory management?', date: '2023-05-17', user: 'Bob S' },
-      { id: 4, technology: 'dotnet', question: 'Explain ASP.NET Core middleware pipeline', date: '2023-05-18', user: 'Eve W' }
-    ]);
+  const validateJobDescriptionData = (jd) => {
+    return {
+      id: jd?.id || '',
+      title: jd?.title || 'Untitled',
+      client: jd?.client || 'Unknown',
+      technology: jd?.technology || 'Unknown',
+      resourceType: jd?.resourceType || 'TT',
+      received: jd?.received || new Date().toISOString(),
+      deadline: jd?.deadline || new Date().toISOString(),
+      description: jd?.description || 'No description available'
+    };
+  };
 
-    // Deployed Employees
-    setDeployedEmployees([
-      { id: 1, name: 'Alice Miller', technology: 'java', resourceType: 'TT', client: 'Tech Corp', date: '2023-05-01' },
-      { id: 2, name: 'Bob Smith', technology: 'python', resourceType: 'TT', client: 'Data Systems', date: '2023-05-10' },
-      { id: 3, name: 'Charlie Brown', technology: 'dotnet', resourceType: 'TCT', client: 'Enterprise Solutions', date: '2023-05-15' }
-    ]);
-  }, []);
+  // Update fetchData function with proper validation
+  const fetchData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Fetch all data in parallel
+      const [jobDescriptionsData, mockInterviewsData, clientInterviewsData, interviewQuestionsData] = await Promise.all([
+        getJobDescriptions(searchTerm, technologyFilter, resourceTypeFilter),
+        getMockInterviews(null, technologyFilter, resourceTypeFilter),
+        getClientInterviews(null, technologyFilter, resourceTypeFilter),
+        getInterviewQuestions(technologyFilter)
+      ]);
+
+      // Validate and transform data
+      const validatedJobDescriptions = validateArrayData(jobDescriptionsData).map(validateJobDescriptionData);
+      const validatedMockInterviews = validateArrayData(mockInterviewsData);
+      const validatedClientInterviews = validateArrayData(clientInterviewsData).map(validateInterviewData);
+      const validatedInterviewQuestions = validateArrayData(interviewQuestionsData);
+
+      setJobDescriptions(validatedJobDescriptions);
+      setMockInterviews(validatedMockInterviews);
+      setClientInterviews(validatedClientInterviews);
+      setInterviewQuestions(validatedInterviewQuestions);
+
+      // Calculate deployed employees from completed client interviews
+      const deployed = validatedClientInterviews
+        .filter(interview => interview.status === 'completed' && interview.result === 'selected')
+        .map(interview => ({
+          id: interview.id,
+          name: interview.employeeName,
+          technology: interview.technology,
+          resourceType: interview.resourceType,
+          client: interview.client,
+          date: interview.date
+        }));
+      setDeployedEmployees(deployed);
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setError(error.message || 'Failed to load dashboard data');
+      
+      // Set empty arrays for all data states in case of error
+      setJobDescriptions([]);
+      setMockInterviews([]);
+      setClientInterviews([]);
+      setInterviewQuestions([]);
+      setDeployedEmployees([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const performanceData = [
     { name: 'Technical', score: 85 },
@@ -176,59 +153,147 @@ const EmployeeDashboard = () => {
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28'];
 
-  const handleFileChange = (e) => {
-    setSelectedFile(e.target.files[0]);
-    // In real app, upload to server
-    setTimeout(() => setResumeStatus('submitted'), 1000);
-  };
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  const handleQuestionSubmit = (e) => {
-    e.preventDefault();
-    if (newQuestion.trim()) {
-      const newQuestionObj = {
-        id: interviewQuestions.length + 1,
-        technology: selectedTechnology,
-        question: newQuestion,
-        date: new Date().toISOString().split('T')[0],
-        user: 'You'
-      };
-      setInterviewQuestions([...interviewQuestions, newQuestionObj]);
-      setNewQuestion('');
-      setShowQuestionModal(false);
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      // In a real app, you would get these IDs from the selected job description
+      const employeeId = 1; // Replace with actual employee ID
+      const jdId = 1; // Replace with actual job description ID
+
+      await uploadResume(employeeId, jdId, file);
+      setResumeStatus('submitted');
+    } catch (error) {
+      console.error('Error uploading resume:', error);
+      setError(error.message || 'Failed to upload resume');
+      setResumeStatus('rejected');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const filteredJobDescriptions = jobDescriptions.filter(jd => {
-    const matchesSearch = jd.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         jd.client.toLowerCase().includes(searchTerm.toLowerCase());
+  const handleQuestionSubmit = async (e) => {
+    e.preventDefault();
+    if (!newQuestion.trim()) return;
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const question = await addInterviewQuestion(
+        selectedTechnology,
+        newQuestion,
+        'You' // Replace with actual user name
+      );
+
+      setInterviewQuestions(prev => [...prev, question]);
+      setNewQuestion('');
+      setShowQuestionModal(false);
+    } catch (error) {
+      console.error('Error adding question:', error);
+      setError(error.message || 'Failed to add question');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDownloadResume = async (resumeId) => {
+    try {
+      const blob = await downloadResume(resumeId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'resume.pdf';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading resume:', error);
+      setError(error.message || 'Failed to download resume');
+    }
+  };
+
+  const handleDeleteResume = async (resumeId) => {
+    try {
+      await deleteResume(resumeId);
+      setResumeStatus('pending');
+    } catch (error) {
+      console.error('Error deleting resume:', error);
+      setError(error.message || 'Failed to delete resume');
+    }
+  };
+
+  // Loading state component
+  const LoadingState = () => (
+    <div className={styles.loadingContainer}>
+      <div className={styles.spinner}></div>
+      <p>Loading dashboard data...</p>
+    </div>
+  );
+
+  // Error state component
+  const ErrorState = ({ message, onRetry }) => (
+    <div className={styles.errorContainer}>
+      <h3>Error</h3>
+      <p>{message}</p>
+      {onRetry && (
+        <button 
+          className={styles.primaryButton}
+          onClick={onRetry}
+        >
+          Try Again
+        </button>
+      )}
+    </div>
+  );
+
+  // Update filter functions with null checks
+  const filteredJobDescriptions = jobDescriptions?.filter(jd => {
+    if (!jd) return false;
+    const matchesSearch = jd.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         jd.client?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTech = technologyFilter === 'all' || jd.technology === technologyFilter;
     const matchesResource = resourceTypeFilter === 'all' || jd.resourceType === resourceTypeFilter;
     return matchesSearch && matchesTech && matchesResource;
-  });
+  }) || [];
 
-  const filteredMockInterviews = mockInterviews.filter(interview => {
+  const filteredMockInterviews = mockInterviews?.filter(interview => {
+    if (!interview) return false;
     const matchesTech = technologyFilter === 'all' || interview.technology === technologyFilter;
     const matchesResource = resourceTypeFilter === 'all' || interview.resourceType === resourceTypeFilter;
     return matchesTech && matchesResource;
-  });
+  }) || [];
 
-  const filteredClientInterviews = clientInterviews.filter(interview => {
+  const filteredClientInterviews = clientInterviews?.filter(interview => {
+    if (!interview) return false;
     const matchesTech = technologyFilter === 'all' || interview.technology === technologyFilter;
     const matchesResource = resourceTypeFilter === 'all' || interview.resourceType === resourceTypeFilter;
     return matchesTech && matchesResource;
-  });
+  }) || [];
 
-  const filteredDeployedEmployees = deployedEmployees.filter(employee => {
+  const filteredDeployedEmployees = deployedEmployees?.filter(employee => {
+    if (!employee) return false;
     const matchesTech = technologyFilter === 'all' || employee.technology === technologyFilter;
     const matchesResource = resourceTypeFilter === 'all' || employee.resourceType === resourceTypeFilter;
     return matchesTech && matchesResource;
-  });
+  }) || [];
 
-  const filteredInterviewQuestions = interviewQuestions.filter(q => 
-    technologyFilter === 'all' || q.technology === technologyFilter
-  );
+  const filteredInterviewQuestions = interviewQuestions?.filter(q => 
+    technologyFilter === 'all' || q?.technology === technologyFilter
+  ) || [];
 
   const renderTabContent = () => {
+    if (isLoading) {
+      return <LoadingState />;
+    }
+
+    if (error) {
+      return <ErrorState message={error} onRetry={fetchData} />;
+    }
+
     switch (activeTab) {
       case 'jd':
         return (

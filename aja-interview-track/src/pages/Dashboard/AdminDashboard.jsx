@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FiUsers, FiSettings, FiActivity, FiLock, FiMail, FiCalendar } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import styles from './Dashboard.module.css';
+import styles from './AdminDashboard.module.css';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('users');
