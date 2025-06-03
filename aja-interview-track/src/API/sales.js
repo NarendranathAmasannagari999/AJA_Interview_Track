@@ -18,6 +18,12 @@ export const getCandidates = async (technology = 'all', status = 'all', resource
     });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid input parameters');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -35,6 +41,10 @@ export const getCandidates = async (technology = 'all', status = 'all', resource
  */
 export const scheduleClientInterview = async (empId, client, date, time, level, jobDescriptionTitle, meetingLink) => {
   try {
+    if (!empId || !client || !date || !time || !level || !jobDescriptionTitle || !meetingLink) {
+      throw new Error('All fields are required for scheduling a client interview');
+    }
+
     const response = await axiosInstance.post(`${BASE_URL}/interviews/schedule`, null, {
       params: {
         empId,
@@ -49,6 +59,15 @@ export const scheduleClientInterview = async (empId, client, date, time, level, 
     });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('Sales team can only schedule client interviews');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid input data');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -64,6 +83,10 @@ export const scheduleClientInterview = async (empId, client, date, time, level, 
  */
 export const updateClientInterview = async (interviewId, result, feedback, technicalScore, communicationScore) => {
   try {
+    if (!interviewId || !result || !feedback || technicalScore === undefined || communicationScore === undefined) {
+      throw new Error('All fields are required for updating interview feedback');
+    }
+
     const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, null, {
       params: {
         result,
@@ -74,6 +97,12 @@ export const updateClientInterview = async (interviewId, result, feedback, techn
     });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid input data');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -90,6 +119,9 @@ export const getClientInterviews = async (search = null) => {
     });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -104,18 +136,27 @@ export const getClientInterviews = async (search = null) => {
  */
 export const addClient = async (name, contactEmail, activePositions, technologies) => {
   try {
+    if (!name || !contactEmail || activePositions === undefined || !technologies?.length) {
+      throw new Error('All fields are required for adding a client');
+    }
+
     const response = await axiosInstance.post(`${BASE_URL}/clients`, null, {
       params: {
         name,
         contactEmail,
         activePositions,
-        technologies
+        technologies: technologies.join(',')
       }
     });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid input data');
+    }
     throw error.response?.data || error.message;
-
   }
 };
 
@@ -131,6 +172,9 @@ export const getClients = async (search = null) => {
     });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -149,6 +193,10 @@ export const getClients = async (search = null) => {
  */
 export const addJobDescription = async (title, client, receivedDate, deadline, technology, resourceType, description, file = null) => {
   try {
+    if (!title || !client || !receivedDate || !deadline || !technology || !resourceType || !description) {
+      throw new Error('All fields except file are required for adding a job description');
+    }
+
     const formData = new FormData();
     formData.append('title', title);
     formData.append('client', client);
@@ -166,6 +214,12 @@ export const addJobDescription = async (title, client, receivedDate, deadline, t
     });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid input data');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -177,11 +231,21 @@ export const addJobDescription = async (title, client, receivedDate, deadline, t
  */
 export const downloadJobDescription = async (jdId) => {
   try {
+    if (!jdId) {
+      throw new Error('Job description ID is required');
+    }
+
     const response = await axiosInstance.get(`${BASE_URL}/job-descriptions/${jdId}/download`, {
       responseType: 'blob',
     });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Job description not found or invalid ID');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -193,9 +257,18 @@ export const downloadJobDescription = async (jdId) => {
  */
 export const deleteJobDescription = async (jdId) => {
   try {
-    const response = await axiosInstance.delete(`${BASE_URL}/job-descriptions/${jdId}`);
-    return response.data;
+    if (!jdId) {
+      throw new Error('Job description ID is required');
+    }
+
+    await axiosInstance.delete(`${BASE_URL}/job-descriptions/${jdId}`);
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Job description not found or invalid ID');
+    }
     throw error.response?.data || error.message;
   }
 };

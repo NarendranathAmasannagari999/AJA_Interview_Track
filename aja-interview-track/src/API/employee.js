@@ -20,6 +20,12 @@ export const getMockInterviews = async (employeeId = null, technology = 'all', r
     const response = await axiosInstance.get(`${BASE_URL}/mock-interviews`, { params });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid input parameters');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -41,6 +47,12 @@ export const getClientInterviews = async (employeeId = null, technology = 'all',
     const response = await axiosInstance.get(`${BASE_URL}/client-interviews`, { params });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid input parameters');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -62,6 +74,12 @@ export const updateEmployeeDetails = async (employeeId, technology = null, empId
     const response = await axiosInstance.put(`${BASE_URL}/me`, null, { params });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid input data');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -83,6 +101,9 @@ export const getJobDescriptions = async (search = null, technology = null, resou
     const response = await axiosInstance.get(`${BASE_URL}/job-descriptions`, { params });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -108,6 +129,12 @@ export const uploadResume = async (employeeId, jdId, file) => {
     });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid file or input data');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -124,6 +151,12 @@ export const downloadResume = async (resumeId) => {
     });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Resume not found or invalid ID');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -135,9 +168,14 @@ export const downloadResume = async (resumeId) => {
  */
 export const deleteResume = async (resumeId) => {
   try {
-    const response = await axiosInstance.delete(`${BASE_URL}/resumes/${resumeId}`);
-    return response.data;
+    await axiosInstance.delete(`${BASE_URL}/resumes/${resumeId}`);
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Resume not found or invalid ID');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -159,6 +197,12 @@ export const addInterviewQuestion = async (technology, question, user) => {
     const response = await axiosInstance.post(`${BASE_URL}/interview-questions`, null, { params });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid input data');
+    }
     throw error.response?.data || error.message;
   }
 };
@@ -176,6 +220,9 @@ export const getInterviewQuestions = async (technology = 'all') => {
     const response = await axiosInstance.get(`${BASE_URL}/interview-questions`, { params });
     return response.data;
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
     throw error.response?.data || error.message;
   }
 };

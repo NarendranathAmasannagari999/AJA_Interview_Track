@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   FiUsers, FiCalendar, FiCheckCircle, FiClock, FiFileText, 
   FiSend, FiEdit, FiPlus, FiFilter, FiSearch, FiBarChart2,
-  FiChevronDown, FiChevronUp, FiExternalLink, FiMail, FiUser
+  FiChevronDown, FiChevronUp, FiExternalLink, FiMail, FiUser, FiX
 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -13,12 +13,12 @@ import {
 import styles from './DeliveryTeamDashboard.module.css';
 import { 
   getEmployees, 
-  scheduleMockInterview, 
   scheduleInterview,
   updateMockInterviewFeedback,
   getUpcomingInterviews,
   getCompletedInterviews 
 } from '../../API/delivery';
+import ScheduleInterviewModal from './ScheduleInterviewModal';
 
 const DeliveryTeamDashboard = () => {
   const [activeTab, setActiveTab] = useState('employees');
@@ -45,6 +45,20 @@ const DeliveryTeamDashboard = () => {
   const [jobDescriptionTitle, setJobDescriptionTitle] = useState('');
   const [meetingLink, setMeetingLink] = useState('');
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isEmployeesLoading, setIsEmployeesLoading] = useState(false);
+  const [isInterviewsLoading, setIsInterviewsLoading] = useState(false);
+  const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
+  const [showInterviewScheduler, setShowInterviewScheduler] = useState(false);
+  const [selectedEmployeeForScheduling, setSelectedEmployeeForScheduling] = useState(null);
+  const [interviewDetails, setInterviewDetails] = useState({
+    level: 1,
+    date: '',
+    time: '',
+    mode: 'virtual',
+    link: '',
+    location: '',
+    notes: ''
+  });
 
   const technologies = ['Java', 'Python', '.NET', 'DevOps', 'SalesForce', 'UI Development', 'Testing'];
   const resourceTypes = ['OM', 'TCT1', 'TCT2'];
@@ -56,13 +70,13 @@ const DeliveryTeamDashboard = () => {
     </div>
   );
 
-  const ErrorMessage = ({ message }) => (
+  const ErrorMessage = ({ message, onRetry }) => (
     <div className={styles.errorContainer}>
       <h3>Error</h3>
       <p>{message}</p>
       <button 
         className={styles.primaryButton}
-        onClick={fetchData}
+        onClick={onRetry}
         disabled={isLoading}
       >
         {isLoading ? 'Loading...' : 'Try Again'}
@@ -94,20 +108,45 @@ const DeliveryTeamDashboard = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch employees
+      // Fetch employees with filters
       const employeesData = await getEmployees(technologyFilter, resourceTypeFilter);
-      setEmployees(Array.isArray(employeesData) ? employeesData : []);
+      if (Array.isArray(employeesData)) {
+        setEmployees(employeesData);
+      } else {
+        console.error('Invalid employees data received:', employeesData);
+        setEmployees([]);
+      }
 
-      // Fetch interviews
-      const [upcomingData, completedData] = await Promise.all([
-        getUpcomingInterviews(),
-        getCompletedInterviews()
-      ]);
+      // Fetch upcoming interviews
+      let upcomingData = [];
+      try {
+        upcomingData = await getUpcomingInterviews();
+      } catch (error) {
+        console.error('Error fetching upcoming interviews:', error);
+        setError(error.message || 'Failed to load upcoming interviews');
+      }
 
+      // Fetch completed interviews
+      let completedData = [];
+      try {
+        completedData = await getCompletedInterviews();
+      } catch (error) {
+        console.error('Error fetching completed interviews:', error);
+        setError(error.message || 'Failed to load completed interviews');
+      }
+
+      // Combine and set all interviews
       const allInterviews = [
         ...(Array.isArray(upcomingData) ? upcomingData : []),
-        ...(Array.isArray(completedData) ? completedData : [])
-      ];
+        ...(Array.isArray(completedData) ? completedData : []),
+      ].map(interview => {
+        // Ensure employeeName is correctly set from the nested user object if available
+        const employee = (Array.isArray(employeesData) ? employeesData : []).find(e => e && e.id === interview.employeeId);
+        return {
+          ...interview,
+          employeeName: employee?.name || 'Unknown Employee'
+        };
+      });
       setMockInterviews(allInterviews);
 
       // Update profiles sent to sales and deployed employees
@@ -127,7 +166,7 @@ const DeliveryTeamDashboard = () => {
 
     } catch (error) {
       console.error('Error fetching data:', error);
-      setError('Failed to load dashboard data. Please try again.');
+      setError(error.message || 'Failed to load dashboard data');
       
       // Set empty arrays for all data
       setEmployees([]);
@@ -142,18 +181,19 @@ const DeliveryTeamDashboard = () => {
 
   useEffect(() => {
     fetchData();
-  }, [technologyFilter, resourceTypeFilter]);
+  }, []);
 
-  const filteredEmployees = Array.isArray(employees) 
-    ? employees.filter(employee => {
-        if (!employee) return false;
-        
-        const matchesSearch = employee.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false;
-        const matchesTechnology = technologyFilter === 'all' || employee.technology === technologyFilter;
-        const matchesResourceType = resourceTypeFilter === 'all' || employee.resourceType === resourceTypeFilter;
-        
-        return matchesSearch && matchesTechnology && matchesResourceType;
-      })
+  const filteredEmployees = Array.isArray(employees) ?
+    employees.filter(employee => {
+      if (!employee) return false;
+
+      const matchesSearch = employee.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false;
+      // Perform case-insensitive comparison for technology and resource type
+      const matchesTechnology = technologyFilter === 'all' || (employee.technology?.toLowerCase() === technologyFilter.toLowerCase());
+      const matchesResourceType = resourceTypeFilter === 'all' || (employee.resourceType?.toLowerCase() === resourceTypeFilter.toLowerCase());
+
+      return matchesSearch && matchesTechnology && matchesResourceType;
+    })
     : [];
 
   const upcomingInterviews = Array.isArray(mockInterviews) 
@@ -257,114 +297,80 @@ const DeliveryTeamDashboard = () => {
     }));
   };
 
-  const validateScheduleForm = () => {
-    if (!selectedEmployee) {
-      setError('Please select an employee');
-      return false;
-    }
-    if (!interviewDate) {
-      setError('Please select interview date and time');
-      return false;
-    }
-    if (!interviewer) {
-      setError('Please enter interviewer name');
-      return false;
-    }
-    if (interviewType !== 'mock') {
-      if (!client) {
-        setError('Please enter client name');
-        return false;
-      }
-      if (!level) {
-        setError('Please select job level');
-        return false;
-      }
-      if (!jobDescriptionTitle) {
-        setError('Please enter job description title');
-        return false;
-      }
-      if (!meetingLink) {
-        setError('Please enter meeting link');
-        return false;
-      }
-    }
-    return true;
-  };
-
-  const handleScheduleInterview = async (empId, date, time, interviewer) => {
-    if (!validateScheduleForm()) {
-      return;
-    }
-
-    setIsSubmitting(true);
+  const handleScheduleInterviewSubmit = async (interviewData) => {
+    setIsLoading(true);
+    setIsInterviewsLoading(true);
     setError(null);
     try {
-      const [interviewDate, interviewTime] = date.split('T');
+      const response = await scheduleInterview({
+        empId: interviewData.empId,
+        interviewType: 'mock', // Delivery team can only schedule mock interviews
+        date: interviewData.date,
+        time: interviewData.time,
+        interviewerId: interviewData.interviewerId,
+        client: null, // Not needed for mock interviews
+        level: null, // Not needed for mock interviews
+        jobDescriptionTitle: null, // Not needed for mock interviews
+        meetingLink: interviewData.meetingLink
+      });
       
-      if (interviewType === 'mock') {
-        const interview = await scheduleMockInterview(empId, interviewDate, interviewTime, interviewer);
-        setMockInterviews(prev => [...prev, interview]);
-    } else {
-        const interview = await scheduleInterview({
-          empId,
-          interviewType,
-          date: interviewDate,
-          time: interviewTime,
-          client,
-          interviewer,
-          level,
-          jobDescriptionTitle,
-          meetingLink
-        });
-        setMockInterviews(prev => [...prev, interview]);
+      if (response) {
+        // Update mock interviews state
+        setMockInterviews(prev => [...prev, response]);
+        setError(null);
+        // Close the modal
+        setShowInterviewScheduler(false);
+        // Reset the selected employee for scheduling
+        setSelectedEmployeeForScheduling(null);
+        // Refresh the data
+        await fetchData();
       }
-      
-      // Show success message
-      setError(null);
-      setIsScheduling(false);
-      
-      // Reset form fields
-      setInterviewDate('');
-      setInterviewer('');
-      setSelectedEmployee(null);
-      setInterviewType('mock');
-      setClient('');
-      setLevel('');
-      setJobDescriptionTitle('');
-      setMeetingLink('');
     } catch (error) {
       console.error('Error scheduling interview:', error);
-      setError(error.response?.data?.message || 'Failed to schedule interview. Please try again.');
+      setError(error.message || 'Failed to schedule interview');
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
+      setIsInterviewsLoading(false);
     }
   };
 
   const handleUpdateFeedback = async (interviewId, feedback, technicalScore, communicationScore) => {
     setIsSubmitting(true);
+    setIsFeedbackLoading(true);
     setError(null);
     try {
+      // Combine technical and communication feedback into a single string
+      const combinedFeedback = `Technical Feedback: ${feedback.technical || 'N/A'} | Communication Feedback: ${feedback.communication || 'N/A'}`;
+
       const updatedInterview = await updateMockInterviewFeedback(
         interviewId,
-        feedback,
+        combinedFeedback, // Send the combined string as the feedback parameter
         technicalScore,
         communicationScore
       );
       
-      setMockInterviews(prev => 
-        prev.map(interview => 
-          interview.id === interviewId ? updatedInterview : interview
-        )
-      );
-      
-      setSelectedEmployee(null);
-      setFeedback({ technical: '', communication: '' });
-      setRatings({ technical: 0, communication: 0 });
+      if (updatedInterview) {
+        // Update the interviews list with the new feedback
+        setMockInterviews(prev => 
+          prev.map(interview => 
+            interview.id === interviewId ? updatedInterview : interview
+          )
+        );
+        
+        // Reset the form
+        setSelectedEmployee(null);
+        setFeedback({ technical: '', communication: '' });
+        setRatings({ technical: 0, communication: 0 });
+        
+        // Refresh the data to ensure consistency
+        await fetchData();
+      }
     } catch (error) {
       console.error('Error updating feedback:', error);
-      setError('Failed to update feedback. Please try again.');
+      setError(error.message || 'Failed to update feedback');
     } finally {
       setIsSubmitting(false);
+      setIsFeedbackLoading(false);
     }
   };
 
@@ -388,7 +394,7 @@ const DeliveryTeamDashboard = () => {
     }
 
     if (error) {
-      return <ErrorMessage message={error} />;
+      return <ErrorMessage message={error} onRetry={fetchData} />;
     }
 
     switch (activeTab) {
@@ -415,7 +421,7 @@ const DeliveryTeamDashboard = () => {
               
               <button 
                 className={styles.primaryButton}
-                onClick={() => setIsScheduling(true)}
+                onClick={() => setShowInterviewScheduler(true)}
               >
                 <FiPlus /> Schedule Interview
               </button>
@@ -467,28 +473,28 @@ const DeliveryTeamDashboard = () => {
                       <FiUser />
                     </div>
                     <div>
-                      <h3>{employee.name}</h3>
+                      <h3>{typeof employee.name === 'string' ? employee.name : 'Unknown Employee'}</h3>
                       <div className={styles.cardMeta}>
-                        <span className={`${styles.techBadge} ${styles[employee.technology.replace(' ', '')]}`}>
-                          {employee.technology}
+                        <span className={`${styles.techBadge} ${styles[typeof employee.technology === 'string' ? employee.technology.replace(' ', '') : '']}`}>
+                          {typeof employee.technology === 'string' ? employee.technology : 'Unknown'}
                         </span>
-                        <span className={`${styles.resourceBadge} ${styles[employee.resourceType]}`}>
-                          {employee.resourceType}
+                        <span className={`${styles.resourceBadge} ${styles[typeof employee.resourceType === 'string' ? employee.resourceType : '']}`}>
+                          {typeof employee.resourceType === 'string' ? employee.resourceType : 'Unknown'}
                         </span>
                       </div>
                     </div>
                   </div>
                   <div className={styles.cardDetails}>
-                    <p><strong>Level:</strong> {employee.level}</p>
-                    <p><strong>Status:</strong> {employee.status}</p>
+                    <p><strong>Level:</strong> {typeof employee.level === 'string' || typeof employee.level === 'number' ? employee.level : 'N/A'}</p>
+                    <p><strong>Status:</strong> {typeof employee.status === 'string' || typeof employee.status === 'number' ? employee.status : 'N/A'}</p>
                   </div>
                   <div className={styles.cardFooter}>
                     <button 
                       className={styles.secondaryButton}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedEmployee(employee);
-                        setIsScheduling(true);
+                        setSelectedEmployeeForScheduling(employee);
+                        setShowInterviewScheduler(true);
                       }}
                     >
                       <FiCalendar /> Schedule
@@ -541,7 +547,7 @@ const DeliveryTeamDashboard = () => {
                 </div>
               ) : (
                 upcomingInterviews.map(interview => {
-                  const employee = employees.find(e => e.id === interview.employeeId);
+                  const employee = employees.find(e => e && e.id === interview.employeeId);
                   return (
                     <motion.div
                       key={interview.id}
@@ -549,30 +555,29 @@ const DeliveryTeamDashboard = () => {
                       whileHover={{ scale: 1.01 }}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
+                      transition={{ duration: 0.3 }} >
                       <div className={styles.interviewHeader}>
                         <div>
-                          <h4>{interview.employeeName}</h4>
+                          <h4>{typeof interview.employeeName === 'string' ? interview.employeeName : 'Unknown Employee'}</h4>
                           <div className={styles.interviewMeta}>
                             {employee && (
                               <>
-                                <span className={`${styles.techBadge} ${styles[employee.technology.replace(' ', '')]}`}>
-                                  {employee.technology}
+                                <span className={`${styles.techBadge} ${styles[employee.technology?.replace(' ', '')]}`}>
+                                  {employee.technology || 'Unknown'}
                                 </span>
                                 <span className={`${styles.resourceBadge} ${styles[employee.resourceType]}`}>
-                                  {employee.resourceType}
+                                  {employee.resourceType || 'Unknown'}
                                 </span>
                               </>
                             )}
                           </div>
                         </div>
                         <div className={styles.interviewDate}>
-                          <FiCalendar /> {interview.date}
+                          <FiCalendar /> {typeof interview.date === 'string' ? interview.date : 'N/A'}
                         </div>
                       </div>
                       <div className={styles.interviewDetails}>
-                        <p><strong>Interviewer:</strong> {interview.interviewer}</p>
+                        <p><strong>Interviewer:</strong> {typeof interview.interviewer === 'string' || typeof interview.interviewer === 'number' ? interview.interviewer : 'N/A'}</p>
                       </div>
                       <div className={styles.interviewActions}>
                         <button className={styles.primaryButton}>
@@ -598,7 +603,7 @@ const DeliveryTeamDashboard = () => {
                 </div>
               ) : (
                 completedInterviews.map(interview => {
-                  const employee = employees.find(e => e.id === interview.employeeId);
+                  const employee = employees.find(e => e && e.id === interview.employeeId);
                   const isSentToSales = profilesSentToSales.includes(interview.employeeId);
                   const isDeployed = deployedEmployees.includes(interview.employeeId);
                   
@@ -609,19 +614,18 @@ const DeliveryTeamDashboard = () => {
                       whileHover={{ scale: 1.01 }}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
+                      transition={{ duration: 0.3 }} >
                       <div className={styles.interviewHeader}>
                         <div>
-                          <h4>{interview.employeeName}</h4>
+                          <h4>{typeof interview.employeeName === 'string' ? interview.employeeName : 'Unknown Employee'}</h4>
                           <div className={styles.interviewMeta}>
                             {employee && (
                               <>
-                                <span className={`${styles.techBadge} ${styles[employee.technology.replace(' ', '')]}`}>
-                                  {employee.technology}
+                                <span className={`${styles.techBadge} ${styles[employee.technology?.replace(' ', '')]}`}>
+                                  {employee.technology || 'Unknown'}
                                 </span>
                                 <span className={`${styles.resourceBadge} ${styles[employee.resourceType]}`}>
-                                  {employee.resourceType}
+                                  {employee.resourceType || 'Unknown'}
                                 </span>
                               </>
                             )}
@@ -631,35 +635,35 @@ const DeliveryTeamDashboard = () => {
                           </div>
                         </div>
                         <div className={styles.interviewDate}>
-                          <FiCalendar /> {interview.date}
+                          <FiCalendar /> {typeof interview.date === 'string' ? interview.date : 'N/A'}
                         </div>
                       </div>
                       
                       <div className={styles.interviewScores}>
                         <div className={styles.scoreMeter}>
                           <div className={styles.scoreLabel}>
-                            Technical: {interview.ratings.technical}/10
+                            Technical: {typeof interview.ratings?.technical === 'number' ? interview.ratings.technical : 'N/A'}/10
                           </div>
                           <div className={styles.scoreBar}>
                             <div 
                               className={styles.scoreFill} 
                               style={{ 
-                                width: `${interview.ratings.technical * 10}%`,
-                                backgroundColor: getScoreColor(interview.ratings.technical)
+                                width: `${(typeof interview.ratings?.technical === 'number' ? interview.ratings.technical : 0) * 10}%`,
+                                backgroundColor: getScoreColor(typeof interview.ratings?.technical === 'number' ? interview.ratings.technical : 0)
                               }}
                             />
                           </div>
                         </div>
                         <div className={styles.scoreMeter}>
                           <div className={styles.scoreLabel}>
-                            Communication: {interview.ratings.communication}/10
+                            Communication: {typeof interview.ratings?.communication === 'number' ? interview.ratings.communication : 'N/A'}/10
                           </div>
                           <div className={styles.scoreBar}>
                             <div 
                               className={styles.scoreFill} 
                               style={{ 
-                                width: `${interview.ratings.communication * 10}%`,
-                                backgroundColor: getScoreColor(interview.ratings.communication)
+                                width: `${(typeof interview.ratings?.communication === 'number' ? interview.ratings.communication : 0) * 10}%`,
+                                backgroundColor: getScoreColor(typeof interview.ratings?.communication === 'number' ? interview.ratings.communication : 0)
                               }}
                             />
                           </div>
@@ -668,10 +672,10 @@ const DeliveryTeamDashboard = () => {
                       
                       <div className={styles.feedback}>
                         <h5>Technical Feedback</h5>
-                        <p>{interview.feedback.technical}</p>
+                        <p>{typeof interview.feedback?.technical === 'string' || typeof interview.feedback?.technical === 'number' ? interview.feedback.technical : 'N/A'}</p>
                         
                         <h5>Communication Feedback</h5>
-                        <p>{interview.feedback.communication}</p>
+                        <p>{typeof interview.feedback?.communication === 'string' || typeof interview.feedback?.communication === 'number' ? interview.feedback.communication : 'N/A'}</p>
                       </div>
                       
                       <div className={styles.interviewActions}>
@@ -679,8 +683,8 @@ const DeliveryTeamDashboard = () => {
                           className={styles.secondaryButton}
                           onClick={() => {
                             setSelectedEmployee(employee);
-                            setRatings(interview.ratings);
-                            setFeedback(interview.feedback);
+                            setRatings(interview.ratings || { technical: 0, communication: 0 });
+                            setFeedback(interview.feedback || { technical: '', communication: '' });
                           }}
                         >
                           <FiEdit /> Edit Feedback
@@ -886,7 +890,7 @@ const DeliveryTeamDashboard = () => {
     <div className={styles.modalActions}>
       <button 
         className={styles.primaryButton}
-        disabled={isSubmitting}
+        disabled={isSubmitting || isFeedbackLoading}
         onClick={() => {
           if (selectedEmployee) {
             handleUpdateFeedback(
@@ -898,7 +902,7 @@ const DeliveryTeamDashboard = () => {
           }
         }}
       >
-        {isSubmitting ? (
+        {isSubmitting || isFeedbackLoading ? (
           <>
             <div className={styles.spinner} style={{ width: '20px', height: '20px', margin: '0' }} />
             Saving...
@@ -909,208 +913,11 @@ const DeliveryTeamDashboard = () => {
       </button>
       <button 
         className={styles.secondaryButton}
-        disabled={isSubmitting}
+        disabled={isSubmitting || isFeedbackLoading}
         onClick={() => {
           setSelectedEmployee(null);
           setFeedback({ technical: '', communication: '' });
           setRatings({ technical: 0, communication: 0 });
-        }}
-      >
-        Cancel
-      </button>
-    </div>
-  );
-
-  const renderScheduleForm = () => (
-    <div className={styles.scheduleForm}>
-      {selectedEmployee ? (
-        <div className={styles.employeeInfo}>
-          <h4>Employee: {selectedEmployee.name}</h4>
-          <div className={styles.employeeMeta}>
-            <span className={`${styles.techBadge} ${styles[selectedEmployee.technology.replace(' ', '')]}`}>
-              {selectedEmployee.technology}
-            </span>
-            <span className={`${styles.resourceBadge} ${styles[selectedEmployee.resourceType]}`}>
-              {selectedEmployee.resourceType}
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className={styles.formGroup}>
-          <label>Select Employee</label>
-          <select
-            value={selectedEmployee?.id || ''}
-            onChange={(e) => {
-              const employee = employees.find(emp => emp.id === e.target.value);
-              setSelectedEmployee(employee);
-            }}
-          >
-            <option value="">Select an employee</option>
-            {employees.map(employee => (
-              <option key={employee.id} value={employee.id}>{employee.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
-      
-      <div className={styles.formGroup}>
-        <label>Interview Type</label>
-        <select
-          value={interviewType}
-          onChange={(e) => setInterviewType(e.target.value)}
-        >
-          <option value="mock">Mock Interview</option>
-          <option value="client">Client Interview</option>
-          <option value="technical">Technical Interview</option>
-          <option value="hr">HR Interview</option>
-        </select>
-      </div>
-      
-      <div className={styles.formGroup}>
-        <label>Interview Date & Time</label>
-        <input
-          type="datetime-local"
-          value={interviewDate}
-          onChange={(e) => setInterviewDate(e.target.value)}
-          min={new Date().toISOString().slice(0, 16)}
-        />
-      </div>
-      
-      <div className={styles.formGroup}>
-        <label>Interviewer</label>
-        <input
-          type="text"
-          placeholder="Enter interviewer name"
-          value={interviewer}
-          onChange={(e) => setInterviewer(e.target.value)}
-        />
-      </div>
-
-      {interviewType !== 'mock' && (
-        <>
-          <div className={styles.formGroup}>
-            <label>Client Name</label>
-            <input
-              type="text"
-              placeholder="Enter client name"
-              value={client}
-              onChange={(e) => setClient(e.target.value)}
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Level</label>
-            <select
-              value={level}
-              onChange={(e) => setLevel(e.target.value)}
-            >
-              <option value="">Select level</option>
-              <option value="1">Level 1</option>
-              <option value="2">Level 2</option>
-              <option value="3">Level 3</option>
-              <option value="4">Level 4</option>
-            </select>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Job Description Title</label>
-            <input
-              type="text"
-              placeholder="Enter job description title"
-              value={jobDescriptionTitle}
-              onChange={(e) => setJobDescriptionTitle(e.target.value)}
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Meeting Link</label>
-            <input
-              type="url"
-              placeholder="Enter meeting link (e.g., https://meet.google.com/xxx-yyyy-zzz)"
-              value={meetingLink}
-              onChange={(e) => setMeetingLink(e.target.value)}
-              pattern="https?://.+"
-              title="Please enter a valid URL starting with http:// or https://"
-            />
-          </div>
-        </>
-      )}
-    </div>
-  );
-
-  const renderScheduleModal = () => (
-    <motion.div 
-      className={styles.modalContent}
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.9, opacity: 0 }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className={styles.modalHeader}>
-        <h3>Schedule Interview</h3>
-        <button 
-          className={styles.closeButton}
-          onClick={() => {
-            setIsScheduling(false);
-            setInterviewDate('');
-            setInterviewer('');
-            setSelectedEmployee(null);
-            setInterviewType('mock');
-            setClient('');
-            setLevel('');
-            setJobDescriptionTitle('');
-            setMeetingLink('');
-          }}
-        >
-          &times;
-        </button>
-      </div>
-      
-      {renderScheduleForm()}
-      
-      {renderScheduleModalActions()}
-    </motion.div>
-  );
-
-  const renderScheduleModalActions = () => (
-    <div className={styles.modalActions}>
-      <button 
-        className={styles.primaryButton}
-        disabled={isSubmitting}
-        onClick={() => {
-          if (selectedEmployee) {
-            handleScheduleInterview(
-              selectedEmployee.id,
-              interviewDate,
-              interviewDate.split('T')[1],
-              interviewer
-            );
-          }
-        }}
-      >
-        {isSubmitting ? (
-          <>
-            <div className={styles.spinner} style={{ width: '20px', height: '20px', margin: '0' }} />
-            Scheduling...
-          </>
-        ) : (
-          'Schedule Interview'
-        )}
-      </button>
-      <button 
-        className={styles.secondaryButton}
-        disabled={isSubmitting}
-        onClick={() => {
-          setIsScheduling(false);
-          setInterviewDate('');
-          setInterviewer('');
-          setSelectedEmployee(null);
-          setInterviewType('mock');
-          setClient('');
-          setLevel('');
-          setJobDescriptionTitle('');
-          setMeetingLink('');
-          setError(null);
         }}
       >
         Cancel
@@ -1124,7 +931,7 @@ const DeliveryTeamDashboard = () => {
     const [errorInfo, setErrorInfo] = useState(null);
 
     if (hasError) {
-  return (
+      return (
         <div className={styles.errorContainer}>
           <h3>Something went wrong</h3>
           <p>Please try refreshing the page or contact support if the problem persists.</p>
@@ -1156,7 +963,7 @@ const DeliveryTeamDashboard = () => {
         {isInitialLoading ? (
           <LoadingState />
         ) : error ? (
-          <ErrorMessage message={error} />
+          <ErrorMessage message={error} onRetry={fetchData} />
         ) : (
           <>
       <div className={styles.dashboardHeader}>
@@ -1212,7 +1019,7 @@ const DeliveryTeamDashboard = () => {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3 }}
       >
-              {isLoading ? <LoadingState /> : renderTabContent()}
+        {isLoading ? <LoadingState /> : renderTabContent()}
       </motion.div>
       
       <AnimatePresence>
@@ -1345,23 +1152,24 @@ const DeliveryTeamDashboard = () => {
                 </div>
               </div>
               
-                    {renderModalActions()}
+              {renderModalActions()}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
       
       <AnimatePresence>
-        {isScheduling && (
-          <motion.div 
-            className={styles.modalOverlay}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsScheduling(false)}
-          >
-                  {renderScheduleModal()}
-          </motion.div>
+        {showInterviewScheduler && (
+          <ScheduleInterviewModal
+            show={showInterviewScheduler}
+            onClose={() => {
+              setShowInterviewScheduler(false);
+              setSelectedEmployeeForScheduling(null);
+            }}
+            onSubmit={handleScheduleInterviewSubmit}
+            employees={employees}
+            selectedEmployee={selectedEmployeeForScheduling}
+          />
         )}
       </AnimatePresence>
           </>

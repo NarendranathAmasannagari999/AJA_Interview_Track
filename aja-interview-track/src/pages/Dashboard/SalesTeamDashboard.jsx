@@ -15,14 +15,14 @@ import {
 import styles from './Sales.module.css';
 import {
   getCandidates,
+  scheduleClientInterview,
+  updateClientInterview,
   getClientInterviews,
-  getClients,
   addClient,
+  getClients,
   addJobDescription,
   downloadJobDescription,
-  deleteJobDescription,
-  scheduleClientInterview,
-  updateClientInterview
+  deleteJobDescription
 } from '../../API/sales';
 
 const ClientModal = ({
@@ -131,6 +131,248 @@ const ClientModal = ({
   );
 };
 
+// Add the ScheduleInterviewModal component definition here, adapted for Sales Team context
+const ScheduleInterviewModal = ({
+    show,
+    onClose,
+    onSubmit,
+    selectedCandidates, // Array of selected candidate objects/IDs
+    interviewDetails,
+    setInterviewDetails,
+    clients, // Pass clients to the modal for the client dropdown
+    jobDescriptions // Pass job descriptions for the JD dropdown
+}) => {
+    if (!show) return null;
+
+    // Find the selected candidates' names for display
+    // Assuming selectedCandidates is an array of candidate objects with a 'name' property
+    const candidateNames = selectedCandidates.map(c => c.name).join(', ');
+
+
+    return (
+        <div className={styles.modalOverlay}>
+            <motion.div
+                className={styles.modal}
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+            >
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    // Pass only the interviewDetails object to onSubmit
+                    onSubmit(selectedCandidates.map(c => c.id), interviewDetails);
+                }}>
+                    <div className={styles.modalHeader}>
+                        <h3>Schedule Client Interview</h3>
+                        <button
+                            className={styles.closeButton}
+                            type="button"
+                            onClick={onClose}
+                        >
+                            <FiX />
+                        </button>
+                    </div>
+                    <div className={styles.modalContent}>
+                        {/* Display selected candidates */}
+                        <div className={styles.formGroup}>
+                            <label>Candidate(s)</label>
+                            <input
+                                type="text"
+                                value={candidateNames}
+                                className={styles.input}
+                                readOnly // Display only, not editable
+                            />
+                        </div>
+
+                        {/* Client dropdown */}
+                         <div className={styles.formGroup}>
+                            <label>Client *</label>
+                            <select
+                                value={interviewDetails.client}
+                                onChange={(e) => setInterviewDetails({
+                                    ...interviewDetails,
+                                    client: e.target.value
+                                })}
+                                className={styles.input}
+                                required
+                            >
+                                <option value="">Select Client</option>
+                                {clients.map(client => (
+                                    <option key={client.id} value={client.name}>{client.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* JD dropdown */}
+                         <div className={styles.formGroup}>
+                            <label>Job Description *</label>
+                            <select
+                                value={interviewDetails.jobDescriptionTitle}
+                                onChange={(e) => setInterviewDetails({
+                                    ...interviewDetails,
+                                    jobDescriptionTitle: e.target.value
+                                })}
+                                className={styles.input}
+                                required
+                            >
+                                <option value="">Select JD</option>
+                                {jobDescriptions.map(jd => (
+                                    <option key={jd.id} value={jd.title}>{jd.title} ({jd.clientName})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Date & Time */}
+                        <div className={styles.formGroup}>
+                            <label>Date & Time *</label>
+                            <div className={styles.dateTimeGroup}>
+                                <input
+                                    type="date"
+                                    value={interviewDetails.date}
+                                    onChange={(e) => setInterviewDetails({
+                                        ...interviewDetails,
+                                        date: e.target.value
+                                    })}
+                                    className={styles.input}
+                                    required
+                                />
+                                <input
+                                    type="time"
+                                    value={interviewDetails.time}
+                                    onChange={(e) => setInterviewDetails({
+                                        ...interviewDetails,
+                                        time: e.target.value
+                                    })}
+                                    className={styles.input}
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        {/* Interview Level */}
+                         <div className={styles.formGroup}>
+                            <label>Interview Level *</label>
+                            <select
+                                value={interviewDetails.level}
+                                onChange={(e) => setInterviewDetails({
+                                    ...interviewDetails,
+                                    level: parseInt(e.target.value) || 1
+                                })}
+                                className={styles.input}
+                                required
+                            >
+                                <option value={1}>Level 1</option>
+                                <option value={2}>Level 2</option>
+                                <option value={3}>Level 3</option>
+                            </select>
+                        </div>
+
+                         {/* Mode */}
+                        <div className={styles.formGroup}>
+                            <label>Mode *</label>
+                            <select
+                                value={interviewDetails.mode}
+                                onChange={(e) => setInterviewDetails({
+                                    ...interviewDetails,
+                                    mode: e.target.value
+                                })}
+                                className={styles.input}
+                                required
+                            >
+                                <option value="virtual">Virtual</option>
+                                <option value="in-person">In-Person</option>
+                            </select>
+                        </div>
+
+                         {/* Link/Location based on mode */}
+                        {interviewDetails.mode === 'virtual' && (
+                            <div className={styles.formGroup}>
+                                <label>Meeting Link *</label>
+                                <input
+                                    type="text"
+                                    value={interviewDetails.link}
+                                    onChange={(e) => setInterviewDetails({
+                                        ...interviewDetails,
+                                        link: e.target.value
+                                    })}
+                                    className={styles.input}
+                                    placeholder="Enter meeting link"
+                                    required
+                                />
+                            </div>
+                        )}
+                        {interviewDetails.mode === 'in-person' && (
+                            <div className={styles.formGroup}>
+                                <label>Location *</label>
+                                <input
+                                    type="text"
+                                    value={interviewDetails.location}
+                                    onChange={(e) => setInterviewDetails({
+                                        ...interviewDetails,
+                                        location: e.target.value
+                                    })}
+                                    className={styles.input}
+                                    placeholder="Enter interview location"
+                                    required
+                                />
+                            </div>
+                        )}
+
+                        {/* Interviewer (Optional based on backend) */}
+                        {/* Keeping this as per image, but backend might not use it */}
+                         <div className={styles.formGroup}>
+                            <label>Interviewer</label>
+                            <input
+                                type="text"
+                                value={interviewDetails.interviewerName} // Assuming you add this to interviewDetails state
+                                onChange={(e) => setInterviewDetails({
+                                    ...interviewDetails,
+                                    interviewerName: e.target.value
+                                })}
+                                className={styles.input}
+                                placeholder="Enter interviewer name"
+                            />
+                        </div>
+
+
+                         {/* Notes */}
+                        <div className={styles.formGroup}>
+                            <label>Notes</label>
+                            <textarea
+                                value={interviewDetails.notes}
+                                onChange={(e) => setInterviewDetails({
+                                    ...interviewDetails,
+                                    notes: e.target.value
+                                })}
+                                className={styles.input}
+                                placeholder="Add notes about the interview..."
+                            />
+                        </div>
+
+
+                        <div className={styles.modalFooter}>
+                            <button
+                                className={`${styles.button} ${styles.secondary}`}
+                                type="button"
+                                onClick={onClose}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className={`${styles.button} ${styles.primary}`}
+                                type="submit"
+                                disabled={false} // Add loading state logic here if needed
+                            >
+                                Schedule Interview
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </motion.div>
+        </div>
+    );
+};
+
 const SalesTeamDashboard = () => {
   // Main state
   const [activeTab, setActiveTab] = useState('jds');
@@ -174,7 +416,10 @@ const SalesTeamDashboard = () => {
     mode: 'virtual',
     link: '',
     location: '',
-    notes: ''
+    notes: '',
+    client: '',
+    jobDescriptionTitle: '',
+    interviewerName: ''
   });
 
   // Add loading and error states
@@ -215,6 +460,9 @@ const SalesTeamDashboard = () => {
   const [jdModalSuccess, setJDModalSuccess] = useState('');
   const [jdModalLoading, setJDModalLoading] = useState(false);
 
+  // Add new state for selected candidates for bulk scheduling
+  const [bulkSelectedCandidates, setBulkSelectedCandidates] = useState([]);
+
   // Add debounced search function
   const handleSearch = (value) => {
     if (searchTimeout) {
@@ -239,16 +487,44 @@ const SalesTeamDashboard = () => {
   // Fetch all data on component mount
   useEffect(() => {
     fetchData();
-  }, [filterTech, filterStatus, filterResourceType]);
+  }, []);
 
   const fetchData = async (retryCount = 0) => {
     setIsLoading(true);
     setError(null);
     try {
+      // Fetch all data in parallel with proper error handling
       const [candidatesData, interviewsData, clientsData] = await Promise.all([
-        getCandidates(filterTech, filterStatus, filterResourceType),
-        getClientInterviews(),
-        getClients()
+        getCandidates(filterTech, filterStatus, filterResourceType).catch(error => {
+          console.error('Error fetching candidates:', error);
+          if (error.response?.status === 401) {
+            throw new Error('Please log in to view candidates');
+          }
+          if (error.response?.status === 400) {
+            throw new Error('Invalid filter parameters');
+          }
+          return [];
+        }),
+        getClientInterviews().catch(error => {
+          console.error('Error fetching interviews:', error);
+          if (error.response?.status === 401) {
+            throw new Error('Please log in to view interviews');
+          }
+          if (error.response?.status === 400) {
+            throw new Error('Invalid search parameters');
+          }
+          return [];
+        }),
+        getClients().catch(error => {
+          console.error('Error fetching clients:', error);
+          if (error.response?.status === 401) {
+            throw new Error('Please log in to view clients');
+          }
+          if (error.response?.status === 400) {
+            throw new Error('Invalid search parameters');
+          }
+          return [];
+        })
       ]);
 
       // Validate and transform data
@@ -265,11 +541,12 @@ const SalesTeamDashboard = () => {
         levels: interview.levels || []
       }));
 
+      // Update state with validated data
       setCandidates(validatedCandidates);
       setClientInterviews(validatedInterviews);
       setClients(clientsData);
 
-      // Calculate deployment stats with validation
+      // Calculate deployment stats
       const stats = {
         profilesSent: validatedCandidates.filter(c => c.status === 'profile_sent').length,
         resumesSent: validatedCandidates.filter(c => c.status === 'resume_sent').length,
@@ -280,7 +557,7 @@ const SalesTeamDashboard = () => {
       setDeploymentStats(stats);
 
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error in fetchData:', error);
       if (retryCount < 3) {
         // Retry with exponential backoff
         setTimeout(() => {
@@ -402,7 +679,10 @@ const SalesTeamDashboard = () => {
       mode: 'virtual',
       link: '',
       location: '',
-      notes: ''
+      notes: '',
+      client: '',
+      jobDescriptionTitle: '',
+      interviewerName: ''
     });
     } catch (error) {
       console.error('Error scheduling interviews:', error);
@@ -684,6 +964,14 @@ const SalesTeamDashboard = () => {
     );
   };
 
+  const handleSelectCandidateForBulkScheduling = (candidateId, isSelected) => {
+    setBulkSelectedCandidates(prev => 
+      isSelected 
+        ? [...prev, candidateId] 
+        : prev.filter(id => id !== candidateId)
+    );
+  };
+
   const ShortlistedTab = () => {
     const filteredShortlisted = shortlistedCandidates.filter(candidate => 
       candidate.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -708,6 +996,13 @@ const SalesTeamDashboard = () => {
               className={styles.searchInput}
             />
           </div>
+          <button 
+            className={`${styles.button} ${styles.primary}`}
+            onClick={() => openInterviewScheduler(bulkSelectedCandidates)}
+            disabled={bulkSelectedCandidates.length === 0}
+          >
+            <FiCalendar /> Schedule Interview
+          </button>
         </div>
 
         {filteredShortlisted.length > 0 ? (
@@ -721,6 +1016,13 @@ const SalesTeamDashboard = () => {
                 transition={{ duration: 0.3 }}
                 className={styles.profileCard}
               >
+                <div className={styles.profileSelection}>
+                  <input 
+                    type="checkbox"
+                    checked={bulkSelectedCandidates.includes(candidate.id)}
+                    onChange={(e) => handleSelectCandidateForBulkScheduling(candidate.id, e.target.checked)}
+                  />
+                </div>
                 <div className={styles.profileHeader}>
                   <h3 className={styles.profileName}>{candidate.candidateName}</h3>
                   <span className={`${styles.statusBadge} ${styles.shortlisted}`}>
@@ -942,138 +1244,35 @@ const SalesTeamDashboard = () => {
         )}
 
         {/* Interview Scheduler Modal */}
-        {showInterviewScheduler && (
-          <div className={styles.modalOverlay}>
-            <motion.div 
-              className={styles.modal}
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-            >
-              <div className={styles.modalHeader}>
-                <h3>Schedule Client Interview</h3>
-                <button 
-                  className={styles.closeButton}
-                  onClick={() => setShowInterviewScheduler(false)}
-                >
-                  <FiX />
-                </button>
-              </div>
-              
-              <div className={styles.modalContent}>
-                <div className={styles.formGroup}>
-                  <label>Interview Level</label>
-                  <select
-                    value={interviewDetails.level}
-                    onChange={(e) => setInterviewDetails({
-                      ...interviewDetails,
-                      level: parseInt(e.target.value)
-                    })}
-                  >
-                    <option value={1}>Level 1</option>
-                    <option value={2}>Level 2</option>
-                    <option value={3}>Level 3</option>
-                  </select>
-                </div>
-                
-                <div className={styles.formGroup}>
-                  <label>Date</label>
-                  <input
-                    type="date"
-                    value={interviewDetails.date}
-                    onChange={(e) => setInterviewDetails({
-                      ...interviewDetails,
-                      date: e.target.value
-                    })}
-                  />
-                </div>
-                
-                <div className={styles.formGroup}>
-                  <label>Time</label>
-                  <input
-                    type="time"
-                    value={interviewDetails.time}
-                    onChange={(e) => setInterviewDetails({
-                      ...interviewDetails,
-                      time: e.target.value
-                    })}
-                  />
-                </div>
-                
-                <div className={styles.formGroup}>
-                  <label>Mode</label>
-                  <select
-                    value={interviewDetails.mode}
-                    onChange={(e) => setInterviewDetails({
-                      ...interviewDetails,
-                      mode: e.target.value
-                    })}
-                  >
-                    <option value="virtual">Virtual</option>
-                    <option value="in-person">In-Person</option>
-                  </select>
-                </div>
-                
-                {interviewDetails.mode === 'virtual' && (
-                  <div className={styles.formGroup}>
-                    <label>Meeting Link</label>
-                    <input
-                      type="text"
-                      placeholder="https://meet.example.com/interview"
-                      value={interviewDetails.link}
-                      onChange={(e) => setInterviewDetails({
-                        ...interviewDetails,
-                        link: e.target.value
-                      })}
-                    />
-                  </div>
-                )}
-                
-                {interviewDetails.mode === 'in-person' && (
-                  <div className={styles.formGroup}>
-                    <label>Location</label>
-                    <input
-                      type="text"
-                      placeholder="Company Address"
-                      value={interviewDetails.location}
-                      onChange={(e) => setInterviewDetails({
-                        ...interviewDetails,
-                        location: e.target.value
-                      })}
-                    />
-                  </div>
-                )}
-                
-                <div className={styles.formGroup}>
-                  <label>Additional Notes</label>
-                  <textarea
-                    placeholder="Any special instructions for the candidate..."
-                    value={interviewDetails.notes}
-                    onChange={(e) => setInterviewDetails({
-                      ...interviewDetails,
-                      notes: e.target.value
-                    })}
-                  />
-                </div>
-                
-                <div className={styles.modalFooter}>
-                  <button 
-                    className={`${styles.button} ${styles.secondary}`}
-                    onClick={() => setShowInterviewScheduler(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    className={`${styles.button} ${styles.primary}`}
-                    onClick={() => notifyShortlistedCandidates(selectedForInterview, interviewDetails)}
-                  >
-                    <FiSend /> Send Schedule to Candidates
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
+        <AnimatePresence>
+          {showInterviewScheduler && (
+            <ScheduleInterviewModal
+              show={showInterviewScheduler}
+              onClose={() => {
+                setShowInterviewScheduler(false);
+                setSelectedForInterview([]); // Clear selected candidates on close
+                setInterviewDetails({ // Reset interview details on close
+                  level: 1,
+                  date: '',
+                  time: '',
+                  mode: 'virtual',
+                  link: '',
+                  location: '',
+                  notes: '',
+                  client: '',
+                  jobDescriptionTitle: '',
+                  interviewerName: ''
+                });
+              }}
+              onSubmit={notifyShortlistedCandidates} // Use the existing function to handle submission
+              selectedCandidates={candidates.filter(c => selectedForInterview.includes(c.id))} // Pass selected candidate objects to the modal
+              interviewDetails={interviewDetails}
+              setInterviewDetails={setInterviewDetails}
+              clients={clients} // Pass clients data to the modal
+              jobDescriptions={jobDescriptions} // Pass job descriptions data to the modal
+            />
+          )}
+        </AnimatePresence>
       </motion.div>
     );
   };
@@ -1400,7 +1599,7 @@ const SalesTeamDashboard = () => {
       setClients(prev => [...prev, response]);
       
       // Show success message
-      alert('Client added successfully!');
+      setClientModalSuccess('Client added successfully!');
 
       // Reset form and close modal
       setClientModalFields({
@@ -1412,7 +1611,13 @@ const SalesTeamDashboard = () => {
       setShowClientModal(false);
     } catch (error) {
       console.error('Error adding client:', error);
-      setClientModalError(error.message || 'Failed to add client');
+      if (error.response?.status === 401) {
+        setClientModalError('Please log in to add clients');
+      } else if (error.response?.status === 400) {
+        setClientModalError(error.response.data || 'Invalid client data');
+      } else {
+        setClientModalError(error.message || 'Failed to add client');
+      }
     } finally {
       setClientModalLoading(false);
     }
@@ -1621,52 +1826,57 @@ const SalesTeamDashboard = () => {
     e.preventDefault();
     setJDModalError('');
     setJDModalSuccess('');
+    
     // Validation
     if (!jdModalFields.title.trim() || !jdModalFields.client || !jdModalFields.technology || !jdModalFields.resourceType || !jdModalFile) {
       setJDModalError('Please fill all required fields and select a file.');
       return;
     }
+
     // File validation
     const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     const maxSize = 5 * 1024 * 1024; // 5MB
+
     if (!allowedTypes.includes(jdModalFile.type)) {
       setJDModalError('Invalid file type. Please upload a PDF or Word document.');
       return;
     }
+
     if (jdModalFile.size > maxSize) {
       setJDModalError('File size too large. Maximum size is 5MB.');
       return;
     }
+
     setJDModalLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', jdModalFile);
-      formData.append('title', jdModalFields.title);
-      formData.append('client', jdModalFields.client);
-      formData.append('technology', jdModalFields.technology);
-      formData.append('resourceType', jdModalFields.resourceType);
-      formData.append('description', jdModalFields.description);
-      formData.append('receivedDate', jdModalFields.receivedDate || new Date().toISOString().split('T')[0]);
-      formData.append('deadline', jdModalFields.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
       const response = await addJobDescription(
-        formData.get('title'),
-        formData.get('client'),
-        formData.get('receivedDate'),
-        formData.get('deadline'),
-        formData.get('technology'),
-        formData.get('resourceType'),
-        formData.get('description'),
+        jdModalFields.title,
+        jdModalFields.client,
+        jdModalFields.receivedDate || new Date().toISOString().split('T')[0],
+        jdModalFields.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        jdModalFields.technology,
+        jdModalFields.resourceType,
+        jdModalFields.description,
         jdModalFile
       );
+
       setJobDescriptions(prev => [...prev, response]);
-      setResumeStatus('submitted');
       setJDModalSuccess('Job description uploaded successfully!');
-      setJDModalLoading(false);
+      
+      // Reset form after success
       setTimeout(() => {
         resetJDModal();
       }, 1500);
     } catch (error) {
-      setJDModalError(error.message || 'Failed to upload file');
+      console.error('Error uploading job description:', error);
+      if (error.response?.status === 401) {
+        setJDModalError('Please log in to upload job descriptions');
+      } else if (error.response?.status === 400) {
+        setJDModalError(error.response.data || 'Invalid job description data');
+      } else {
+        setJDModalError(error.message || 'Failed to upload job description');
+      }
+    } finally {
       setJDModalLoading(false);
     }
   };
@@ -1739,6 +1949,108 @@ const SalesTeamDashboard = () => {
     } catch (error) {
       setClientModalError(error.message || 'Failed to add client');
       setClientModalLoading(false);
+    }
+  };
+
+  // Update handleScheduleInterview with better error handling
+  const handleScheduleInterview = async (candidateId) => {
+    const candidate = candidates.find(c => c.id === candidateId);
+    if (!candidate) {
+      setError('Candidate not found');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await scheduleClientInterview(
+        candidateId,
+        selectedClient,
+        interviewDetails.date,
+        interviewDetails.time,
+        interviewDetails.level,
+        selectedJD?.title,
+        interviewDetails.link
+      );
+
+      if (response) {
+        // Update candidate status
+        setCandidates(prev => prev.map(c => 
+          c.id === candidateId 
+            ? { ...c, status: 'interview_scheduled' }
+            : c
+        ));
+        
+        // Update interviews list
+        setClientInterviews(prev => [...prev, response]);
+        
+        // Show success message
+        setSuccessMessage('Interview scheduled successfully');
+        
+        // Close scheduler
+        setShowInterviewScheduler(false);
+        setSelectedForInterview([]);
+        setInterviewDetails({
+          level: 1,
+          date: '',
+          time: '',
+          mode: 'virtual',
+          link: '',
+          location: '',
+          notes: '',
+          client: '',
+          jobDescriptionTitle: '',
+          interviewerName: ''
+        });
+      }
+    } catch (error) {
+      console.error('Error scheduling interview:', error);
+      if (error.response?.status === 401) {
+        setError('Please log in to schedule interviews');
+      } else if (error.response?.status === 403) {
+        setError('Sales team can only schedule client interviews');
+      } else if (error.response?.status === 400) {
+        setError(error.response.data || 'Invalid interview data');
+      } else {
+        setError(error.message || 'Failed to schedule interview');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateFeedback = async (interviewId, feedback) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await updateClientInterview(interviewId, {
+        feedback,
+        result: feedback.toLowerCase().includes('selected') ? 'hired' : 'rejected',
+        overallStatus: 'completed'
+      });
+
+      if (response) {
+        // Update interview status
+        setClientInterviews(prev => prev.map(i => 
+          i.id === interviewId 
+            ? { ...i, feedback, result: response.result, overallStatus: 'completed' }
+            : i
+        ));
+        // Refresh data
+        fetchData();
+        setSuccessMessage('Feedback updated successfully');
+      }
+    } catch (error) {
+      console.error('Error updating feedback:', error);
+      if (error.response?.status === 401) {
+        setError('Please log in to update feedback');
+      } else if (error.response?.status === 400) {
+        setError('Invalid feedback data. Please check your input.');
+      } else {
+        setError(error.message || 'Failed to update feedback');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1871,8 +2183,8 @@ const SalesTeamDashboard = () => {
                     className={styles.input}
                   >
                     <option value="">Select type</option>
-                    <option value="TT">TT</option>
-                    <option value="TCT">TCT</option>
+                    <option value="OM">OM</option>
+                    <option value="TCT1">TCT1</option>
                   </select>
                 </div>
                 <div className={styles.formGroup}>

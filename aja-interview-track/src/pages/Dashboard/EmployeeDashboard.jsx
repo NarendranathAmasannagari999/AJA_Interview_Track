@@ -80,25 +80,81 @@ const EmployeeDashboard = () => {
     };
   };
 
-  // Update fetchData function with proper validation
+  // Update fetchData function with better error handling and data validation
   const fetchData = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch all data in parallel
+      // Fetch all data in parallel with proper error handling
       const [jobDescriptionsData, mockInterviewsData, clientInterviewsData, interviewQuestionsData] = await Promise.all([
-        getJobDescriptions(searchTerm, technologyFilter, resourceTypeFilter),
-        getMockInterviews(null, technologyFilter, resourceTypeFilter),
-        getClientInterviews(null, technologyFilter, resourceTypeFilter),
-        getInterviewQuestions(technologyFilter)
+        getJobDescriptions(searchTerm, technologyFilter, resourceTypeFilter).catch(error => {
+          console.error('Error fetching job descriptions:', error);
+          throw new Error(error.message || 'Failed to load job descriptions');
+        }),
+        getMockInterviews(null, technologyFilter, resourceTypeFilter).catch(error => {
+          console.error('Error fetching mock interviews:', error);
+          throw new Error(error.message || 'Failed to load mock interviews');
+        }),
+        getClientInterviews(null, technologyFilter, resourceTypeFilter).catch(error => {
+          console.error('Error fetching client interviews:', error);
+          throw new Error(error.message || 'Failed to load client interviews');
+        }),
+        getInterviewQuestions(technologyFilter).catch(error => {
+          console.error('Error fetching interview questions:', error);
+          throw new Error(error.message || 'Failed to load interview questions');
+        })
       ]);
 
-      // Validate and transform data
-      const validatedJobDescriptions = validateArrayData(jobDescriptionsData).map(validateJobDescriptionData);
-      const validatedMockInterviews = validateArrayData(mockInterviewsData);
-      const validatedClientInterviews = validateArrayData(clientInterviewsData).map(validateInterviewData);
-      const validatedInterviewQuestions = validateArrayData(interviewQuestionsData);
+      // Transform and validate the data
+      const validatedJobDescriptions = validateArrayData(jobDescriptionsData).map(jd => ({
+        id: jd.id,
+        title: jd.title || 'Untitled',
+        client: jd.client || 'Unknown',
+        technology: jd.technology || 'Unknown',
+        resourceType: jd.resourceType || 'TT',
+        received: jd.received || new Date().toISOString(),
+        deadline: jd.deadline || new Date().toISOString(),
+        description: jd.description || 'No description available'
+      }));
 
+      const validatedMockInterviews = validateArrayData(mockInterviewsData).map(interview => ({
+        id: interview.id,
+        employeeId: interview.employeeId,
+        interviewer: interview.interviewer || 'Unknown',
+        technology: interview.technology || 'Unknown',
+        resourceType: interview.resourceType || 'TT',
+        date: interview.date || new Date().toISOString(),
+        time: interview.time,
+        status: interview.status || 'scheduled',
+        feedback: interview.feedback || '',
+        ratings: interview.ratings || { technical: 0, communication: 0 }
+      }));
+
+      const validatedClientInterviews = validateArrayData(clientInterviewsData).map(interview => ({
+        id: interview.id,
+        employeeId: interview.employeeId,
+        client: interview.client || 'Unknown',
+        technology: interview.technology || 'Unknown',
+        resourceType: interview.resourceType || 'TT',
+        date: interview.date || new Date().toISOString(),
+        time: interview.time,
+        status: interview.status || 'scheduled',
+        level: interview.level || 1,
+        jobDescriptionTitle: interview.jobDescriptionTitle || 'Unknown',
+        meetingLink: interview.meetingLink || '',
+        result: interview.result || 'pending',
+        feedback: interview.feedback || ''
+      }));
+
+      const validatedInterviewQuestions = validateArrayData(interviewQuestionsData).map(question => ({
+        id: question.id,
+        technology: question.technology || 'Unknown',
+        question: question.question || '',
+        user: question.user || 'Unknown',
+        date: question.date || new Date().toISOString()
+      }));
+
+      // Update state with validated data
       setJobDescriptions(validatedJobDescriptions);
       setMockInterviews(validatedMockInterviews);
       setClientInterviews(validatedClientInterviews);
@@ -109,7 +165,7 @@ const EmployeeDashboard = () => {
         .filter(interview => interview.status === 'completed' && interview.result === 'selected')
         .map(interview => ({
           id: interview.id,
-          name: interview.employeeName,
+          name: interview.employeeName || 'Unknown',
           technology: interview.technology,
           resourceType: interview.resourceType,
           client: interview.client,
@@ -118,7 +174,7 @@ const EmployeeDashboard = () => {
       setDeployedEmployees(deployed);
 
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error in fetchData:', error);
       setError(error.message || 'Failed to load dashboard data');
       
       // Set empty arrays for all data states in case of error
@@ -153,6 +209,7 @@ const EmployeeDashboard = () => {
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28'];
 
+  // Update handleFileChange with better error handling
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -160,12 +217,23 @@ const EmployeeDashboard = () => {
     setIsSubmitting(true);
     setError(null);
     try {
-      // In a real app, you would get these IDs from the selected job description
-      const employeeId = 1; // Replace with actual employee ID
-      const jdId = 1; // Replace with actual job description ID
+      // Get the selected job description ID from state
+      const selectedJD = jobDescriptions[0]; // You might want to add state for selected JD
+      if (!selectedJD) {
+        throw new Error('Please select a job description first');
+      }
 
-      await uploadResume(employeeId, jdId, file);
+      const employeeId = 1; // Replace with actual employee ID from auth context
+      const jdId = selectedJD.id;
+
+      const response = await uploadResume(employeeId, jdId, file);
+      if (!response) {
+        throw new Error('Failed to upload resume');
+      }
+      
       setResumeStatus('submitted');
+      // Refresh job descriptions to update resume status
+      await fetchData();
     } catch (error) {
       console.error('Error uploading resume:', error);
       setError(error.message || 'Failed to upload resume');
@@ -175,18 +243,27 @@ const EmployeeDashboard = () => {
     }
   };
 
+  // Update handleQuestionSubmit with better error handling
   const handleQuestionSubmit = async (e) => {
     e.preventDefault();
-    if (!newQuestion.trim()) return;
+    if (!newQuestion.trim()) {
+      setError('Question cannot be empty');
+      return;
+    }
 
     setIsSubmitting(true);
     setError(null);
     try {
+      const user = 'You'; // Replace with actual user name from auth context
       const question = await addInterviewQuestion(
         selectedTechnology,
-        newQuestion,
-        'You' // Replace with actual user name
+        newQuestion.trim(),
+        user
       );
+
+      if (!question) {
+        throw new Error('Failed to add question');
+      }
 
       setInterviewQuestions(prev => [...prev, question]);
       setNewQuestion('');
@@ -199,9 +276,19 @@ const EmployeeDashboard = () => {
     }
   };
 
+  // Update handleDownloadResume with better error handling
   const handleDownloadResume = async (resumeId) => {
+    if (!resumeId) {
+      setError('Invalid resume ID');
+      return;
+    }
+
     try {
       const blob = await downloadResume(resumeId);
+      if (!blob) {
+        throw new Error('Failed to download resume');
+      }
+
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -216,10 +303,18 @@ const EmployeeDashboard = () => {
     }
   };
 
+  // Update handleDeleteResume with better error handling
   const handleDeleteResume = async (resumeId) => {
+    if (!resumeId) {
+      setError('Invalid resume ID');
+      return;
+    }
+
     try {
       await deleteResume(resumeId);
       setResumeStatus('pending');
+      // Refresh job descriptions to update resume status
+      await fetchData();
     } catch (error) {
       console.error('Error deleting resume:', error);
       setError(error.message || 'Failed to delete resume');
@@ -334,8 +429,8 @@ const EmployeeDashboard = () => {
                     onChange={(e) => setResourceTypeFilter(e.target.value)}
                   >
                     <option value="all">All Types</option>
-                    <option value="TCT">TCT</option>
-                    <option value="TT">TT</option>
+                    <option value="TCT1">TCT1</option>
+                    <option value="OM">OM</option>
                   </select>
                 </div>
               </div>
@@ -581,8 +676,8 @@ const EmployeeDashboard = () => {
                               <div className={styles.scoreBar}>
                                 <div 
                                   className={styles.scoreFill} 
-                                  style={{ width: `${interview.technicalScore * 10}%` }}
-                                  data-score={interview.technicalScore}
+                                  style={{ width: `${interview.ratings.technical * 10}%` }}
+                                  data-score={interview.ratings.technical}
                                 ></div>
                               </div>
                             </div>
@@ -591,8 +686,8 @@ const EmployeeDashboard = () => {
                               <div className={styles.scoreBar}>
                                 <div 
                                   className={styles.scoreFill} 
-                                  style={{ width: `${interview.communicationScore * 10}%` }}
-                                  data-score={interview.communicationScore}
+                                  style={{ width: `${interview.ratings.communication * 10}%` }}
+                                  data-score={interview.ratings.communication}
                                 ></div>
                               </div>
                             </div>
@@ -655,7 +750,7 @@ const EmployeeDashboard = () => {
                                 {interview.resourceType}
                               </span>
                               <span><FiCalendar /> {interview.date}</span>
-                              <span>For JD: {interview.jd}</span>
+                              <span>For JD: {interview.jobDescriptionTitle}</span>
                             </div>
                           </div>
                           <span className={`${styles.status} ${styles[interview.status]}`}>
