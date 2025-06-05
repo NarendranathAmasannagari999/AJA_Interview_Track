@@ -572,7 +572,7 @@ const SalesTeamDashboard = () => {
   };
 
   // Refactor handleFileChange to accept form values
-  const handleFileChange = async (e, jdFormValues) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -590,50 +590,63 @@ const SalesTeamDashboard = () => {
       return;
     }
 
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('title', jdFormValues.title || 'New Job Description');
-      formData.append('client', jdFormValues.client || '');
-      formData.append('technology', jdFormValues.technology || '');
-      formData.append('resourceType', jdFormValues.resourceType || '');
-      formData.append('description', jdFormValues.description || 'Job description details...');
-      formData.append('receivedDate', jdFormValues.receivedDate || new Date().toISOString().split('T')[0]);
-      formData.append('deadline', jdFormValues.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+    // Note: This function is intended for handling file selection, 
+    //       the actual JD upload happens in handleJDModalSubmit
+    // setIsSubmitting(true);
+    // setError(null);
+    // try {
+    //   const formData = new FormData();
+    //   formData.append('file', file);
+    //   formData.append('title', jdFormValues.title || 'New Job Description');
+    //   formData.append('client', jdFormValues.client || '');
+    //   formData.append('technology', jdFormValues.technology || '');
+    //   formData.append('resourceType', jdFormValues.resourceType || '');
+    //   formData.append('description', jdFormValues.description || 'Job description details...');
+    //   formData.append('receivedDate', jdFormValues.receivedDate || new Date().toISOString().split('T')[0]);
+    //   formData.append('deadline', jdFormValues.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
-      const response = await addJobDescription(
-        formData.get('title'),
-        formData.get('client'),
-        formData.get('receivedDate'),
-        formData.get('deadline'),
-        formData.get('technology'),
-        formData.get('resourceType'),
-        formData.get('description'),
-        file
-      );
+    //   const response = await addJobDescription(
+    //     formData.get('title'),
+    //     formData.get('client'),
+    //     formData.get('receivedDate'),
+    //     formData.get('deadline'),
+    //     formData.get('technology'),
+    //     formData.get('resourceType'),
+    //     formData.get('description'),
+    //     file
+    //   );
 
-      setJobDescriptions(prev => [...prev, response]);
-      setResumeStatus('submitted');
+    //   setJobDescriptions(prev => [...prev, response]);
+    //   setResumeStatus('submitted');
       
-      // Show success message
-      alert('Job description uploaded successfully!');
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      setError(error.message || 'Failed to upload file');
-      setResumeStatus('rejected');
-    } finally {
-      setIsSubmitting(false);
-    }
+    //   // Show success message
+    //   alert('Job description uploaded successfully!');
+    // } catch (error) {
+    //   console.error('Error uploading file:', error);
+    //   setError(error.message || 'Failed to upload file');
+    //   setResumeStatus('rejected');
+    // } finally {
+    //   setIsSubmitting(false);
+    // }
   };
 
   // Enhanced interview scheduling with validation
   const notifyShortlistedCandidates = async (candidateIds, interviewDetails) => {
     // Validate interview details
     if (!interviewDetails.date || !interviewDetails.time) {
+      // Use the general error state for display
       setError('Please select both date and time for the interview.');
       return;
+    }
+
+    // Ensure client and JD are selected for client interviews
+    if (!interviewDetails.client) {
+        setError('Please select a client for the interview.');
+        return;
+    }
+    if (!interviewDetails.jobDescriptionTitle) {
+        setError('Please select a job description for the interview.');
+        return;
     }
 
     if (interviewDetails.mode === 'virtual' && !interviewDetails.link) {
@@ -647,32 +660,43 @@ const SalesTeamDashboard = () => {
     }
 
     setIsSubmitting(true);
-    setError(null);
+    setError(null); // Clear previous errors
+
     try {
       const interviewPromises = candidateIds.map(candidateId => 
         scheduleClientInterview(
-          candidateId,
-          selectedClient,
-          interviewDetails.date,
-          interviewDetails.time,
-          interviewDetails.level,
-          selectedJD?.title,
-          interviewDetails.link
+          candidateId, // empId
+          interviewDetails.client, // client
+          interviewDetails.date, // date
+          interviewDetails.time, // time
+          interviewDetails.level, // level
+          interviewDetails.jobDescriptionTitle, // jobDescriptionTitle
+          interviewDetails.mode === 'virtual' ? interviewDetails.link : interviewDetails.location // meetingLink or location
         )
       );
 
       const results = await Promise.all(interviewPromises);
       
-      // Update the interviews state with the new interviews
-      setClientInterviews(prev => [...prev, ...results]);
+      // Filter out any potential null or undefined results from the API calls
+      const successfulResults = results.filter(result => result);
 
-      // Show success message
-      alert(`Successfully scheduled interviews for ${candidateIds.length} candidate(s)!`);
+      // Update the interviews state with the new interviews
+      setClientInterviews(prev => [...prev, ...successfulResults]);
+
+      // Update the status of scheduled candidates to 'interview_scheduled'
+      setCandidates(prev => prev.map(candidate => 
+          candidateIds.includes(candidate.id) 
+              ? { ...candidate, status: 'interview_scheduled' } 
+              : candidate
+      ));
+
+      // Show success message using the general error state (or a dedicated success state if added)
+      setError({ type: 'success', message: `Successfully scheduled ${successfulResults.length} interview(s)!` });
 
     // Close the scheduler
     setShowInterviewScheduler(false);
     setSelectedForInterview([]);
-    setInterviewDetails({
+    setInterviewDetails({ // Reset interview details on close
       level: 1,
       date: '',
       time: '',
@@ -682,11 +706,17 @@ const SalesTeamDashboard = () => {
       notes: '',
       client: '',
       jobDescriptionTitle: '',
-      interviewerName: ''
+      interviewerName: '' // This might not be needed based on backend schedule API
     });
+    setBulkSelectedCandidates([]); // Clear bulk selections
+
     } catch (error) {
       console.error('Error scheduling interviews:', error);
-      setError(error.message || 'Failed to schedule interviews');
+      // Use the general error state for display
+      setError({ 
+        type: 'error', 
+        message: error.message || 'Failed to schedule interviews. Please try again.' 
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -1566,63 +1596,6 @@ const SalesTeamDashboard = () => {
     </div>
   );
 
-  // Add function to handle client creation
-  const handleAddClient = async () => {
-    // Validate client data
-    if (!clientModalFields.name.trim()) {
-      setClientModalError('Client name is required');
-      return;
-    }
-    if (!clientModalFields.contactEmail.trim()) {
-      setClientModalError('Contact email is required');
-      return;
-    }
-    if (!clientModalFields.contactEmail.includes('@')) {
-      setClientModalError('Invalid email format');
-      return;
-    }
-    if (clientModalFields.technologies.length === 0) {
-      setClientModalError('At least one technology must be selected');
-      return;
-    }
-
-    setClientModalLoading(true);
-    try {
-      const response = await addClient(
-        clientModalFields.name,
-        clientModalFields.contactEmail,
-        clientModalFields.activePositions,
-        clientModalFields.technologies
-      );
-
-      // Update clients list
-      setClients(prev => [...prev, response]);
-      
-      // Show success message
-      setClientModalSuccess('Client added successfully!');
-
-      // Reset form and close modal
-      setClientModalFields({
-        name: '',
-        contactEmail: '',
-        activePositions: 0,
-        technologies: [],
-      });
-      setShowClientModal(false);
-    } catch (error) {
-      console.error('Error adding client:', error);
-      if (error.response?.status === 401) {
-        setClientModalError('Please log in to add clients');
-      } else if (error.response?.status === 400) {
-        setClientModalError(error.response.data || 'Invalid client data');
-      } else {
-        setClientModalError(error.message || 'Failed to add client');
-      }
-    } finally {
-      setClientModalLoading(false);
-    }
-  };
-
   // Add client management tab
   const ClientsTab = () => {
     const filteredClients = clients.filter(client => 
@@ -1985,7 +1958,7 @@ const SalesTeamDashboard = () => {
         setClientInterviews(prev => [...prev, response]);
         
         // Show success message
-        setSuccessMessage('Interview scheduled successfully');
+        setError({ type: 'success', message: 'Interview scheduled successfully' });
         
         // Close scheduler
         setShowInterviewScheduler(false);
@@ -2038,7 +2011,7 @@ const SalesTeamDashboard = () => {
         ));
         // Refresh data
         fetchData();
-        setSuccessMessage('Feedback updated successfully');
+        setError({ type: 'success', message: 'Feedback updated successfully' });
       }
     } catch (error) {
       console.error('Error updating feedback:', error);
@@ -2105,7 +2078,7 @@ const SalesTeamDashboard = () => {
           setClientModalError('');
           setClientModalSuccess('');
         }}
-        onSubmit={handleAddClient}
+        onSubmit={handleClientModalSubmit}
         fields={clientModalFields}
         onFieldChange={handleClientModalFieldChange}
         error={clientModalError}

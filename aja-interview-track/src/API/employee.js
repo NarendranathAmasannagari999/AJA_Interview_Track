@@ -13,15 +13,25 @@ const BASE_URL = '/api/employee';
 export const getMockInterviews = async (employeeId = null, technology = 'all', resourceType = 'all') => {
   try {
     const params = new URLSearchParams();
-    if (employeeId) params.append('employeeId', employeeId);
-    if (technology) params.append('technology', technology);
-    if (resourceType) params.append('resourceType', resourceType);
+    // Only append employeeId if it's a valid number
+    if (employeeId && !isNaN(employeeId)) {
+      params.append('employeeId', employeeId);
+    }
+    if (technology && technology !== 'all') {
+      params.append('technology', technology);
+    }
+    if (resourceType && resourceType !== 'all') {
+      params.append('resourceType', resourceType);
+    }
 
     const response = await axiosInstance.get(`${BASE_URL}/mock-interviews`, { params });
     return response.data;
   } catch (error) {
     if (error.response?.status === 401) {
       throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('Access denied: You do not have permission to access this resource');
     }
     if (error.response?.status === 400) {
       throw new Error(error.response.data || 'Invalid input parameters');
@@ -50,6 +60,9 @@ export const getClientInterviews = async (employeeId = null, technology = 'all',
     if (error.response?.status === 401) {
       throw new Error('Unauthorized: Please login to access this resource');
     }
+    if (error.response?.status === 403) {
+      throw new Error('Access denied: You do not have permission to access this resource');
+    }
     if (error.response?.status === 400) {
       throw new Error(error.response.data || 'Invalid input parameters');
     }
@@ -76,6 +89,9 @@ export const updateEmployeeDetails = async (employeeId, technology = null, empId
   } catch (error) {
     if (error.response?.status === 401) {
       throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('Access denied: You do not have permission to update employee details');
     }
     if (error.response?.status === 400) {
       throw new Error(error.response.data || 'Invalid input data');
@@ -222,6 +238,65 @@ export const getInterviewQuestions = async (technology = 'all') => {
   } catch (error) {
     if (error.response?.status === 401) {
       throw new Error('Unauthorized: Please login to access this resource');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Update employee profile picture
+ * @param {number} employeeId - Employee ID to update profile picture for
+ * @param {File} file - Profile picture file
+ * @returns {Promise<Object>} Updated employee object with profile picture details
+ */
+export const updateProfilePicture = async (employeeId, file) => {
+  try {
+    if (!employeeId || !file) {
+      throw new Error('Employee ID and profile picture file are required');
+    }
+
+    const formData = new FormData();
+    formData.append('employeeId', employeeId);
+    formData.append('file', file);
+
+    const response = await axiosInstance.put(`${BASE_URL}/profile-picture`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid file or input data');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Get employee profile picture
+ * @param {number} employeeId - Employee ID to get profile picture for
+ * @returns {Promise<Blob>} Profile picture file blob
+ */
+export const getProfilePicture = async (employeeId) => {
+  try {
+    if (!employeeId) {
+      throw new Error('Employee ID is required');
+    }
+
+    const response = await axiosInstance.get(`${BASE_URL}/profile-picture/${employeeId}`, {
+      responseType: 'blob', // Important for downloading binary data like images
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+     if (error.response?.status === 400 || error.response?.status === 404) {
+      throw new Error(error.response.data || 'Profile picture not found or invalid ID');
     }
     throw error.response?.data || error.message;
   }

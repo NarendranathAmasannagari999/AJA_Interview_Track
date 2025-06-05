@@ -17,30 +17,21 @@ export const getEmployees = async (technology = 'all', resourceType = 'all') => 
     }
 };
 
-// Schedule an interview
+// Schedule a mock interview
 export const scheduleInterview = async ({
     empId,
-    interviewType,
     date,
     time,
-    client,
-    interviewerId,
-    level,
-    jobDescriptionTitle,
-    meetingLink
+    interviewerId
 }) => {
     try {
         const response = await axiosInstance.post(`${API_BASE_URL}/schedule`, null, {
             params: {
                 empId,
-                interviewType,
+                interviewType: 'mock', // Only mock interviews are allowed
                 date,
                 time,
-                client,
-                interviewerId,
-                level,
-                jobDescriptionTitle,
-                meetingLink
+                interviewerId
             }
         });
         return response.data;

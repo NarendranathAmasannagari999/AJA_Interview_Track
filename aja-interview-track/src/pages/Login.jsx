@@ -13,9 +13,8 @@ import {
 } from 'react-icons/fa';
 import { FiMail, FiKey } from 'react-icons/fi';
 import styles from './Login.module.css';
+import { loginUser } from '../API/login';
 import { jwtDecode } from 'jwt-decode';
-import { loginUser } from '../API/login'; // your real login API
-import axios from 'axios';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -66,9 +65,20 @@ const Login = () => {
     try {
       const { token, role } = await loginUser(formData.email.trim(), formData.password);
       
+      // Decode the JWT token to get user information
+      const decodedToken = jwtDecode(token);
+      
       // Store authentication data
       localStorage.setItem('jwt_token', token);
       localStorage.setItem('userRole', role);
+      
+      // Store additional user information from the token
+      if (decodedToken) {
+        localStorage.setItem('userEmail', decodedToken.sub); // 'sub' is typically the email in JWT
+        if (decodedToken.exp) {
+          localStorage.setItem('tokenExpiration', decodedToken.exp);
+        }
+      }
       
       // Normalize role for routing (remove 'ROLE_' prefix and convert to lowercase)
       const normalizedRole = role.replace('ROLE_', '').toLowerCase();
@@ -83,9 +93,6 @@ const Login = () => {
           break;
         case 'sales_team':
           navigate('/dashboard/sales-team');
-          break;
-        case 'admin':
-          navigate('/admin-dashboard');
           break;
         default:
           navigate('/dashboard');

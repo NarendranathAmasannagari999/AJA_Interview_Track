@@ -4,10 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiFileText, FiUpload, FiClock, FiCheckCircle, FiXCircle, FiUser, 
   FiBarChart2, FiMail, FiCalendar, FiAward, FiBook, FiUsers, FiFilter,
-  FiSearch, FiShare2, FiDownload, FiMessageSquare, FiHelpCircle
+  FiSearch, FiShare2, FiDownload, FiMessageSquare, FiHelpCircle, FiRefreshCw,
+  FiPlus
 } from 'react-icons/fi';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import styles from './EmployeeDashboard.module.css';
+import axiosInstance from '../../API/axiosConfig';
 import {
   getMockInterviews,
   getClientInterviews,
@@ -16,379 +18,461 @@ import {
   downloadResume,
   deleteResume,
   addInterviewQuestion,
-  getInterviewQuestions
+  getInterviewQuestions,
+  updateEmployeeDetails,
+  updateProfilePicture,
+  getProfilePicture
 } from '../../API/employee';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const EmployeeDashboard = () => {
-  const [activeTab, setActiveTab] = useState('jd');
-  const [activeInterviewTab, setActiveInterviewTab] = useState('mock');
-  const [jobDescriptions, setJobDescriptions] = useState([]);
+  const navigate = useNavigate();
+  const [employeeId, setEmployeeId] = useState(null);
+  const [employeeData, setEmployeeData] = useState({
+    empId: '',
+    technology: '',
+    resourceType: '',
+    level: '',
+    status: '',
+    name: ''
+  });
   const [mockInterviews, setMockInterviews] = useState([]);
   const [clientInterviews, setClientInterviews] = useState([]);
-  const [resumeStatus, setResumeStatus] = useState('pending');
+  const [jobDescriptions, setJobDescriptions] = useState([]);
+  const [interviewQuestions, setInterviewQuestions] = useState([]);
+  const [profilePic, setProfilePic] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedJd, setSelectedJd] = useState('');
+  const [newQuestion, setNewQuestion] = useState({
+    technology: '',
+    question: '',
+    user: ''
+  });
+  const [interviewForm, setInterviewForm] = useState({
+    interviewType: 'mock',
+    date: '',
+    time: '',
+    client: '',
+    interviewerId: '',
+    level: '',
+    jobDescriptionTitle: '',
+    meetingLink: ''
+  });
+  const [filters, setFilters] = useState({
+    technology: 'all',
+    resourceType: 'all'
+  });
+  const [activeTab, setActiveTab] = useState('jd');
+  const [activeInterviewTab, setActiveInterviewTab] = useState('mock');
+  const [loading, setLoading] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [technologyFilter, setTechnologyFilter] = useState('all');
   const [resourceTypeFilter, setResourceTypeFilter] = useState('all');
   const [showQuestionModal, setShowQuestionModal] = useState(false);
-  const [newQuestion, setNewQuestion] = useState('');
-  const [selectedTechnology, setSelectedTechnology] = useState('java');
-  const [interviewQuestions, setInterviewQuestions] = useState([]);
+  const [showInterviewModal, setShowInterviewModal] = useState(false);
   const [deployedEmployees, setDeployedEmployees] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const navigate = useNavigate();
+  const [resumeStatus, setResumeStatus] = useState('pending');
 
-  // Fetch all data on component mount
-  useEffect(() => {
-    fetchData();
-  }, [technologyFilter, resourceTypeFilter]);
-
-  // Add data validation functions
-  const validateArrayData = (data, fallback = []) => {
-    return Array.isArray(data) ? data : fallback;
-  };
-
-  const validateInterviewData = (interview) => {
-    return {
-      id: interview?.id || '',
-      employeeName: interview?.employeeName || 'Unknown',
-      technology: interview?.technology || 'Unknown',
-      resourceType: interview?.resourceType || 'TT',
-      client: interview?.client || 'Unknown',
-      date: interview?.date || new Date().toISOString(),
-      status: interview?.status || 'pending',
-      result: interview?.result || 'pending',
-      feedback: interview?.feedback || '',
-      level: interview?.level || 1,
-      jd: interview?.jd || 'Unknown',
-      meetingLink: interview?.meetingLink || ''
-    };
-  };
-
-  const validateJobDescriptionData = (jd) => {
-    return {
-      id: jd?.id || '',
-      title: jd?.title || 'Untitled',
-      client: jd?.client || 'Unknown',
-      technology: jd?.technology || 'Unknown',
-      resourceType: jd?.resourceType || 'TT',
-      received: jd?.received || new Date().toISOString(),
-      deadline: jd?.deadline || new Date().toISOString(),
-      description: jd?.description || 'No description available'
-    };
-  };
-
-  // Update fetchData function with better error handling and data validation
-  const fetchData = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Fetch all data in parallel with proper error handling
-      const [jobDescriptionsData, mockInterviewsData, clientInterviewsData, interviewQuestionsData] = await Promise.all([
-        getJobDescriptions(searchTerm, technologyFilter, resourceTypeFilter).catch(error => {
-          console.error('Error fetching job descriptions:', error);
-          throw new Error(error.message || 'Failed to load job descriptions');
-        }),
-        getMockInterviews(null, technologyFilter, resourceTypeFilter).catch(error => {
-          console.error('Error fetching mock interviews:', error);
-          throw new Error(error.message || 'Failed to load mock interviews');
-        }),
-        getClientInterviews(null, technologyFilter, resourceTypeFilter).catch(error => {
-          console.error('Error fetching client interviews:', error);
-          throw new Error(error.message || 'Failed to load client interviews');
-        }),
-        getInterviewQuestions(technologyFilter).catch(error => {
-          console.error('Error fetching interview questions:', error);
-          throw new Error(error.message || 'Failed to load interview questions');
-        })
-      ]);
-
-      // Transform and validate the data
-      const validatedJobDescriptions = validateArrayData(jobDescriptionsData).map(jd => ({
-        id: jd.id,
-        title: jd.title || 'Untitled',
-        client: jd.client || 'Unknown',
-        technology: jd.technology || 'Unknown',
-        resourceType: jd.resourceType || 'TT',
-        received: jd.received || new Date().toISOString(),
-        deadline: jd.deadline || new Date().toISOString(),
-        description: jd.description || 'No description available'
-      }));
-
-      const validatedMockInterviews = validateArrayData(mockInterviewsData).map(interview => ({
-        id: interview.id,
-        employeeId: interview.employeeId,
-        interviewer: interview.interviewer || 'Unknown',
-        technology: interview.technology || 'Unknown',
-        resourceType: interview.resourceType || 'TT',
-        date: interview.date || new Date().toISOString(),
-        time: interview.time,
-        status: interview.status || 'scheduled',
-        feedback: interview.feedback || '',
-        ratings: interview.ratings || { technical: 0, communication: 0 }
-      }));
-
-      const validatedClientInterviews = validateArrayData(clientInterviewsData).map(interview => ({
-        id: interview.id,
-        employeeId: interview.employeeId,
-        client: interview.client || 'Unknown',
-        technology: interview.technology || 'Unknown',
-        resourceType: interview.resourceType || 'TT',
-        date: interview.date || new Date().toISOString(),
-        time: interview.time,
-        status: interview.status || 'scheduled',
-        level: interview.level || 1,
-        jobDescriptionTitle: interview.jobDescriptionTitle || 'Unknown',
-        meetingLink: interview.meetingLink || '',
-        result: interview.result || 'pending',
-        feedback: interview.feedback || ''
-      }));
-
-      const validatedInterviewQuestions = validateArrayData(interviewQuestionsData).map(question => ({
-        id: question.id,
-        technology: question.technology || 'Unknown',
-        question: question.question || '',
-        user: question.user || 'Unknown',
-        date: question.date || new Date().toISOString()
-      }));
-
-      // Update state with validated data
-      setJobDescriptions(validatedJobDescriptions);
-      setMockInterviews(validatedMockInterviews);
-      setClientInterviews(validatedClientInterviews);
-      setInterviewQuestions(validatedInterviewQuestions);
-
-      // Calculate deployed employees from completed client interviews
-      const deployed = validatedClientInterviews
-        .filter(interview => interview.status === 'completed' && interview.result === 'selected')
-        .map(interview => ({
-          id: interview.id,
-          name: interview.employeeName || 'Unknown',
-          technology: interview.technology,
-          resourceType: interview.resourceType,
-          client: interview.client,
-          date: interview.date
-        }));
-      setDeployedEmployees(deployed);
-
-    } catch (error) {
-      console.error('Error in fetchData:', error);
-      setError(error.message || 'Failed to load dashboard data');
-      
-      // Set empty arrays for all data states in case of error
-      setJobDescriptions([]);
-      setMockInterviews([]);
-      setClientInterviews([]);
-      setInterviewQuestions([]);
-      setDeployedEmployees([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const performanceData = [
-    { name: 'Technical', score: 85 },
-    { name: 'Communication', score: 75 },
-    { name: 'Problem Solving', score: 90 },
-    { name: 'System Design', score: 70 }
-  ];
-
-  const mockInterviewData = [
-    { name: 'Interview 1', technical: 8, communication: 7 },
-    { name: 'Interview 2', technical: 7, communication: 9 },
-    { name: 'Interview 3', technical: 9, communication: 8 }
-  ];
+  // Mock data for performance charts (since backend doesn't provide this)
+  const mockInterviewData = mockInterviews.map((interview, index) => ({
+    name: `Interview ${index + 1}`,
+    technical: interview.ratings?.technical || 0,
+    communication: interview.ratings?.communication || 0
+  }));
 
   const deploymentStatusData = [
-    { name: 'Selected', value: 3 },
-    { name: 'Rejected', value: 2 },
-    { name: 'Pending', value: 1 }
+    { name: 'Selected', value: clientInterviews.filter(i => i.status === 'completed' && i.result === 'selected').length },
+    { name: 'Rejected', value: clientInterviews.filter(i => i.status === 'completed' && i.result === 'rejected').length },
+    { name: 'Pending', value: clientInterviews.filter(i => i.status === 'scheduled').length }
   ];
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28'];
+  const COLORS = ['#0088FE', '#FF8042', '#00C49F'];
 
-  // Update handleFileChange with better error handling
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const performanceData = [
+    { name: 'Technical Skills', score: mockInterviews.reduce((sum, i) => sum + (i.ratings?.technical || 0), 0) / (mockInterviews.length || 1) },
+    { name: 'Communication', score: mockInterviews.reduce((sum, i) => sum + (i.ratings?.communication || 0), 0) / (mockInterviews.length || 1) }
+  ];
 
-    setIsSubmitting(true);
-    setError(null);
+  // Load initial data
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('jwt_token');
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        // Get employee ID from auth context or local storage
+        const empId = localStorage.getItem('employeeId') || 1; // Fallback to 1 for testing
+        setEmployeeId(empId);
+
+        // Fetch employee data
+        const employeeResponse = await updateEmployeeDetails(empId);
+        setEmployeeData({
+          empId: employeeResponse.empId,
+          technology: employeeResponse.technology || '',
+          resourceType: employeeResponse.resourceType || '',
+          level: employeeResponse.level || '',
+          status: employeeResponse.status || '',
+          name: employeeResponse.user?.name || 'Employee'
+        });
+
+        // Fetch profile picture
+        try {
+          const picBlob = await getProfilePicture(empId);
+          const picUrl = URL.createObjectURL(picBlob);
+          setProfilePic(picUrl);
+        } catch (picError) {
+          console.warn('Could not load profile picture:', picError.message);
+        }
+
+        // Fetch other data
+        await Promise.all([
+          fetchMockInterviews(empId),
+          fetchClientInterviews(empId),
+          fetchJobDescriptions(),
+          fetchInterviewQuestions()
+        ]);
+      } catch (err) {
+        if (err.message.includes('Unauthorized')) {
+          localStorage.removeItem('jwt_token');
+          navigate('/login');
+        }
+        toast.error(err.message);
+      } finally {
+        setLoading(false);
+        setIsDataLoading(false);
+      }
+    };
+
+    fetchInitialData();
+  }, [navigate]);
+
+  const fetchMockInterviews = async (empId) => {
     try {
-      // Get the selected job description ID from state
-      const selectedJD = jobDescriptions[0]; // You might want to add state for selected JD
-      if (!selectedJD) {
-        throw new Error('Please select a job description first');
-      }
-
-      const employeeId = 1; // Replace with actual employee ID from auth context
-      const jdId = selectedJD.id;
-
-      const response = await uploadResume(employeeId, jdId, file);
-      if (!response) {
-        throw new Error('Failed to upload resume');
-      }
-      
-      setResumeStatus('submitted');
-      // Refresh job descriptions to update resume status
-      await fetchData();
-    } catch (error) {
-      console.error('Error uploading resume:', error);
-      setError(error.message || 'Failed to upload resume');
-      setResumeStatus('rejected');
-    } finally {
-      setIsSubmitting(false);
+      const data = await getMockInterviews(empId, technologyFilter, resourceTypeFilter);
+      setMockInterviews(data);
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
-  // Update handleQuestionSubmit with better error handling
-  const handleQuestionSubmit = async (e) => {
+  const fetchClientInterviews = async (empId) => {
+    try {
+      const data = await getClientInterviews(empId, technologyFilter, resourceTypeFilter);
+      setClientInterviews(data);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const fetchJobDescriptions = async () => {
+    try {
+      const data = await getJobDescriptions(searchTerm, technologyFilter, resourceTypeFilter);
+      setJobDescriptions(data);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const fetchInterviewQuestions = async () => {
+    try {
+      const data = await getInterviewQuestions(technologyFilter);
+      setInterviewQuestions(data);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleScheduleInterview = async (e) => {
     e.preventDefault();
-    if (!newQuestion.trim()) {
-      setError('Question cannot be empty');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
     try {
-      const user = 'You'; // Replace with actual user name from auth context
-      const question = await addInterviewQuestion(
-        selectedTechnology,
-        newQuestion.trim(),
-        user
-      );
-
-      if (!question) {
-        throw new Error('Failed to add question');
+      setLoading(true);
+      const response = await axiosInstance.post('/api/employee/schedule-interview', {
+        empId: employeeData.empId,
+        ...interviewForm
+      });
+      if (interviewForm.interviewType === 'mock') {
+        setMockInterviews([...mockInterviews, response.data]);
+        toast.success('Mock interview scheduled successfully');
+      } else {
+        setClientInterviews([...clientInterviews, response.data]);
+        toast.success('Client interview scheduled successfully');
       }
-
-      setInterviewQuestions(prev => [...prev, question]);
-      setNewQuestion('');
-      setShowQuestionModal(false);
-    } catch (error) {
-      console.error('Error adding question:', error);
-      setError(error.message || 'Failed to add question');
+      setShowInterviewModal(false);
+      setInterviewForm({
+        interviewType: 'mock',
+        date: '',
+        time: '',
+        client: '',
+        interviewerId: '',
+        level: '',
+        jobDescriptionTitle: '',
+        meetingLink: ''
+      });
+    } catch (err) {
+      toast.error(err.response?.data || 'Failed to schedule interview');
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
-  // Update handleDownloadResume with better error handling
-  const handleDownloadResume = async (resumeId) => {
-    if (!resumeId) {
-      setError('Invalid resume ID');
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setEmployeeData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleInterviewFormChange = (e) => {
+    const { name, value } = e.target;
+    setInterviewForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+    if (name === 'technology') setTechnologyFilter(value);
+    else if (name === 'resourceType') setResourceTypeFilter(value);
+  };
+
+  const handleQuestionChange = (e) => {
+    const { name, value } = e.target;
+    setNewQuestion(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleFileChange = (e) => {
+    setSelectedFile(e.target.files[0]);
+  };
+
+  const handleJdChange = (e) => {
+    setSelectedJd(e.target.value);
+  };
+
+  const handleSubmitEmployeeDetails = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const updatedEmployee = await updateEmployeeDetails(
+        employeeId,
+        employeeData.technology,
+        employeeData.empId
+      );
+      setEmployeeData({
+        empId: updatedEmployee.empId,
+        technology: updatedEmployee.technology,
+        resourceType: updatedEmployee.resourceType,
+        level: updatedEmployee.level,
+        status: updatedEmployee.status,
+        name: updatedEmployee.user?.name
+      });
+      toast.success('Employee details updated successfully!');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUploadResume = async (e) => {
+    e.preventDefault();
+    if (!selectedFile || !selectedJd) {
+      toast.error('Please select both a file and a job description');
       return;
     }
-
     try {
-      const blob = await downloadResume(resumeId);
-      if (!blob) {
-        throw new Error('Failed to download resume');
-      }
+      setLoading(true);
+      const resume = await uploadResume(employeeId, selectedJd, selectedFile);
+      setResumeStatus('pending');
+      toast.success('Resume uploaded successfully!');
+      setSelectedFile(null);
+      setSelectedJd('');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const handleDownloadResume = async (resumeId) => {
+    try {
+      setLoading(true);
+      const blob = await downloadResume(resumeId);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'resume.pdf';
+      a.download = `resume_${resumeId}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (error) {
-      console.error('Error downloading resume:', error);
-      setError(error.message || 'Failed to download resume');
+      toast.success('Resume downloaded successfully!');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Update handleDeleteResume with better error handling
   const handleDeleteResume = async (resumeId) => {
-    if (!resumeId) {
-      setError('Invalid resume ID');
-      return;
-    }
-
     try {
+      setLoading(true);
       await deleteResume(resumeId);
-      setResumeStatus('pending');
-      // Refresh job descriptions to update resume status
-      await fetchData();
-    } catch (error) {
-      console.error('Error deleting resume:', error);
-      setError(error.message || 'Failed to delete resume');
+      toast.success('Resume deleted successfully!');
+      fetchMockInterviews(employeeId);
+      fetchClientInterviews(employeeId);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Loading state component
-  const LoadingState = () => (
-    <div className={styles.loadingContainer}>
-      <div className={styles.spinner}></div>
-      <p>Loading dashboard data...</p>
-    </div>
+  const handleAddQuestion = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const question = await addInterviewQuestion(
+        newQuestion.technology,
+        newQuestion.question,
+        newQuestion.user
+      );
+      setInterviewQuestions([...interviewQuestions, question]);
+      setNewQuestion({ technology: '', question: '', user: '' });
+      setShowQuestionModal(false);
+      toast.success('Interview question added successfully!');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProfilePictureChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      setLoading(true);
+      await updateProfilePicture(employeeId, file);
+      const picBlob = await getProfilePicture();
+      const picUrl = URL.createObjectURL(picBlob);
+      setProfilePic(picUrl);
+      toast.success('Profile picture updated successfully!');
+      setSelectedFile(null);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+  };
+
+  const formatDate = (dateString) => {
+    return dateString ? new Date(dateString).toLocaleDateString() : 'N/A';
+  };
+
+  const filteredInterviewQuestions = interviewQuestions.filter(
+    q => technologyFilter === 'all' || q.technology.toLowerCase() === technologyFilter
   );
 
-  // Error state component
-  const ErrorState = ({ message, onRetry }) => (
-    <div className={styles.errorContainer}>
-      <h3>Error</h3>
-      <p>{message}</p>
-      {onRetry && (
-        <button 
-          className={styles.primaryButton}
-          onClick={onRetry}
-        >
-          Try Again
-        </button>
-      )}
-    </div>
+  const filteredDeployedEmployees = () => deployedEmployees.filter(
+    e => technologyFilter === 'all' || e.technology.toLowerCase() === technologyFilter
+      && resourceTypeFilter === 'all' || e.resourceType.toLowerCase() === resourceTypeFilter
   );
 
-  // Update filter functions with null checks
-  const filteredJobDescriptions = jobDescriptions?.filter(jd => {
-    if (!jd) return false;
-    const matchesSearch = jd.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         jd.client?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTech = technologyFilter === 'all' || jd.technology === technologyFilter;
-    const matchesResource = resourceTypeFilter === 'all' || jd.resourceType === resourceTypeFilter;
-    return matchesSearch && matchesTech && matchesResource;
-  }) || [];
+  const renderPerformanceSection = () => {
+    if (!mockInterviews?.length && !clientInterviews?.length) {
+      return (
+        <div className={styles.emptyState}>
+          <FiHelpCircle size={48} />
+          <p>Complete some interviews to see your performance metrics</p>
+        </div>
+      );
+    }
 
-  const filteredMockInterviews = mockInterviews?.filter(interview => {
-    if (!interview) return false;
-    const matchesTech = technologyFilter === 'all' || interview.technology === technologyFilter;
-    const matchesResource = resourceTypeFilter === 'all' || interview.resourceType === resourceTypeFilter;
-    return matchesTech && matchesResource;
-  }) || [];
+    return (
+      <div className={styles.sectionContainer}>
+        <div className={styles.performanceGrid}>
+          <div className={styles.chartContainer}>
+            <h4>Mock Interview Scores</h4>
+            {mockInterviewData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={mockInterviewData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis domain={[0, 10]} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="technical" fill="#8884d8" name="Technical" />
+                  <Bar dataKey="communication" fill="#82ca9d" name="Communication" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className={styles.emptyChart}>
+                <p>No mock interview data available</p>
+              </div>
+            )}
+          </div>
 
-  const filteredClientInterviews = clientInterviews?.filter(interview => {
-    if (!interview) return false;
-    const matchesTech = technologyFilter === 'all' || interview.technology === technologyFilter;
-    const matchesResource = resourceTypeFilter === 'all' || interview.resourceType === resourceTypeFilter;
-    return matchesTech && matchesResource;
-  }) || [];
+          <div className={styles.chartContainer}>
+            <h4>Deployment Status</h4>
+            {deploymentStatusData.some(item => item.value > 0) ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={deploymentStatusData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {deploymentStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className={styles.emptyChart}>
+                <p>No deployment data available</p>
+              </div>
+            )}
+          </div>
+        </div>
 
-  const filteredDeployedEmployees = deployedEmployees?.filter(employee => {
-    if (!employee) return false;
-    const matchesTech = technologyFilter === 'all' || employee.technology === technologyFilter;
-    const matchesResource = resourceTypeFilter === 'all' || employee.resourceType === resourceTypeFilter;
-    return matchesTech && matchesResource;
-  }) || [];
-
-  const filteredInterviewQuestions = interviewQuestions?.filter(q => 
-    technologyFilter === 'all' || q?.technology === technologyFilter
-  ) || [];
+        <div className={styles.statsGrid}>
+          {[
+            { title: 'Mock Interviews', value: mockInterviews?.length || 0, label: 'Completed' },
+            { title: 'Avg. Technical Score', value: performanceData[0]?.score?.toFixed(1) || '0.0', label: '/ 10.0' },
+            { title: 'Avg. Communication', value: performanceData[1]?.score?.toFixed(1) || '0.0', label: '/ 10.0' },
+            { 
+              title: 'Conversion Rate', 
+              value: clientInterviews?.length ? 
+                `${((clientInterviews.filter(i => i?.status === 'completed' && i?.result === 'selected').length / clientInterviews.length) * 100).toFixed(0)}%` : 
+                '0%',
+              label: 'Success'
+            }
+          ].map((stat, index) => (
+            <motion.div key={index} className={styles.statCard} whileHover={{ scale: 1.05 }}>
+              <h5>{stat.title}</h5>
+              <p className={styles.statValue}>{stat.value}</p>
+              <p className={styles.statLabel}>{stat.label}</p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   const renderTabContent = () => {
-    if (isLoading) {
-      return <LoadingState />;
-    }
-
-    if (error) {
-      return <ErrorState message={error} onRetry={fetchData} />;
-    }
-
     switch (activeTab) {
       case 'jd':
         return (
@@ -401,6 +485,7 @@ const EmployeeDashboard = () => {
                   placeholder="Search JDs..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  className={styles.searchInput}
                 />
               </div>
               <div className={styles.filterControls}>
@@ -409,16 +494,17 @@ const EmployeeDashboard = () => {
                   <select 
                     id="technology-filter" 
                     value={technologyFilter}
-                    onChange={(e) => setTechnologyFilter(e.target.value)}
+                    onChange={handleFilterChange}
+                    name="technology"
                   >
                     <option value="all">All Technologies</option>
-                    <option value="java">Java</option>
-                    <option value="python">Python</option>
-                    <option value="dotnet">.NET</option>
-                    <option value="devops">DevOps</option>
-                    <option value="salesforce">SalesForce</option>
-                    <option value="ui">UI</option>
-                    <option value="testing">Testing</option>
+                    <option value="Java">Java</option>
+                    <option value="Python">Python</option>
+                    <option value=".NET">.NET</option>
+                    <option value="DevOps">DevOps</option>
+                    <option value="SalesForce">SalesForce</option>
+                    <option value="UI">UI</option>
+                    <option value="Testing">Testing</option>
                   </select>
                 </div>
                 <div className={styles.filterGroup}>
@@ -426,7 +512,8 @@ const EmployeeDashboard = () => {
                   <select 
                     id="resource-filter" 
                     value={resourceTypeFilter}
-                    onChange={(e) => setResourceTypeFilter(e.target.value)}
+                    onChange={handleFilterChange}
+                    name="resourceType"
                   >
                     <option value="all">All Types</option>
                     <option value="TCT1">TCT1</option>
@@ -435,11 +522,11 @@ const EmployeeDashboard = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className={styles.cardGrid}>
               <AnimatePresence>
-                {filteredJobDescriptions.length > 0 ? (
-                  filteredJobDescriptions.map(jd => (
+                {jobDescriptions.length > 0 ? (
+                  jobDescriptions.map(jd => (
                     <motion.div 
                       key={jd.id} 
                       className={styles.card}
@@ -447,34 +534,22 @@ const EmployeeDashboard = () => {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ duration: 0.3 }}
                     >
                       <div className={styles.cardHeader}>
                         <h3>{jd.title}</h3>
-                        <div className={styles.techBadge} data-tech={jd.technology}>
-                          {jd.technology}
-                        </div>
-                        <div className={styles.resourceBadge} data-type={jd.resourceType}>
-                          {jd.resourceType}
-                        </div>
+                        <div className={styles.techBadge}>{jd.technology}</div>
+                        <div className={styles.resourceBadge}>{jd.resourceType}</div>
                       </div>
                       <p className={styles.clientName}><strong>Client:</strong> {jd.client}</p>
-                      <div className={styles.dateInfo}>
-                        <p><FiCalendar /> <strong>Received:</strong> {jd.received}</p>
-                        <p><FiClock /> <strong>Deadline:</strong> {jd.deadline}</p>
-                      </div>
-                      <div className={styles.jdPreview}>
-                        <p>{jd.description.substring(0, 100)}...</p>
-                      </div>
                       <div className={styles.cardActions}>
                         <button 
                           className={styles.primaryButton}
-                          onClick={() => setActiveTab('resume')}
+                          onClick={() => {
+                            setSelectedJd(jd.id);
+                            setActiveTab('resume');
+                          }}
                         >
                           <FiFileText /> Prepare Resume
-                        </button>
-                        <button className={styles.secondaryButton}>
-                          <FiDownload /> Download JD
                         </button>
                       </div>
                     </motion.div>
@@ -486,94 +561,58 @@ const EmployeeDashboard = () => {
                     animate={{ opacity: 1 }}
                   >
                     <FiHelpCircle size={48} />
-                    <h4>No Job Descriptions Found</h4>
-                    <p>Try adjusting your filters or check back later</p>
+                    <p>No Job Descriptions Found</p>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
           </div>
         );
+
       case 'resume':
         return (
           <div className={styles.sectionContainer}>
             <h3 className={styles.sectionTitle}><FiFileText /> Resume Preparation</h3>
-            
-            <motion.div 
-              className={styles.statusCard}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-            >
+            <motion.div className={styles.statusCard}>
               <div className={`${styles.statusIndicator} ${styles[resumeStatus]}`}>
                 {resumeStatus === 'pending' && <FiClock size={24} />}
                 {resumeStatus === 'submitted' && <FiCheckCircle size={24} />}
                 {resumeStatus === 'rejected' && <FiXCircle size={24} />}
                 <span>{resumeStatus.charAt(0).toUpperCase() + resumeStatus.slice(1)}</span>
               </div>
-              
+
               {resumeStatus === 'pending' && (
-                <motion.div 
-                  className={styles.uploadArea}
-                  initial={{ scale: 0.95 }}
-                  animate={{ scale: 1 }}
-                  whileHover={{ scale: 1.01 }}
-                >
+                <motion.div className={styles.uploadArea}>
                   <FiFileText size={48} />
-                  <p>Upload your resume tailored to the job description</p>
+                  <select value={selectedJd} onChange={handleJdChange} className={styles.select}>
+                    <option value="">Select Job Description</option>
+                    {jobDescriptions.map(jd => (
+                      <option key={jd.id} value={jd.id}>{jd.title}</option>
+                    ))}
+                  </select>
                   <input 
                     type="file" 
                     id="resumeUpload" 
                     onChange={handleFileChange} 
-                    accept=".pdf,.doc,.docx" 
+                    accept=".pdf" 
+                    className={styles.fileInput}
                   />
                   <label htmlFor="resumeUpload" className={styles.uploadButton}>
-                    <FiUpload /> Select File
+                    <FiUpload /> Select Resume
                   </label>
-                  <div className={styles.uploadTips}>
-                    <h5>Resume Tips:</h5>
-                    <ul>
-                      <li>Tailor your resume to match the job description</li>
-                      <li>Highlight relevant technical skills</li>
-                      <li>Keep it concise (1-2 pages max)</li>
-                      <li>Include measurable achievements</li>
-                    </ul>
-                  </div>
-                </motion.div>
-              )}
-              
-              {resumeStatus === 'submitted' && (
-                <motion.div 
-                  className={styles.submissionDetails}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  <div className={styles.successMessage}>
-                    <FiCheckCircle size={32} />
-                    <h4>Resume Submitted Successfully!</h4>
-                  </div>
-                  <p>Your resume has been submitted to the sales team for review.</p>
-                  <p>You will be notified when it's sent to clients.</p>
-                  
-                  <div className={styles.resumeStats}>
-                    <div className={styles.statItem}>
-                      <span className={styles.statNumber}>3</span>
-                      <span className={styles.statLabel}>JDs Applied For</span>
-                    </div>
-                    <div className={styles.statItem}>
-                      <span className={styles.statNumber}>2</span>
-                      <span className={styles.statLabel}>Resumes Sent to Clients</span>
-                    </div>
-                    <div className={styles.statItem}>
-                      <span className={styles.statNumber}>1</span>
-                      <span className={styles.statLabel}>Interview Calls</span>
-                    </div>
-                  </div>
+                  <button 
+                    onClick={handleUploadResume}
+                    disabled={loading || !selectedFile || !selectedJd}
+                    className={styles.primaryButton}
+                  >
+                    {loading ? 'Uploading...' : 'Upload Resume'}
+                  </button>
                 </motion.div>
               )}
             </motion.div>
           </div>
         );
+
       case 'interviews':
         return (
           <div className={styles.sectionContainer}>
@@ -602,8 +641,14 @@ const EmployeeDashboard = () => {
               >
                 <FiAward /> Deployed Colleagues
               </button>
+              <button 
+                className={styles.primaryButton}
+                onClick={() => setShowInterviewModal(true)}
+              >
+                <FiPlus /> Schedule Interview
+              </button>
             </div>
-            
+
             <div className={styles.filterSection}>
               <div className={styles.filterControls}>
                 <div className={styles.filterGroup}>
@@ -611,16 +656,17 @@ const EmployeeDashboard = () => {
                   <select 
                     id="interview-tech-filter" 
                     value={technologyFilter}
-                    onChange={(e) => setTechnologyFilter(e.target.value)}
+                    onChange={handleFilterChange}
+                    name="technology"
                   >
                     <option value="all">All Technologies</option>
-                    <option value="java">Java</option>
-                    <option value="python">Python</option>
-                    <option value="dotnet">.NET</option>
-                    <option value="devops">DevOps</option>
-                    <option value="salesforce">SalesForce</option>
-                    <option value="ui">UI</option>
-                    <option value="testing">Testing</option>
+                    <option value="Java">Java</option>
+                    <option value="Python">Python</option>
+                    <option value=".NET">.NET</option>
+                    <option value="DevOps">DevOps</option>
+                    <option value="SalesForce">SalesForce</option>
+                    <option value="UI">UI</option>
+                    <option value="Testing">Testing</option>
                   </select>
                 </div>
                 <div className={styles.filterGroup}>
@@ -628,100 +674,62 @@ const EmployeeDashboard = () => {
                   <select 
                     id="interview-resource-filter" 
                     value={resourceTypeFilter}
-                    onChange={(e) => setResourceTypeFilter(e.target.value)}
+                    onChange={handleFilterChange}
+                    name="resourceType"
                   >
                     <option value="all">All Types</option>
-                    <option value="TCT">TCT</option>
-                    <option value="TT">TT</option>
+                    <option value="TCT1">TCT1</option>
+                    <option value="OM">OM</option>
                   </select>
                 </div>
               </div>
             </div>
-            
+
             {activeInterviewTab === 'mock' ? (
               <div className={styles.interviewList}>
                 <AnimatePresence>
-                  {filteredMockInterviews.length > 0 ? (
-                    filteredMockInterviews.map(interview => (
+                  {mockInterviews.length > 0 ? (
+                    mockInterviews.map(interview => (
                       <motion.div 
                         key={interview.id} 
                         className={styles.interviewCard}
                         whileHover={{ scale: 1.01 }}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
                       >
                         <div className={styles.interviewHeader}>
                           <div>
-                            <h4>Interview with {interview.interviewer}</h4>
+                            <h4>Interview with {interview.interviewer?.name || 'TBD'}</h4>
                             <div className={styles.interviewMeta}>
-                              <span className={styles.techBadge} data-tech={interview.technology}>
-                                {interview.technology}
-                              </span>
-                              <span className={styles.resourceBadge} data-type={interview.resourceType}>
-                                {interview.resourceType}
-                              </span>
-                              <span><FiCalendar /> {interview.date}</span>
+                              <span className={styles.techBadge}>{interview.employee?.technology}</span>
+                              <span className={styles.resourceBadge}>{interview.employee?.resourceType}</span>
+                              <span><FiCalendar /> {formatDate(interview.date)}</span>
                             </div>
                           </div>
                           <span className={`${styles.status} ${styles[interview.status]}`}>
                             {interview.status}
                           </span>
                         </div>
-                        
-                        {interview.status === 'completed' && (
-                          <div className={styles.interviewScores}>
-                            <div className={styles.scoreMeter}>
-                              <div className={styles.scoreLabel}>Technical</div>
-                              <div className={styles.scoreBar}>
-                                <div 
-                                  className={styles.scoreFill} 
-                                  style={{ width: `${interview.ratings.technical * 10}%` }}
-                                  data-score={interview.ratings.technical}
-                                ></div>
-                              </div>
-                            </div>
-                            <div className={styles.scoreMeter}>
-                              <div className={styles.scoreLabel}>Communication</div>
-                              <div className={styles.scoreBar}>
-                                <div 
-                                  className={styles.scoreFill} 
-                                  style={{ width: `${interview.ratings.communication * 10}%` }}
-                                  data-score={interview.ratings.communication}
-                                ></div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {interview.feedback && (
-                          <div className={styles.feedback}>
-                            <h5>Feedback:</h5>
-                            <p>{interview.feedback}</p>
-                          </div>
-                        )}
-                        
-                        {interview.questions && interview.questions.length > 0 && (
-                          <div className={styles.questionsSection}>
-                            <h5>Questions Asked:</h5>
-                            <ul>
-                              {interview.questions.map((q, idx) => (
-                                <li key={idx}>{q}</li>
-                              ))}
-                            </ul>
+                        {interview.resume && (
+                          <div className={styles.interviewActions}>
+                            <button 
+                              onClick={() => handleDownloadResume(interview.resume.id)}
+                              className={styles.primaryButton}
+                            >
+                              <FiDownload /> Resume
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteResume(interview.resume.id)}
+                              className={styles.secondaryButton}
+                            >
+                              Delete Resume
+                            </button>
                           </div>
                         )}
                       </motion.div>
                     ))
                   ) : (
-                    <motion.div 
-                      className={styles.emptyState}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                    >
+                    <motion.div className={styles.emptyState}>
                       <FiHelpCircle size={48} />
-                      <h4>No Mock Interviews Found</h4>
-                      <p>Try adjusting your filters or check back later</p>
+                      <p>No Mock Interviews Found</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -729,27 +737,20 @@ const EmployeeDashboard = () => {
             ) : activeInterviewTab === 'client' ? (
               <div className={styles.interviewList}>
                 <AnimatePresence>
-                  {filteredClientInterviews.length > 0 ? (
-                    filteredClientInterviews.map(interview => (
+                  {clientInterviews.length > 0 ? (
+                    clientInterviews.map(interview => (
                       <motion.div 
                         key={interview.id} 
                         className={styles.interviewCard}
                         whileHover={{ scale: 1.01 }}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
                       >
                         <div className={styles.interviewHeader}>
                           <div>
                             <h4>{interview.client} - Level {interview.level}</h4>
                             <div className={styles.interviewMeta}>
-                              <span className={styles.techBadge} data-tech={interview.technology}>
-                                {interview.technology}
-                              </span>
-                              <span className={styles.resourceBadge} data-type={interview.resourceType}>
-                                {interview.resourceType}
-                              </span>
-                              <span><FiCalendar /> {interview.date}</span>
+                              <span className={styles.techBadge}>{interview.employee?.technology}</span>
+                              <span className={styles.resourceBadge}>{interview.employee?.resourceType}</span>
+                              <span><FiCalendar /> {formatDate(interview.date)}</span>
                               <span>For JD: {interview.jobDescriptionTitle}</span>
                             </div>
                           </div>
@@ -757,7 +758,6 @@ const EmployeeDashboard = () => {
                             {interview.status}
                           </span>
                         </div>
-                        
                         {interview.status === 'scheduled' && interview.meetingLink && (
                           <div className={styles.interviewActions}>
                             <a 
@@ -768,37 +768,30 @@ const EmployeeDashboard = () => {
                             >
                               Join Interview
                             </a>
-                            <button className={styles.secondaryButton}>
-                              Reschedule
-                            </button>
                           </div>
                         )}
-                        
-                        {interview.status === 'completed' && (
-                          <div className={styles.interviewResult}>
-                            <h5>Result: 
-                              <span className={interview.result === 'selected' ? styles.resultSuccess : styles.resultFailure}>
-                                {interview.result === 'selected' ? 'Selected' : 'Rejected'}
-                              </span>
-                            </h5>
-                            {interview.feedback && (
-                              <div className={styles.feedback}>
-                                <p>{interview.feedback}</p>
-                              </div>
-                            )}
+                        {interview.resume && (
+                          <div className={styles.interviewActions}>
+                            <button 
+                              onClick={() => handleDownloadResume(interview.resume.id)}
+                              className={styles.primaryButton}
+                            >
+                              <FiDownload /> Resume
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteResume(interview.resume.id)}
+                              className={styles.secondaryButton}
+                            >
+                              Delete Resume
+                            </button>
                           </div>
                         )}
                       </motion.div>
                     ))
                   ) : (
-                    <motion.div 
-                      className={styles.emptyState}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                    >
+                    <motion.div className={styles.emptyState}>
                       <FiHelpCircle size={48} />
-                      <h4>No Client Interviews Found</h4>
-                      <p>Try adjusting your filters or check back later</p>
+                      <p>No Client Interviews Found</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -814,19 +807,6 @@ const EmployeeDashboard = () => {
                     <FiShare2 /> Share a Question
                   </button>
                 </div>
-                
-                <div className={styles.technologyTabs}>
-                  {['all', 'java', 'python', 'dotnet', 'devops', 'salesforce', 'ui', 'testing'].map(tech => (
-                    <button
-                      key={tech}
-                      className={`${styles.techTab} ${technologyFilter === tech ? styles.active : ''}`}
-                      onClick={() => setTechnologyFilter(tech)}
-                    >
-                      {tech === 'all' ? 'All' : tech}
-                    </button>
-                  ))}
-                </div>
-                
                 <div className={styles.questionsList}>
                   {filteredInterviewQuestions.length > 0 ? (
                     filteredInterviewQuestions.map(question => (
@@ -834,33 +814,19 @@ const EmployeeDashboard = () => {
                         key={question.id} 
                         className={styles.questionCard}
                         whileHover={{ scale: 1.01 }}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2 }}
                       >
                         <div className={styles.questionMeta}>
-                          <span className={styles.techBadge} data-tech={question.technology}>
-                            {question.technology}
-                          </span>
-                          <span className={styles.questionDate}>{question.date}</span>
+                          <span className={styles.techBadge}>{question.technology}</span>
+                          <span className={styles.questionDate}>{formatDate(question.date)}</span>
                           <span className={styles.questionUser}>by {question.user}</span>
                         </div>
                         <p className={styles.questionText}>{question.question}</p>
-                        <div className={styles.questionActions}>
-                          <button className={styles.smallButton}>Save</button>
-                          <button className={styles.smallButton}>Answer</button>
-                        </div>
                       </motion.div>
                     ))
                   ) : (
-                    <motion.div 
-                      className={styles.emptyState}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                    >
+                    <motion.div className={styles.emptyState}>
                       <FiHelpCircle size={48} />
-                      <h4>No Questions Found</h4>
-                      <p>Try adjusting your filters or be the first to share a question</p>
+                      <p>No Questions Found</p>
                     </motion.div>
                   )}
                 </div>
@@ -869,15 +835,12 @@ const EmployeeDashboard = () => {
               <div className={styles.deployedContainer}>
                 <h4>Recently Deployed Colleagues</h4>
                 <div className={styles.deployedGrid}>
-                  {filteredDeployedEmployees.length > 0 ? (
-                    filteredDeployedEmployees.map(employee => (
+                  {filteredDeployedEmployees().length > 0 ? (
+                    filteredDeployedEmployees().map(employee => (
                       <motion.div 
                         key={employee.id} 
                         className={styles.deployedCard}
                         whileHover={{ scale: 1.02 }}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2 }}
                       >
                         <div className={styles.deployedHeader}>
                           <div className={styles.avatar}>
@@ -886,33 +849,21 @@ const EmployeeDashboard = () => {
                           <div>
                             <h5>{employee.name}</h5>
                             <div className={styles.deployedMeta}>
-                              <span className={styles.techBadge} data-tech={employee.technology}>
-                                {employee.technology}
-                              </span>
-                              <span className={styles.resourceBadge} data-type={employee.resourceType}>
-                                {employee.resourceType}
-                              </span>
+                              <span className={styles.techBadge}>{employee.technology}</span>
+                              <span className={styles.resourceBadge}>{employee.resourceType}</span>
                             </div>
                           </div>
                         </div>
                         <div className={styles.deployedDetails}>
                           <p><strong>Client:</strong> {employee.client}</p>
-                          <p><strong>Deployed on:</strong> {employee.date}</p>
+                          <p><strong>Deployed on:</strong> {formatDate(employee.date)}</p>
                         </div>
-                        <button className={styles.smallButton}>
-                          <FiMail /> Congratulate
-                        </button>
                       </motion.div>
                     ))
                   ) : (
-                    <motion.div 
-                      className={styles.emptyState}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                    >
+                    <motion.div className={styles.emptyState}>
                       <FiHelpCircle size={48} />
-                      <h4>No Deployed Colleagues Found</h4>
-                      <p>Try adjusting your filters or check back later</p>
+                      <p>No Deployed Colleagues Found</p>
                     </motion.div>
                   )}
                 </div>
@@ -920,141 +871,10 @@ const EmployeeDashboard = () => {
             )}
           </div>
         );
+
       case 'performance':
-        return (
-          <div className={styles.sectionContainer}>
-            <h3 className={styles.sectionTitle}><FiBarChart2 /> Performance Analytics</h3>
-            
-            <div className={styles.performanceGrid}>
-              <div className={styles.chartContainer}>
-                <h4>Mock Interview Scores</h4>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={mockInterviewData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis domain={[0, 10]} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="technical" fill="#8884d8" name="Technical" />
-                    <Bar dataKey="communication" fill="#82ca9d" name="Communication" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              
-              <div className={styles.chartContainer}>
-                <h4>Deployment Status</h4>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={deploymentStatusData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {deploymentStatusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-            
-            <div className={styles.statsGrid}>
-              <motion.div 
-                className={styles.statCard}
-                whileHover={{ scale: 1.05 }}
-              >
-                <h5>Mock Interviews</h5>
-                <p className={styles.statValue}>8</p>
-                <p className={styles.statLabel}>Completed</p>
-                <div className={styles.statTrend} data-trend="up">
-                  +2 from last month
-                </div>
-              </motion.div>
-              <motion.div 
-                className={styles.statCard}
-                whileHover={{ scale: 1.05 }}
-              >
-                <h5>Avg. Technical Score</h5>
-                <p className={styles.statValue}>8.2</p>
-                <p className={styles.statLabel}>/ 10.0</p>
-                <div className={styles.statTrend} data-trend="up">
-                  +0.5 from last month
-                </div>
-              </motion.div>
-              <motion.div 
-                className={styles.statCard}
-                whileHover={{ scale: 1.05 }}
-              >
-                <h5>Avg. Communication</h5>
-                <p className={styles.statValue}>7.5</p>
-                <p className={styles.statLabel}>/ 10.0</p>
-                <div className={styles.statTrend} data-trend="steady">
-                  Same as last month
-                </div>
-              </motion.div>
-              <motion.div 
-                className={styles.statCard}
-                whileHover={{ scale: 1.05 }}
-              >
-                <h5>Conversion Rate</h5>
-                <p className={styles.statValue}>60%</p>
-                <p className={styles.statLabel}>Success</p>
-                <div className={styles.statTrend} data-trend="up">
-                  +10% from last month
-                </div>
-              </motion.div>
-            </div>
-            
-            <div className={styles.skillDevelopment}>
-              <h4>Skill Development Areas</h4>
-              <div className={styles.skillList}>
-                <div className={styles.skillItem}>
-                  <div className={styles.skillInfo}>
-                    <h5>System Design</h5>
-                    <p>Average score of 6.5 in mock interviews</p>
-                  </div>
-                  <div className={styles.skillProgress}>
-                    <div className={styles.progressBar}>
-                      <div className={styles.progressFill} style={{ width: '65%' }}></div>
-                    </div>
-                    <button className={styles.smallButton}>Resources</button>
-                  </div>
-                </div>
-                <div className={styles.skillItem}>
-                  <div className={styles.skillInfo}>
-                    <h5>Problem Solving</h5>
-                    <p>Average score of 7.8 in mock interviews</p>
-                  </div>
-                  <div className={styles.skillProgress}>
-                    <div className={styles.progressBar}>
-                      <div className={styles.progressFill} style={{ width: '78%' }}></div>
-                    </div>
-                    <button className={styles.smallButton}>Resources</button>
-                  </div>
-                </div>
-                <div className={styles.skillItem}>
-                  <div className={styles.skillInfo}>
-                    <h5>Communication</h5>
-                    <p>Average score of 7.5 in mock interviews</p>
-                  </div>
-                  <div className={styles.skillProgress}>
-                    <div className={styles.progressBar}>
-                      <div className={styles.progressFill} style={{ width: '75%' }}></div>
-                    </div>
-                    <button className={styles.smallButton}>Resources</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
+        return renderPerformanceSection();
+
       default:
         return null;
     }
@@ -1062,71 +882,74 @@ const EmployeeDashboard = () => {
 
   return (
     <div className={styles.dashboardContainer}>
+      <ToastContainer />
       <div className={styles.dashboardHeader}>
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <h2>AJA Interview Preparation Track</h2>
-          <p className={styles.dashboardSubtitle}>Your personalized dashboard for interview success</p>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+          <h2>Employee Dashboard</h2>
+          <p className={styles.dashboardSubtitle}>Your personalized interview preparation platform</p>
         </motion.div>
         <div className={styles.userProfile}>
           <div className={styles.avatar}>
-            <FiUser size={18} />
+            {loading ? (
+              <div className={styles.loadingSpinner} />
+            ) : profilePic ? (
+              <img src={profilePic} alt="Profile" />
+            ) : (
+              <FiUser size={18} />
+            )}
+            <input
+              type="file"
+              id="profilePicture"
+              accept="image/jpeg,image/png"
+              onChange={handleProfilePictureChange}
+              style={{ display: 'none' }}
+            />
+            <label htmlFor="profilePicture" className={styles.avatarUpload}>
+              <FiUpload size={14} />
+            </label>
           </div>
           <div className={styles.userInfo}>
-            <span className={styles.userName}>John Doe</span>
-            <span className={styles.userRole}>Java Developer (TT)</span>
+            <span className={styles.userName}>{employeeData.name}</span>
+            <span className={styles.userRole}>{employeeData.technology} Developer ({employeeData.resourceType})</span>
           </div>
         </div>
       </div>
-      
+
       <div className={styles.tabs}>
-        <motion.button 
-          className={`${styles.tab} ${activeTab === 'jd' ? styles.active : ''}`}
-          onClick={() => setActiveTab('jd')}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <FiFileText /> Job Descriptions
-        </motion.button>
-        <motion.button 
-          className={`${styles.tab} ${activeTab === 'resume' ? styles.active : ''}`}
-          onClick={() => setActiveTab('resume')}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <FiUpload /> Resume Preparation
-        </motion.button>
-        <motion.button 
-          className={`${styles.tab} ${activeTab === 'interviews' ? styles.active : ''}`}
-          onClick={() => setActiveTab('interviews')}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <FiMessageSquare /> Interviews
-        </motion.button>
-        <motion.button 
-          className={`${styles.tab} ${activeTab === 'performance' ? styles.active : ''}`}
-          onClick={() => setActiveTab('performance')}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <FiBarChart2 /> Performance
-        </motion.button>
+        {[
+          { id: 'jd', label: 'Job Descriptions', icon: <FiFileText /> },
+          { id: 'resume', label: 'Resume Preparation', icon: <FiUpload /> },
+          { id: 'interviews', label: 'Interviews', icon: <FiMessageSquare /> },
+          { id: 'performance', label: 'Performance', icon: <FiBarChart2 /> }
+        ].map(tab => (
+          <motion.button 
+            key={tab.id}
+            className={`${styles.tab} ${activeTab === tab.id ? styles.active : ''}`}
+            onClick={() => handleTabChange(tab.id)}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            {tab.icon} {tab.label}
+          </motion.button>
+        ))}
       </div>
-      
+
       <motion.div 
         className={styles.tabContent}
         key={activeTab}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
       >
-        {renderTabContent()}
+        {isDataLoading ? (
+          <div className={styles.loadingContainer}>
+            <div className={styles.spinner}></div>
+            <p>Loading dashboard data...</p>
+          </div>
+        ) : (
+          renderTabContent()
+        )}
       </motion.div>
-      
+
       {/* Question Sharing Modal */}
       {showQuestionModal && (
         <motion.div 
@@ -1137,34 +960,50 @@ const EmployeeDashboard = () => {
         >
           <motion.div 
             className={styles.modalContent}
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
           >
             <h3>Share an Interview Question</h3>
-            <form onSubmit={handleQuestionSubmit}>
+            <form onSubmit={handleAddQuestion}>
               <div className={styles.formGroup}>
                 <label>Technology:</label>
                 <select
-                  value={selectedTechnology}
-                  onChange={(e) => setSelectedTechnology(e.target.value)}
+                  name="technology"
+                  value={newQuestion.technology}
+                  onChange={handleQuestionChange}
+                  required
                 >
-                  <option value="java">Java</option>
-                  <option value="python">Python</option>
-                  <option value="dotnet">.NET</option>
-                  <option value="devops">DevOps</option>
-                  <option value="salesforce">SalesForce</option>
-                  <option value="ui">UI</option>
-                  <option value="testing">Testing</option>
+                  <option value="">Select Technology</option>
+                  <option value="Java">Java</option>
+                  <option value="Python">Python</option>
+                  <option value=".NET">.NET</option>
+                  <option value="DevOps">DevOps</option>
+                  <option value="SalesForce">SalesForce</option>
+                  <option value="UI">UI</option>
+                  <option value="Testing">Testing</option>
                 </select>
               </div>
               <div className={styles.formGroup}>
                 <label>Question:</label>
                 <textarea
-                  value={newQuestion}
-                  onChange={(e) => setNewQuestion(e.target.value)}
-                  placeholder="Enter the interview question you were asked..."
+                  name="question"
+                  value={newQuestion.question}
+                  onChange={handleQuestionChange}
+                  placeholder="Enter the interview question..."
                   rows={4}
+                  required
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label>User:</label>
+                <input
+                  type="text"
+                  name="user"
+                  value={newQuestion.user}
+                  onChange={handleQuestionChange}
+                  placeholder="Your name"
+                  required
                 />
               </div>
               <div className={styles.modalActions}>
@@ -1178,8 +1017,138 @@ const EmployeeDashboard = () => {
                 <button 
                   type="submit" 
                   className={styles.primaryButton}
+                  disabled={loading}
                 >
-                  Share Question
+                  {loading ? 'Sharing...' : 'Share Question'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Interview Scheduling Modal */}
+      {showInterviewModal && (
+        <motion.div 
+          className={styles.modalOverlay}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          onClick={() => setShowInterviewModal(false)}
+        >
+          <motion.div 
+            className={styles.modalContent}
+            onClick={e => e.stopPropagation()}
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+          >
+            <h3>Schedule Interview</h3>
+            <form onSubmit={handleScheduleInterview}>
+              <div className={styles.formGroup}>
+                <label>Interview Type:</label>
+                <select
+                  name="interviewType"
+                  value={interviewForm.interviewType}
+                  onChange={handleInterviewFormChange}
+                  required
+                >
+                  <option value="mock">Mock Interview</option>
+                  <option value="client">Client Interview</option>
+                </select>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Date:</label>
+                <input
+                  type="date"
+                  name="date"
+                  value={interviewForm.date}
+                  onChange={handleInterviewFormChange}
+                  required
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Time:</label>
+                <input
+                  type="time"
+                  name="time"
+                  value={interviewForm.time}
+                  onChange={handleInterviewFormChange}
+                  required
+                />
+              </div>
+              {interviewForm.interviewType === 'mock' && (
+                <div className={styles.formGroup}>
+                  <label>Interviewer ID:</label>
+                  <input
+                    type="number"
+                    name="interviewerId"
+                    value={interviewForm.interviewerId}
+                    onChange={handleInterviewFormChange}
+                    required
+                  />
+                </div>
+              )}
+              {interviewForm.interviewType === 'client' && (
+                <>
+                  <div className={styles.formGroup}>
+                    <label>Client:</label>
+                    <input
+                      type="text"
+                      name="client"
+                      value={interviewForm.client}
+                      onChange={handleInterviewFormChange}
+                      required
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Level:</label>
+                    <input
+                      type="number"
+                      name="level"
+                      value={interviewForm.level}
+                      onChange={handleInterviewFormChange}
+                      required
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Job Description Title:</label>
+                    <select
+                      name="jobDescriptionTitle"
+                      value={interviewForm.jobDescriptionTitle}
+                      onChange={handleInterviewFormChange}
+                      required
+                    >
+                      <option value="">Select JD</option>
+                      {jobDescriptions.map(jd => (
+                        <option key={jd.id} value={jd.title}>{jd.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label>Meeting Link:</label>
+                    <input
+                      type="url"
+                      name="meetingLink"
+                      value={interviewForm.meetingLink}
+                      onChange={handleInterviewFormChange}
+                      required
+                    />
+                  </div>
+                </>
+              )}
+              <div className={styles.modalActions}>
+                <button 
+                  type="button" 
+                  className={styles.secondaryButton}
+                  onClick={() => setShowInterviewModal(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className={styles.primaryButton}
+                  disabled={loading}
+                >
+                  {loading ? 'Scheduling...' : 'Schedule Interview'}
                 </button>
               </div>
             </form>

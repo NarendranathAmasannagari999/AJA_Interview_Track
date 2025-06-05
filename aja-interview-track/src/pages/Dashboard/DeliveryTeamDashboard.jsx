@@ -111,7 +111,17 @@ const DeliveryTeamDashboard = () => {
       // Fetch employees with filters
       const employeesData = await getEmployees(technologyFilter, resourceTypeFilter);
       if (Array.isArray(employeesData)) {
-        setEmployees(employeesData);
+        // Validate each employee has the required structure
+        const validEmployees = employeesData.filter(employee => 
+          employee && 
+          employee.id && 
+          employee.user && 
+          employee.user.fullName && 
+          employee.empId && 
+          employee.technology && 
+          employee.resourceType
+        );
+        setEmployees(validEmployees);
       } else {
         console.error('Invalid employees data received:', employeesData);
         setEmployees([]);
@@ -121,6 +131,10 @@ const DeliveryTeamDashboard = () => {
       let upcomingData = [];
       try {
         upcomingData = await getUpcomingInterviews();
+        if (!Array.isArray(upcomingData)) {
+          console.error('Invalid upcoming interviews data received:', upcomingData);
+          upcomingData = [];
+        }
       } catch (error) {
         console.error('Error fetching upcoming interviews:', error);
         setError(error.message || 'Failed to load upcoming interviews');
@@ -130,6 +144,10 @@ const DeliveryTeamDashboard = () => {
       let completedData = [];
       try {
         completedData = await getCompletedInterviews();
+        if (!Array.isArray(completedData)) {
+          console.error('Invalid completed interviews data received:', completedData);
+          completedData = [];
+        }
       } catch (error) {
         console.error('Error fetching completed interviews:', error);
         setError(error.message || 'Failed to load completed interviews');
@@ -137,31 +155,27 @@ const DeliveryTeamDashboard = () => {
 
       // Combine and set all interviews
       const allInterviews = [
-        ...(Array.isArray(upcomingData) ? upcomingData : []),
-        ...(Array.isArray(completedData) ? completedData : []),
+        ...upcomingData,
+        ...completedData,
       ].map(interview => {
-        // Ensure employeeName is correctly set from the nested user object if available
-        const employee = (Array.isArray(employeesData) ? employeesData : []).find(e => e && e.id === interview.employeeId);
+        // Find the employee and get their full name from the user object
+        const employee = employeesData.find(e => e && e.id === interview.employeeId);
         return {
           ...interview,
-          employeeName: employee?.name || 'Unknown Employee'
+          employeeName: employee?.user?.fullName || 'Unknown Employee'
         };
       });
       setMockInterviews(allInterviews);
 
       // Update profiles sent to sales and deployed employees
-      const sentToSales = Array.isArray(completedData) 
-        ? completedData
-            .filter(i => i && i.sentToSales)
-            .map(i => i.employeeId)
-        : [];
+      const sentToSales = completedData
+        .filter(i => i && i.sentToSales)
+        .map(i => i.employeeId);
       setProfilesSentToSales(sentToSales);
 
-      const deployed = Array.isArray(completedData)
-        ? completedData
-            .filter(i => i && i.deployed)
-            .map(i => i.employeeId)
-        : [];
+      const deployed = completedData
+        .filter(i => i && i.deployed)
+        .map(i => i.employeeId);
       setDeployedEmployees(deployed);
 
     } catch (error) {
@@ -185,10 +199,9 @@ const DeliveryTeamDashboard = () => {
 
   const filteredEmployees = Array.isArray(employees) ?
     employees.filter(employee => {
-      if (!employee) return false;
+      if (!employee || !employee.user) return false;
 
-      const matchesSearch = employee.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false;
-      // Perform case-insensitive comparison for technology and resource type
+      const matchesSearch = employee.user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false;
       const matchesTechnology = technologyFilter === 'all' || (employee.technology?.toLowerCase() === technologyFilter.toLowerCase());
       const matchesResourceType = resourceTypeFilter === 'all' || (employee.resourceType?.toLowerCase() === resourceTypeFilter.toLowerCase());
 
@@ -258,7 +271,8 @@ const DeliveryTeamDashboard = () => {
       return {
         ...i,
         technology: emp?.technology || '',
-        resourceType: emp?.resourceType || ''
+        resourceType: emp?.resourceType || '',
+        employeeName: emp?.user?.fullName || 'Unknown Employee'
       };
     });
 
@@ -304,30 +318,37 @@ const DeliveryTeamDashboard = () => {
     try {
       const response = await scheduleInterview({
         empId: interviewData.empId,
-        interviewType: 'mock', // Delivery team can only schedule mock interviews
         date: interviewData.date,
         time: interviewData.time,
-        interviewerId: interviewData.interviewerId,
-        client: null, // Not needed for mock interviews
-        level: null, // Not needed for mock interviews
-        jobDescriptionTitle: null, // Not needed for mock interviews
-        meetingLink: interviewData.meetingLink
+        interviewerId: interviewData.interviewerId
       });
       
       if (response) {
-        // Update mock interviews state
-        setMockInterviews(prev => [...prev, response]);
-        setError(null);
-        // Close the modal
+        // Update mock interviews state with the new interview
+        setMockInterviews(prev => {
+          const newInterview = {
+            ...response,
+            employeeName: employees.find(e => e.id === response.employeeId)?.name || 'Unknown Employee'
+          };
+          return [...prev, newInterview];
+        });
+        
+        // Close the modal and reset state
         setShowInterviewScheduler(false);
-        // Reset the selected employee for scheduling
         setSelectedEmployeeForScheduling(null);
-        // Refresh the data
+        
+        // Show success message
+        setError({ type: 'success', message: 'Interview scheduled successfully!' });
+        
+        // Refresh the data to ensure consistency
         await fetchData();
       }
     } catch (error) {
       console.error('Error scheduling interview:', error);
-      setError(error.message || 'Failed to schedule interview');
+      setError({ 
+        type: 'error', 
+        message: error.message || 'Failed to schedule interview. Please try again.' 
+      });
     } finally {
       setIsLoading(false);
       setIsInterviewsLoading(false);
@@ -344,7 +365,7 @@ const DeliveryTeamDashboard = () => {
 
       const updatedInterview = await updateMockInterviewFeedback(
         interviewId,
-        combinedFeedback, // Send the combined string as the feedback parameter
+        combinedFeedback,
         technicalScore,
         communicationScore
       );
@@ -353,7 +374,10 @@ const DeliveryTeamDashboard = () => {
         // Update the interviews list with the new feedback
         setMockInterviews(prev => 
           prev.map(interview => 
-            interview.id === interviewId ? updatedInterview : interview
+            interview.id === interviewId ? {
+              ...updatedInterview,
+              employeeName: employees.find(e => e.id === updatedInterview.employeeId)?.name || 'Unknown Employee'
+            } : interview
           )
         );
         
@@ -362,12 +386,18 @@ const DeliveryTeamDashboard = () => {
         setFeedback({ technical: '', communication: '' });
         setRatings({ technical: 0, communication: 0 });
         
+        // Show success message
+        setError({ type: 'success', message: 'Feedback updated successfully!' });
+        
         // Refresh the data to ensure consistency
         await fetchData();
       }
     } catch (error) {
       console.error('Error updating feedback:', error);
-      setError(error.message || 'Failed to update feedback');
+      setError({ 
+        type: 'error', 
+        message: error.message || 'Failed to update feedback. Please try again.' 
+      });
     } finally {
       setIsSubmitting(false);
       setIsFeedbackLoading(false);
@@ -473,20 +503,20 @@ const DeliveryTeamDashboard = () => {
                       <FiUser />
                     </div>
                     <div>
-                      <h3>{typeof employee.name === 'string' ? employee.name : 'Unknown Employee'}</h3>
+                      <h3>{employee.user?.fullName || 'Unknown Employee'}</h3>
                       <div className={styles.cardMeta}>
-                        <span className={`${styles.techBadge} ${styles[typeof employee.technology === 'string' ? employee.technology.replace(' ', '') : '']}`}>
-                          {typeof employee.technology === 'string' ? employee.technology : 'Unknown'}
+                        <span className={`${styles.techBadge} ${styles[employee.technology?.replace(' ', '')]}`}>
+                          {employee.technology || 'Unknown'}
                         </span>
-                        <span className={`${styles.resourceBadge} ${styles[typeof employee.resourceType === 'string' ? employee.resourceType : '']}`}>
-                          {typeof employee.resourceType === 'string' ? employee.resourceType : 'Unknown'}
+                        <span className={`${styles.resourceBadge} ${styles[employee.resourceType]}`}>
+                          {employee.resourceType || 'Unknown'}
                         </span>
                       </div>
                     </div>
                   </div>
                   <div className={styles.cardDetails}>
-                    <p><strong>Level:</strong> {typeof employee.level === 'string' || typeof employee.level === 'number' ? employee.level : 'N/A'}</p>
-                    <p><strong>Status:</strong> {typeof employee.status === 'string' || typeof employee.status === 'number' ? employee.status : 'N/A'}</p>
+                    <p><strong>Employee ID:</strong> {employee.empId || 'N/A'}</p>
+                    <p><strong>Status:</strong> {employee.status || 'N/A'}</p>
                   </div>
                   <div className={styles.cardFooter}>
                     <button 
@@ -541,9 +571,48 @@ const DeliveryTeamDashboard = () => {
               </div>
               
               {upcomingInterviews.length === 0 ? (
-                <div className={styles.emptyState}>
-                  <FiCalendar size={48} />
-                  <p>No upcoming interviews scheduled</p>
+                <div className={styles.employeeList}>
+                  {employees.map(employee => (
+                    <motion.div
+                      key={employee.id}
+                      className={styles.interviewCard}
+                      whileHover={{ scale: 1.01 }}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className={styles.interviewHeader}>
+                        <div>
+                          <h4>{employee.user?.fullName || 'Unknown Employee'}</h4>
+                          <div className={styles.interviewMeta}>
+                            <span className={`${styles.techBadge} ${styles[employee.technology?.replace(' ', '')]}`}>
+                              {employee.technology || 'Unknown'}
+                            </span>
+                            <span className={`${styles.resourceBadge} ${styles[employee.resourceType]}`}>
+                              {employee.resourceType || 'Unknown'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className={styles.employeeId}>
+                          <FiUser /> {employee.empId || 'N/A'}
+                        </div>
+                      </div>
+                      <div className={styles.interviewDetails}>
+                        <p><strong>Status:</strong> {employee.status || 'N/A'}</p>
+                      </div>
+                      <div className={styles.interviewActions}>
+                        <button 
+                          className={styles.primaryButton}
+                          onClick={() => {
+                            setSelectedEmployeeForScheduling(employee);
+                            setShowInterviewScheduler(true);
+                          }}
+                        >
+                          Schedule Interview
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               ) : (
                 upcomingInterviews.map(interview => {
@@ -555,10 +624,11 @@ const DeliveryTeamDashboard = () => {
                       whileHover={{ scale: 1.01 }}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3 }} >
+                      transition={{ duration: 0.3 }}
+                    >
                       <div className={styles.interviewHeader}>
                         <div>
-                          <h4>{typeof interview.employeeName === 'string' ? interview.employeeName : 'Unknown Employee'}</h4>
+                          <h4>{employee?.user?.fullName || 'Unknown Employee'}</h4>
                           <div className={styles.interviewMeta}>
                             {employee && (
                               <>
@@ -577,6 +647,7 @@ const DeliveryTeamDashboard = () => {
                         </div>
                       </div>
                       <div className={styles.interviewDetails}>
+                        <p><strong>Employee ID:</strong> {employee?.empId || 'N/A'}</p>
                         <p><strong>Interviewer:</strong> {typeof interview.interviewer === 'string' || typeof interview.interviewer === 'number' ? interview.interviewer : 'N/A'}</p>
                       </div>
                       <div className={styles.interviewActions}>
@@ -614,10 +685,11 @@ const DeliveryTeamDashboard = () => {
                       whileHover={{ scale: 1.01 }}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }} >
+                      transition={{ duration: 0.3 }}
+                    >
                       <div className={styles.interviewHeader}>
                         <div>
-                          <h4>{typeof interview.employeeName === 'string' ? interview.employeeName : 'Unknown Employee'}</h4>
+                          <h4>{employee?.user?.fullName || 'Unknown Employee'}</h4>
                           <div className={styles.interviewMeta}>
                             {employee && (
                               <>
@@ -639,6 +711,12 @@ const DeliveryTeamDashboard = () => {
                         </div>
                       </div>
                       
+                      <div className={styles.interviewDetails}>
+                        <p><strong>Employee ID:</strong> {employee?.empId || 'N/A'}</p>
+                        <p><strong>Date:</strong> {typeof interview.date === 'string' ? interview.date : 'N/A'}</p>
+                        <p><strong>Interviewer:</strong> {typeof interview.interviewer === 'string' || typeof interview.interviewer === 'number' ? interview.interviewer : 'N/A'}</p>
+                      </div>
+                      
                       <div className={styles.interviewScores}>
                         <div className={styles.scoreMeter}>
                           <div className={styles.scoreLabel}>
@@ -647,7 +725,7 @@ const DeliveryTeamDashboard = () => {
                           <div className={styles.scoreBar}>
                             <div 
                               className={styles.scoreFill} 
-                              style={{ 
+                              style={{
                                 width: `${(typeof interview.ratings?.technical === 'number' ? interview.ratings.technical : 0) * 10}%`,
                                 backgroundColor: getScoreColor(typeof interview.ratings?.technical === 'number' ? interview.ratings.technical : 0)
                               }}
@@ -661,7 +739,7 @@ const DeliveryTeamDashboard = () => {
                           <div className={styles.scoreBar}>
                             <div 
                               className={styles.scoreFill} 
-                              style={{ 
+                              style={{
                                 width: `${(typeof interview.ratings?.communication === 'number' ? interview.ratings.communication : 0) * 10}%`,
                                 backgroundColor: getScoreColor(typeof interview.ratings?.communication === 'number' ? interview.ratings.communication : 0)
                               }}
@@ -672,10 +750,10 @@ const DeliveryTeamDashboard = () => {
                       
                       <div className={styles.feedback}>
                         <h5>Technical Feedback</h5>
-                        <p>{typeof interview.feedback?.technical === 'string' || typeof interview.feedback?.technical === 'number' ? interview.feedback.technical : 'N/A'}</p>
+                        <p>{interview.feedback ? (interview.feedback.split(' | ')[0]?.replace('Technical Feedback: ', '') || 'N/A') : 'N/A'}</p>
                         
                         <h5>Communication Feedback</h5>
-                        <p>{typeof interview.feedback?.communication === 'string' || typeof interview.feedback?.communication === 'number' ? interview.feedback.communication : 'N/A'}</p>
+                        <p>{interview.feedback ? (interview.feedback.split(' | ')[1]?.replace('Communication Feedback: ', '') || 'N/A') : 'N/A'}</p>
                       </div>
                       
                       <div className={styles.interviewActions}>
@@ -684,7 +762,11 @@ const DeliveryTeamDashboard = () => {
                           onClick={() => {
                             setSelectedEmployee(employee);
                             setRatings(interview.ratings || { technical: 0, communication: 0 });
-                            setFeedback(interview.feedback || { technical: '', communication: '' });
+                             // Parse the combined feedback string back into separate technical and communication feedback
+                            const feedbackParts = interview.feedback?.split(' | ');
+                            const techFeedback = feedbackParts && feedbackParts[0]?.replace('Technical Feedback: ', '');
+                            const commFeedback = feedbackParts && feedbackParts[1]?.replace('Communication Feedback: ', '');
+                            setFeedback({ technical: techFeedback || '', communication: commFeedback || '' });
                           }}
                         >
                           <FiEdit /> Edit Feedback
@@ -739,7 +821,7 @@ const DeliveryTeamDashboard = () => {
                 <h5>Avg Technical Score</h5>
                 <p className={styles.statValue}>
                   {completedInterviews.length > 0 
-                    ? (completedInterviews.reduce((sum, i) => sum + i.ratings.technical, 0) / completedInterviews.length).toFixed(1)
+                    ? (completedInterviews.reduce((sum, i) => sum + (i.ratings?.technical || 0), 0) / completedInterviews.length).toFixed(1)
                     : '0.0'}
                 </p>
                 <p className={styles.statLabel}>/ 10.0</p>
@@ -750,6 +832,21 @@ const DeliveryTeamDashboard = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.3 }}
+              >
+                <h5>Avg Communication Score</h5>
+                <p className={styles.statValue}>
+                  {completedInterviews.length > 0 
+                    ? (completedInterviews.reduce((sum, i) => sum + (i.ratings?.communication || 0), 0) / completedInterviews.length).toFixed(1)
+                    : '0.0'}
+                </p>
+                <p className={styles.statLabel}>/ 10.0</p>
+              </motion.div>
+              <motion.div 
+                className={styles.statCard}
+                whileHover={{ scale: 1.03 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.4 }}
               >
                 <h5>Profiles Sent</h5>
                 <p className={styles.statValue}>
@@ -762,7 +859,7 @@ const DeliveryTeamDashboard = () => {
                 whileHover={{ scale: 1.03 }}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.4 }}
+                transition={{ duration: 0.3, delay: 0.5 }}
               >
                 <h5>Deployment Rate</h5>
                 <p className={styles.statValue}>

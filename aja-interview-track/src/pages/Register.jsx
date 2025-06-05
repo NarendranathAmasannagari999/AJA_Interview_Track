@@ -55,22 +55,45 @@ const Register = () => {
 
         setLoading(true);
 
-        // Only send technology/resourceType for employee role
-        const payload = {
-            fullName: formData.fullName,
-            empId: formData.empId,
-            email: formData.email,
-            password: formData.password,
-            role: formData.role,
-            technology: formData.role === 'employee' ? formData.technology : '',
-            resourceType: formData.role === 'employee' ? formData.resourceType : ''
-        };
-
         try {
+            // Format role to match backend expectations
+            let role;
+            switch(formData.role) {
+                case 'employee':
+                    role = 'EMPLOYEE';
+                    break;
+                case 'sales-team':
+                    role = 'SALES_TEAM';
+                    break;
+                case 'delivery_team':
+                    role = 'DELIVERY_TEAM';
+                    break;
+                default:
+                    setError('Invalid role selected');
+                    setLoading(false);
+                    return;
+            }
+
+            const payload = {
+                fullName: formData.fullName.trim(),
+                empId: formData.empId.trim(),
+                email: formData.email.trim(),
+                password: formData.password,
+                role: role,
+                technology: formData.role === 'employee' ? formData.technology : '',
+                resourceType: formData.role === 'employee' ? formData.resourceType : ''
+            };
+
             await registerUser(payload);
-            navigate('/login');
+            
+            // Show success message and redirect to login
+            setError('Registration successful! Redirecting to login...');
+            setTimeout(() => {
+                navigate('/login');
+            }, 1500); // Redirect after 1.5 seconds
+            
         } catch (err) {
-            setError(err.message || 'Registration failed');
+            setError(err.message || 'Registration failed. Please try again.');
         } finally {
             setLoading(false);
         }
