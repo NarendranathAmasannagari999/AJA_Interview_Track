@@ -77,6 +77,16 @@ const EmployeeDashboard = () => {
   const [resumeStatus, setResumeStatus] = useState('pending');
   const [openAccordionPanel, setOpenAccordionPanel] = useState('mock');
 
+  useEffect(() => {
+    if (employeeData.technology && employeeData.name) {
+      setNewQuestion(prev => ({
+        ...prev,
+        technology: employeeData.technology,
+        user: employeeData.name
+      }));
+    }
+  }, [employeeData.technology, employeeData.name]);
+
   // Mock data for performance charts (since backend doesn't provide this)
   const mockInterviewData = mockInterviews.map((interview, index) => ({
     name: `Interview ${index + 1}`,
@@ -824,27 +834,44 @@ const EmployeeDashboard = () => {
                     <div className={styles.questionsHeader}>
                       <button 
                         className={styles.primaryButton}
-                        onClick={() => setShowQuestionModal(true)}
+                        onClick={() => {
+                          console.log('Technology from employeeData:', employeeData.technology);
+                          console.log('User name from employeeData:', employeeData.name);
+                          setNewQuestion(prev => ({
+                            ...prev,
+                            technology: employeeData.technology,
+                            user: employeeData.name
+                          }));
+                          setShowQuestionModal(true);
+                        }}
                       >
                         <FiShare2 /> Share a Question
                       </button>
                     </div>
                     <div className={styles.questionsList}>
                       {filteredInterviewQuestions.length > 0 ? (
-                        filteredInterviewQuestions.map(question => (
-                          <motion.div 
-                            key={question.id} 
-                            className={styles.questionCard}
-                            whileHover={{ scale: 1.01 }}
-                          >
-                            <div className={styles.questionMeta}>
-                              <span className={styles.techBadge}>{question.technology}</span>
-                              <span className={styles.questionDate}>{formatDate(question.date)}</span>
-                              <span className={styles.questionUser}>by {question.user}</span>
-                            </div>
-                            <p className={styles.questionText}>{question.question}</p>
-                          </motion.div>
-                        ))
+                        <ol>
+                          {filteredInterviewQuestions.map(question => (
+                            <li key={question.id} className={styles.questionCard}>
+                              <motion.div 
+                                whileHover={{ scale: 1.01 }}
+                              >
+                                <div className={styles.questionMeta}>
+                                  <span className={styles.techBadge}>{question.technology}</span>
+                                  <span className={styles.questionDate}>{formatDate(question.date)}</span>
+                                  <span className={styles.questionUser}>by {question.user}</span>
+                                </div>
+                                <div className={styles.questionText}>
+                                  <ol>
+                                    {question.question.split('\n').map((line, index) => (
+                                      <li key={index}>{line}</li>
+                                    ))}
+                                  </ol>
+                                </div>
+                              </motion.div>
+                            </li>
+                          ))}
+                        </ol>
                       ) : (
                         <motion.div className={styles.emptyState}>
                           <FiHelpCircle size={48} />
@@ -925,27 +952,44 @@ const EmployeeDashboard = () => {
               <h4>Interview Questions Bank</h4>
               <button 
                 className={styles.primaryButton}
-                onClick={() => setShowQuestionModal(true)}
+                onClick={() => {
+                  console.log('Technology from employeeData:', employeeData.technology);
+                  console.log('User name from employeeData:', employeeData.name);
+                  setNewQuestion(prev => ({
+                    ...prev,
+                    technology: employeeData.technology,
+                    user: employeeData.name
+                  }));
+                  setShowQuestionModal(true);
+                }}
               >
                 <FiShare2 /> Share a Question
               </button>
             </div>
             <div className={styles.questionsList}>
               {filteredInterviewQuestions.length > 0 ? (
-                filteredInterviewQuestions.map(question => (
-                  <motion.div 
-                    key={question.id} 
-                    className={styles.questionCard}
-                    whileHover={{ scale: 1.01 }}
-                  >
-                    <div className={styles.questionMeta}>
-                      <span className={styles.techBadge}>{question.technology}</span>
-                      <span className={styles.questionDate}>{formatDate(question.date)}</span>
-                      <span className={styles.questionUser}>by {question.user}</span>
-                    </div>
-                    <p className={styles.questionText}>{question.question}</p>
-                  </motion.div>
-                ))
+                <ol>
+                  {filteredInterviewQuestions.map(question => (
+                    <li key={question.id} className={styles.questionCard}>
+                      <motion.div 
+                        whileHover={{ scale: 1.01 }}
+                      >
+                        <div className={styles.questionMeta}>
+                          <span className={styles.techBadge}>{question.technology}</span>
+                          <span className={styles.questionDate}>{formatDate(question.date)}</span>
+                          <span className={styles.questionUser}>by {question.user}</span>
+                        </div>
+                        <div className={styles.questionText}>
+                          <ol>
+                            {question.question.split('\n').map((line, index) => (
+                              <li key={index}>{line}</li>
+                            ))}
+                          </ol>
+                        </div>
+                      </motion.div>
+                    </li>
+                  ))}
+                </ol>
               ) : (
                 <motion.div className={styles.emptyState}>
                   <FiHelpCircle size={48} />
@@ -1051,21 +1095,12 @@ const EmployeeDashboard = () => {
             <form onSubmit={handleAddQuestion}>
               <div className={styles.formGroup}>
                 <label>Technology:</label>
-                <select
-                  name="technology"
+                <input
+                  type="text"
                   value={newQuestion.technology}
-                  onChange={handleQuestionChange}
-                  required
-                >
-                  <option value="">Select Technology</option>
-                  <option value="Java">Java</option>
-                  <option value="Python">Python</option>
-                  <option value=".NET">.NET</option>
-                  <option value="DevOps">DevOps</option>
-                  <option value="SalesForce">SalesForce</option>
-                  <option value="UI">UI</option>
-                  <option value="Testing">Testing</option>
-                </select>
+                  className={styles.input}
+                  readOnly
+                />
               </div>
               <div className={styles.formGroup}>
                 <label>Question:</label>
@@ -1082,11 +1117,9 @@ const EmployeeDashboard = () => {
                 <label>User:</label>
                 <input
                   type="text"
-                  name="user"
                   value={newQuestion.user}
-                  onChange={handleQuestionChange}
-                  placeholder="Your name"
-                  required
+                  className={styles.input}
+                  readOnly
                 />
               </div>
               <div className={styles.modalActions}>
