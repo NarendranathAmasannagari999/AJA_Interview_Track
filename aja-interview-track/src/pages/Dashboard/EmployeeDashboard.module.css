@@ -53,8 +53,8 @@ Dashboard Container
   
   .avatar {
     position: relative;
-    width: 40px;
-    height: 40px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     overflow: hidden;
     background-color: #f0f0f0;
@@ -773,8 +773,7 @@ Dashboard Container
   }
   
   .interviewList {
-    display: grid;
-    gap: 1.75rem;
+    margin-top: 1.5rem;
   }
   
   .interviewCard {
@@ -1536,4 +1535,51 @@ Dashboard Container
       width: 16px;
       height: 16px;
     }
+  }
+
+  /* Accordion Styles */
+  .accordionPanel {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    margin-bottom: 1rem;
+    overflow: hidden;
+  }
+  
+  .accordionHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: #f1f5f9;
+    cursor: pointer;
+    font-weight: 600;
+    color: #4b5563;
+    transition: background-color 0.3s ease;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  
+  .accordionHeader:hover {
+    background: #e5e7eb;
+  }
+  
+  .accordionHeader h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .accordionHeader svg {
+    transition: transform 0.3s ease;
+  }
+  
+  .accordionHeader .active svg {
+    transform: rotate(180deg);
+  }
+  
+  .accordionContent {
+    padding: 1rem 1.5rem;
+    border-top: none;
   }

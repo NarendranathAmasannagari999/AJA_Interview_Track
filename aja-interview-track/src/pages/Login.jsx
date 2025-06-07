@@ -78,6 +78,9 @@ const Login = () => {
         if (decodedToken.exp) {
           localStorage.setItem('tokenExpiration', decodedToken.exp);
         }
+        if (decodedToken.employeeId) {
+          localStorage.setItem('employeeId', decodedToken.employeeId);
+        }
       }
       
       // Normalize role for routing (remove 'ROLE_' prefix and convert to lowercase)

@@ -5,7 +5,7 @@ import {
   FiBarChart2, FiPieChart, FiUpload, FiDownload, FiMessageSquare,
   FiMail, FiUserPlus, FiBriefcase, FiAward, FiClock, FiLayers,
   FiBook, FiUserCheck, FiUserX, FiShare2, FiToggleLeft, FiToggleRight,
-  FiRefreshCw
+  FiRefreshCw, FiUser
 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -463,6 +463,14 @@ const SalesTeamDashboard = () => {
   // Add new state for selected candidates for bulk scheduling
   const [bulkSelectedCandidates, setBulkSelectedCandidates] = useState([]);
 
+  // New state for sales team user profile
+  const [salesUserData, setSalesUserData] = useState({
+    fullName: 'Ravi',
+    email: 'ravi@gmail.com',
+    role: 'ROLE_SALES_TEAM'
+  });
+  const [profilePic, setProfilePic] = useState(null); // Placeholder for profile picture
+
   // Add debounced search function
   const handleSearch = (value) => {
     if (searchTimeout) {
@@ -484,9 +492,21 @@ const SalesTeamDashboard = () => {
     }
   };
 
+  // Placeholder for profile picture change (similar to EmployeeDashboard)
+  const handleProfilePictureChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // In a real app, you'd upload this file and update the profilePic URL
+      setProfilePic(URL.createObjectURL(file));
+      // Optionally, add toast for success/error
+    }
+  };
+
   // Fetch all data on component mount
   useEffect(() => {
     fetchData();
+    // In a real app, you would fetch user data from an auth context or API here
+    // For now, it's mocked in the state initialization
   }, []);
 
   const fetchData = async (retryCount = 0) => {
@@ -1593,6 +1613,31 @@ const SalesTeamDashboard = () => {
           </div>
         </div>
       </div>
+      {/* Sales Team Profile */} 
+      <div className={styles.userProfile}> 
+        <div className={styles.userAvatar}> 
+          {profilePic ? ( 
+            <img src={profilePic} alt="Profile" /> 
+          ) : ( 
+            <FiUser size={18} /> 
+          )} 
+          <input 
+            type="file" 
+            id="salesProfilePicture" 
+            accept="image/jpeg,image/png" 
+            onChange={handleProfilePictureChange} 
+            style={{ display: 'none' }} 
+          /> 
+          <label htmlFor="salesProfilePicture" className={styles.avatarUpload}> 
+            <FiUpload size={14} /> 
+          </label> 
+        </div> 
+        <div className={styles.userInfo}> 
+          <span className={styles.userName}>{salesUserData.fullName}</span> 
+          <span className={styles.userRole}>Sales Manager ({salesUserData.email})</span> 
+          <span className={styles.userRole}>Sales Team</span> 
+        </div> 
+      </div> 
     </div>
   );
 

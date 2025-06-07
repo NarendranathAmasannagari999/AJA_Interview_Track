@@ -616,7 +616,6 @@ const DeliveryTeamDashboard = () => {
                 </div>
               ) : (
                 upcomingInterviews.map(interview => {
-                  const employee = employees.find(e => e && e.id === interview.employeeId);
                   return (
                     <motion.div
                       key={interview.id}
@@ -628,27 +627,24 @@ const DeliveryTeamDashboard = () => {
                     >
                       <div className={styles.interviewHeader}>
                         <div>
-                          <h4>{employee?.user?.fullName || 'Unknown Employee'}</h4>
+                          <h4>{interview.employee?.user?.fullName || 'Unknown Employee'}</h4>
                           <div className={styles.interviewMeta}>
-                            {employee && (
-                              <>
-                                <span className={`${styles.techBadge} ${styles[employee.technology?.replace(' ', '')]}`}>
-                                  {employee.technology || 'Unknown'}
-                                </span>
-                                <span className={`${styles.resourceBadge} ${styles[employee.resourceType]}`}>
-                                  {employee.resourceType || 'Unknown'}
-                                </span>
-                              </>
-                            )}
+                            <span className={`${styles.techBadge} ${styles[interview.employee?.technology?.replace(' ', '')]}`}>
+                              {interview.employee?.technology || 'Unknown'}
+                            </span>
+                            <span className={`${styles.resourceBadge} ${styles[interview.employee?.resourceType]}`}>
+                              {interview.employee?.resourceType || 'Unknown'}
+                            </span>
                           </div>
                         </div>
                         <div className={styles.interviewDate}>
-                          <FiCalendar /> {typeof interview.date === 'string' ? interview.date : 'N/A'}
+                          <FiCalendar /> {interview.date} at {interview.time}
                         </div>
                       </div>
                       <div className={styles.interviewDetails}>
-                        <p><strong>Employee ID:</strong> {employee?.empId || 'N/A'}</p>
-                        <p><strong>Interviewer:</strong> {typeof interview.interviewer === 'string' || typeof interview.interviewer === 'number' ? interview.interviewer : 'N/A'}</p>
+                        <p><strong>Employee ID:</strong> {interview.employee?.empId || 'N/A'}</p>
+                        <p><strong>Status:</strong> {interview.status || 'N/A'}</p>
+                        <p><strong>Interviewer:</strong> {interview.interviewer?.fullName || 'N/A'}</p>
                       </div>
                       <div className={styles.interviewActions}>
                         <button className={styles.primaryButton}>
@@ -674,10 +670,6 @@ const DeliveryTeamDashboard = () => {
                 </div>
               ) : (
                 completedInterviews.map(interview => {
-                  const employee = employees.find(e => e && e.id === interview.employeeId);
-                  const isSentToSales = profilesSentToSales.includes(interview.employeeId);
-                  const isDeployed = deployedEmployees.includes(interview.employeeId);
-                  
                   return (
                     <motion.div
                       key={interview.id}
@@ -689,59 +681,54 @@ const DeliveryTeamDashboard = () => {
                     >
                       <div className={styles.interviewHeader}>
                         <div>
-                          <h4>{employee?.user?.fullName || 'Unknown Employee'}</h4>
+                          <h4>{interview.employee?.user?.fullName || 'Unknown Employee'}</h4>
                           <div className={styles.interviewMeta}>
-                            {employee && (
-                              <>
-                                <span className={`${styles.techBadge} ${styles[employee.technology?.replace(' ', '')]}`}>
-                                  {employee.technology || 'Unknown'}
-                                </span>
-                                <span className={`${styles.resourceBadge} ${styles[employee.resourceType]}`}>
-                                  {employee.resourceType || 'Unknown'}
-                                </span>
-                              </>
-                            )}
+                            <span className={`${styles.techBadge} ${styles[interview.employee?.technology?.replace(' ', '')]}`}>
+                              {interview.employee?.technology || 'Unknown'}
+                            </span>
+                            <span className={`${styles.resourceBadge} ${styles[interview.employee?.resourceType]}`}>
+                              {interview.employee?.resourceType || 'Unknown'}
+                            </span>
                             <span className={styles.status}>
-                              Completed
+                              {interview.status}
                             </span>
                           </div>
                         </div>
                         <div className={styles.interviewDate}>
-                          <FiCalendar /> {typeof interview.date === 'string' ? interview.date : 'N/A'}
+                          <FiCalendar /> {interview.date} at {interview.time}
                         </div>
                       </div>
                       
                       <div className={styles.interviewDetails}>
-                        <p><strong>Employee ID:</strong> {employee?.empId || 'N/A'}</p>
-                        <p><strong>Date:</strong> {typeof interview.date === 'string' ? interview.date : 'N/A'}</p>
-                        <p><strong>Interviewer:</strong> {typeof interview.interviewer === 'string' || typeof interview.interviewer === 'number' ? interview.interviewer : 'N/A'}</p>
+                        <p><strong>Employee ID:</strong> {interview.employee?.empId || 'N/A'}</p>
+                        <p><strong>Interviewer:</strong> {interview.interviewer?.fullName || 'N/A'}</p>
                       </div>
                       
                       <div className={styles.interviewScores}>
                         <div className={styles.scoreMeter}>
                           <div className={styles.scoreLabel}>
-                            Technical: {typeof interview.ratings?.technical === 'number' ? interview.ratings.technical : 'N/A'}/10
+                            Technical: {interview.technicalRating || 'N/A'}/10
                           </div>
                           <div className={styles.scoreBar}>
                             <div 
                               className={styles.scoreFill} 
                               style={{
-                                width: `${(typeof interview.ratings?.technical === 'number' ? interview.ratings.technical : 0) * 10}%`,
-                                backgroundColor: getScoreColor(typeof interview.ratings?.technical === 'number' ? interview.ratings.technical : 0)
+                                width: `${(interview.technicalRating || 0) * 10}%`,
+                                backgroundColor: getScoreColor(interview.technicalRating || 0)
                               }}
                             />
                           </div>
                         </div>
                         <div className={styles.scoreMeter}>
                           <div className={styles.scoreLabel}>
-                            Communication: {typeof interview.ratings?.communication === 'number' ? interview.ratings.communication : 'N/A'}/10
+                            Communication: {interview.communicationRating || 'N/A'}/10
                           </div>
                           <div className={styles.scoreBar}>
                             <div 
                               className={styles.scoreFill} 
                               style={{
-                                width: `${(typeof interview.ratings?.communication === 'number' ? interview.ratings.communication : 0) * 10}%`,
-                                backgroundColor: getScoreColor(typeof interview.ratings?.communication === 'number' ? interview.ratings.communication : 0)
+                                width: `${(interview.communicationRating || 0) * 10}%`,
+                                backgroundColor: getScoreColor(interview.communicationRating || 0)
                               }}
                             />
                           </div>
@@ -750,40 +737,45 @@ const DeliveryTeamDashboard = () => {
                       
                       <div className={styles.feedback}>
                         <h5>Technical Feedback</h5>
-                        <p>{interview.feedback ? (interview.feedback.split(' | ')[0]?.replace('Technical Feedback: ', '') || 'N/A') : 'N/A'}</p>
+                        <p>{interview.technicalFeedback?.split(' | ')[0]?.replace('Technical Feedback: ', '') || 'N/A'}</p>
                         
                         <h5>Communication Feedback</h5>
-                        <p>{interview.feedback ? (interview.feedback.split(' | ')[1]?.replace('Communication Feedback: ', '') || 'N/A') : 'N/A'}</p>
+                        <p>{interview.technicalFeedback?.split(' | ')[1]?.replace('Communication Feedback: ', '') || 'N/A'}</p>
                       </div>
                       
                       <div className={styles.interviewActions}>
                         <button 
                           className={styles.secondaryButton}
                           onClick={() => {
-                            setSelectedEmployee(employee);
-                            setRatings(interview.ratings || { technical: 0, communication: 0 });
-                             // Parse the combined feedback string back into separate technical and communication feedback
-                            const feedbackParts = interview.feedback?.split(' | ');
+                            setSelectedEmployee(interview.employee);
+                            setRatings({
+                              technical: interview.technicalRating || 0,
+                              communication: interview.communicationRating || 0
+                            });
+                            const feedbackParts = interview.technicalFeedback?.split(' | ');
                             const techFeedback = feedbackParts && feedbackParts[0]?.replace('Technical Feedback: ', '');
                             const commFeedback = feedbackParts && feedbackParts[1]?.replace('Communication Feedback: ', '');
-                            setFeedback({ technical: techFeedback || '', communication: commFeedback || '' });
+                            setFeedback({
+                              technical: techFeedback || '',
+                              communication: commFeedback || ''
+                            });
                           }}
                         >
                           <FiEdit /> Edit Feedback
                         </button>
                         
-                        {isDeployed ? (
+                        {interview.deployed ? (
                           <span className={styles.deployedBadge}>
                             <FiCheckCircle /> Deployed to Client
                           </span>
-                        ) : isSentToSales ? (
+                        ) : interview.sentToSales ? (
                           <span className={styles.sentBadge}>
                             <FiSend /> Sent to Sales
                           </span>
                         ) : (
                           <button
                             className={styles.successButton}
-                            onClick={() => sendToSales(interview.employeeId)}
+                            onClick={() => sendToSales(interview.employee.id)}
                           >
                             <FiSend /> Send to Sales
                           </button>
@@ -1077,7 +1069,8 @@ const DeliveryTeamDashboard = () => {
             <FiUser />
           </div>
           <div className={styles.userInfo}>
-            <span className={styles.userName}>Delivery Manager</span>
+            <span className={styles.userName}>Anil Choppari</span>
+            <span className={styles.userName}>Delivery Manager ({'anil.choppari3@gmail.com'})</span>
             <span className={styles.userRole}>Delivery Team</span>
           </div>
         </div>

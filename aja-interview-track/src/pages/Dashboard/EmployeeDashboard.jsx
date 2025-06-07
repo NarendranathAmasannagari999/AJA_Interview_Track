@@ -5,7 +5,7 @@ import {
   FiFileText, FiUpload, FiClock, FiCheckCircle, FiXCircle, FiUser, 
   FiBarChart2, FiMail, FiCalendar, FiAward, FiBook, FiUsers, FiFilter,
   FiSearch, FiShare2, FiDownload, FiMessageSquare, FiHelpCircle, FiRefreshCw,
-  FiPlus
+  FiPlus, FiChevronUp, FiChevronDown
 } from 'react-icons/fi';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import styles from './EmployeeDashboard.module.css';
@@ -35,7 +35,8 @@ const EmployeeDashboard = () => {
     resourceType: '',
     level: '',
     status: '',
-    name: ''
+    name: '',
+    userEmail: ''
   });
   const [mockInterviews, setMockInterviews] = useState([]);
   const [clientInterviews, setClientInterviews] = useState([]);
@@ -74,6 +75,7 @@ const EmployeeDashboard = () => {
   const [showInterviewModal, setShowInterviewModal] = useState(false);
   const [deployedEmployees, setDeployedEmployees] = useState([]);
   const [resumeStatus, setResumeStatus] = useState('pending');
+  const [openAccordionPanel, setOpenAccordionPanel] = useState('mock');
 
   // Mock data for performance charts (since backend doesn't provide this)
   const mockInterviewData = mockInterviews.map((interview, index) => ({
@@ -117,7 +119,8 @@ const EmployeeDashboard = () => {
           resourceType: employeeResponse.resourceType || '',
           level: employeeResponse.level || '',
           status: employeeResponse.status || '',
-          name: employeeResponse.user?.name || 'Employee'
+          name: employeeResponse.user?.fullName || 'Employee',
+          userEmail: employeeResponse.user?.email || 'n.amasannagari@ajacs.in'
         });
 
         // Fetch profile picture
@@ -265,7 +268,8 @@ const EmployeeDashboard = () => {
         resourceType: updatedEmployee.resourceType,
         level: updatedEmployee.level,
         status: updatedEmployee.status,
-        name: updatedEmployee.user?.name
+        name: updatedEmployee.user?.fullName,
+        userEmail: updatedEmployee.user?.email
       });
       toast.success('Employee details updated successfully!');
     } catch (err) {
@@ -616,39 +620,6 @@ const EmployeeDashboard = () => {
       case 'interviews':
         return (
           <div className={styles.sectionContainer}>
-            <div className={styles.interviewTabs}>
-              <button 
-                className={`${styles.tabButton} ${activeInterviewTab === 'mock' ? styles.active : ''}`}
-                onClick={() => setActiveInterviewTab('mock')}
-              >
-                <FiMessageSquare /> Mock Interviews
-              </button>
-              <button 
-                className={`${styles.tabButton} ${activeInterviewTab === 'client' ? styles.active : ''}`}
-                onClick={() => setActiveInterviewTab('client')}
-              >
-                <FiUsers /> Client Interviews
-              </button>
-              <button 
-                className={`${styles.tabButton} ${activeInterviewTab === 'questions' ? styles.active : ''}`}
-                onClick={() => setActiveInterviewTab('questions')}
-              >
-                <FiBook /> Interview Questions
-              </button>
-              <button 
-                className={`${styles.tabButton} ${activeInterviewTab === 'deployed' ? styles.active : ''}`}
-                onClick={() => setActiveInterviewTab('deployed')}
-              >
-                <FiAward /> Deployed Colleagues
-              </button>
-              <button 
-                className={styles.primaryButton}
-                onClick={() => setShowInterviewModal(true)}
-              >
-                <FiPlus /> Schedule Interview
-              </button>
-            </div>
-
             <div className={styles.filterSection}>
               <div className={styles.filterControls}>
                 <div className={styles.filterGroup}>
@@ -685,195 +656,305 @@ const EmployeeDashboard = () => {
               </div>
             </div>
 
-            {activeInterviewTab === 'mock' ? (
-              <div className={styles.interviewList}>
-                <AnimatePresence>
-                  {mockInterviews.length > 0 ? (
-                    mockInterviews.map(interview => (
-                      <motion.div 
-                        key={interview.id} 
-                        className={styles.interviewCard}
-                        whileHover={{ scale: 1.01 }}
-                      >
-                        <div className={styles.interviewHeader}>
-                          <div>
-                            <h4>Interview with {interview.interviewer?.name || 'TBD'}</h4>
-                            <div className={styles.interviewMeta}>
-                              <span className={styles.techBadge}>{interview.employee?.technology}</span>
-                              <span className={styles.resourceBadge}>{interview.employee?.resourceType}</span>
-                              <span><FiCalendar /> {formatDate(interview.date)}</span>
-                            </div>
-                          </div>
-                          <span className={`${styles.status} ${styles[interview.status]}`}>
-                            {interview.status}
-                          </span>
-                        </div>
-                        {interview.resume && (
-                          <div className={styles.interviewActions}>
-                            <button 
-                              onClick={() => handleDownloadResume(interview.resume.id)}
-                              className={styles.primaryButton}
-                            >
-                              <FiDownload /> Resume
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteResume(interview.resume.id)}
-                              className={styles.secondaryButton}
-                            >
-                              Delete Resume
-                            </button>
-                          </div>
-                        )}
-                      </motion.div>
-                    ))
-                  ) : (
-                    <motion.div className={styles.emptyState}>
-                      <FiHelpCircle size={48} />
-                      <p>No Mock Interviews Found</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+            {/* Mock Interviews Accordion Panel */}
+            <div className={styles.accordionPanel}>
+              <div 
+                className={styles.accordionHeader}
+                onClick={() => setOpenAccordionPanel(openAccordionPanel === 'mock' ? null : 'mock')}
+              >
+                <h4><FiMessageSquare /> Mock Interviews</h4>
+                {openAccordionPanel === 'mock' ? <FiChevronUp /> : <FiChevronDown />}
               </div>
-            ) : activeInterviewTab === 'client' ? (
-              <div className={styles.interviewList}>
-                <AnimatePresence>
-                  {clientInterviews.length > 0 ? (
-                    clientInterviews.map(interview => (
-                      <motion.div 
-                        key={interview.id} 
-                        className={styles.interviewCard}
-                        whileHover={{ scale: 1.01 }}
-                      >
-                        <div className={styles.interviewHeader}>
-                          <div>
-                            <h4>{interview.client} - Level {interview.level}</h4>
-                            <div className={styles.interviewMeta}>
-                              <span className={styles.techBadge}>{interview.employee?.technology}</span>
-                              <span className={styles.resourceBadge}>{interview.employee?.resourceType}</span>
-                              <span><FiCalendar /> {formatDate(interview.date)}</span>
-                              <span>For JD: {interview.jobDescriptionTitle}</span>
-                            </div>
-                          </div>
-                          <span className={`${styles.status} ${styles[interview.status]}`}>
-                            {interview.status}
-                          </span>
-                        </div>
-                        {interview.status === 'scheduled' && interview.meetingLink && (
-                          <div className={styles.interviewActions}>
-                            <a 
-                              href={interview.meetingLink} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className={styles.primaryButton}
-                            >
-                              Join Interview
-                            </a>
-                          </div>
-                        )}
-                        {interview.resume && (
-                          <div className={styles.interviewActions}>
-                            <button 
-                              onClick={() => handleDownloadResume(interview.resume.id)}
-                              className={styles.primaryButton}
-                            >
-                              <FiDownload /> Resume
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteResume(interview.resume.id)}
-                              className={styles.secondaryButton}
-                            >
-                              Delete Resume
-                            </button>
-                          </div>
-                        )}
-                      </motion.div>
-                    ))
-                  ) : (
-                    <motion.div className={styles.emptyState}>
-                      <FiHelpCircle size={48} />
-                      <p>No Client Interviews Found</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ) : activeInterviewTab === 'questions' ? (
-              <div className={styles.questionsContainer}>
-                <div className={styles.questionsHeader}>
-                  <h4>Interview Questions Bank</h4>
-                  <button 
-                    className={styles.primaryButton}
-                    onClick={() => setShowQuestionModal(true)}
+              <AnimatePresence>
+                {openAccordionPanel === 'mock' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className={styles.accordionContent}
                   >
-                    <FiShare2 /> Share a Question
-                  </button>
-                </div>
-                <div className={styles.questionsList}>
-                  {filteredInterviewQuestions.length > 0 ? (
-                    filteredInterviewQuestions.map(question => (
-                      <motion.div 
-                        key={question.id} 
-                        className={styles.questionCard}
-                        whileHover={{ scale: 1.01 }}
-                      >
-                        <div className={styles.questionMeta}>
-                          <span className={styles.techBadge}>{question.technology}</span>
-                          <span className={styles.questionDate}>{formatDate(question.date)}</span>
-                          <span className={styles.questionUser}>by {question.user}</span>
-                        </div>
-                        <p className={styles.questionText}>{question.question}</p>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <motion.div className={styles.emptyState}>
-                      <FiHelpCircle size={48} />
-                      <p>No Questions Found</p>
-                    </motion.div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className={styles.deployedContainer}>
-                <h4>Recently Deployed Colleagues</h4>
-                <div className={styles.deployedGrid}>
-                  {filteredDeployedEmployees().length > 0 ? (
-                    filteredDeployedEmployees().map(employee => (
-                      <motion.div 
-                        key={employee.id} 
-                        className={styles.deployedCard}
-                        whileHover={{ scale: 1.02 }}
-                      >
-                        <div className={styles.deployedHeader}>
-                          <div className={styles.avatar}>
-                            {employee.name.charAt(0)}
-                          </div>
-                          <div>
-                            <h5>{employee.name}</h5>
-                            <div className={styles.deployedMeta}>
-                              <span className={styles.techBadge}>{employee.technology}</span>
-                              <span className={styles.resourceBadge}>{employee.resourceType}</span>
+                    {mockInterviews.length > 0 ? (
+                      mockInterviews.map(interview => (
+                        <motion.div 
+                          key={interview.id} 
+                          className={styles.interviewCard}
+                          whileHover={{ scale: 1.01 }}
+                        >
+                          <div className={styles.interviewHeader}>
+                            <div>
+                              <h4>Interview with {interview.interviewer?.name || 'TBD'}</h4>
+                              <div className={styles.interviewMeta}>
+                                <span className={styles.techBadge}>{interview.employee?.technology}</span>
+                                <span className={styles.resourceBadge}>{interview.employee?.resourceType}</span>
+                                <span><FiCalendar /> {formatDate(interview.date)}</span>
+                              </div>
                             </div>
+                            <span className={`${styles.status} ${styles[interview.status]}`}>
+                              {interview.status}
+                            </span>
                           </div>
-                        </div>
-                        <div className={styles.deployedDetails}>
-                          <p><strong>Client:</strong> {employee.client}</p>
-                          <p><strong>Deployed on:</strong> {formatDate(employee.date)}</p>
-                        </div>
+                          {interview.resume && (
+                            <div className={styles.interviewActions}>
+                              <button 
+                                onClick={() => handleDownloadResume(interview.resume.id)}
+                                className={styles.primaryButton}
+                              >
+                                <FiDownload /> Resume
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteResume(interview.resume.id)}
+                                className={styles.secondaryButton}
+                              >
+                                Delete Resume
+                              </button>
+                            </div>
+                          )}
+                        </motion.div>
+                      ))
+                    ) : (
+                      <motion.div className={styles.emptyState}>
+                        <FiHelpCircle size={48} />
+                        <p>No Mock Interviews Found</p>
                       </motion.div>
-                    ))
-                  ) : (
-                    <motion.div className={styles.emptyState}>
-                      <FiHelpCircle size={48} />
-                      <p>No Deployed Colleagues Found</p>
-                    </motion.div>
-                  )}
-                </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Client Interviews Accordion Panel */}
+            <div className={styles.accordionPanel}>
+              <div 
+                className={styles.accordionHeader}
+                onClick={() => setOpenAccordionPanel(openAccordionPanel === 'client' ? null : 'client')}
+              >
+                <h4><FiUsers /> Client Interviews</h4>
+                {openAccordionPanel === 'client' ? <FiChevronUp /> : <FiChevronDown />}
               </div>
-            )}
+              <AnimatePresence>
+                {openAccordionPanel === 'client' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className={styles.accordionContent}
+                  >
+                    {clientInterviews.length > 0 ? (
+                      clientInterviews.map(interview => (
+                        <motion.div 
+                          key={interview.id} 
+                          className={styles.interviewCard}
+                          whileHover={{ scale: 1.01 }}
+                        >
+                          <div className={styles.interviewHeader}>
+                            <div>
+                              <h4>{interview.client} - Level {interview.level}</h4>
+                              <div className={styles.interviewMeta}>
+                                <span className={styles.techBadge}>{interview.employee?.technology}</span>
+                                <span className={styles.resourceBadge}>{interview.employee?.resourceType}</span>
+                                <span><FiCalendar /> {formatDate(interview.date)}</span>
+                                <span>For JD: {interview.jobDescriptionTitle}</span>
+                              </div>
+                            </div>
+                            <span className={`${styles.status} ${styles[interview.status]}`}>
+                              {interview.status}
+                            </span>
+                          </div>
+                          {interview.status === 'scheduled' && interview.meetingLink && (
+                            <div className={styles.interviewActions}>
+                              <a 
+                                href={interview.meetingLink} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className={styles.primaryButton}
+                              >
+                                Join Interview
+                              </a>
+                            </div>
+                          )}
+                          {interview.resume && (
+                            <div className={styles.interviewActions}>
+                              <button 
+                                onClick={() => handleDownloadResume(interview.resume.id)}
+                                className={styles.primaryButton}
+                              >
+                                <FiDownload /> Resume
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteResume(interview.resume.id)}
+                                className={styles.secondaryButton}
+                              >
+                                Delete Resume
+                              </button>
+                            </div>
+                          )}
+                        </motion.div>
+                      ))
+                    ) : (
+                      <motion.div className={styles.emptyState}>
+                        <FiHelpCircle size={48} />
+                        <p>No Client Interviews Found</p>
+                      </motion.div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Interview Questions Accordion Panel */}
+            <div className={styles.accordionPanel}>
+              <div 
+                className={styles.accordionHeader}
+                onClick={() => setOpenAccordionPanel(openAccordionPanel === 'questions' ? null : 'questions')}
+              >
+                <h4><FiBook /> Interview Questions</h4>
+                {openAccordionPanel === 'questions' ? <FiChevronUp /> : <FiChevronDown />}
+              </div>
+              <AnimatePresence>
+                {openAccordionPanel === 'questions' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className={styles.accordionContent}
+                  >
+                    <div className={styles.questionsHeader}>
+                      <button 
+                        className={styles.primaryButton}
+                        onClick={() => setShowQuestionModal(true)}
+                      >
+                        <FiShare2 /> Share a Question
+                      </button>
+                    </div>
+                    <div className={styles.questionsList}>
+                      {filteredInterviewQuestions.length > 0 ? (
+                        filteredInterviewQuestions.map(question => (
+                          <motion.div 
+                            key={question.id} 
+                            className={styles.questionCard}
+                            whileHover={{ scale: 1.01 }}
+                          >
+                            <div className={styles.questionMeta}>
+                              <span className={styles.techBadge}>{question.technology}</span>
+                              <span className={styles.questionDate}>{formatDate(question.date)}</span>
+                              <span className={styles.questionUser}>by {question.user}</span>
+                            </div>
+                            <p className={styles.questionText}>{question.question}</p>
+                          </motion.div>
+                        ))
+                      ) : (
+                        <motion.div className={styles.emptyState}>
+                          <FiHelpCircle size={48} />
+                          <p>No Questions Found</p>
+                        </motion.div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Deployed Colleagues Accordion Panel */}
+            <div className={styles.accordionPanel}>
+              <div 
+                className={styles.accordionHeader}
+                onClick={() => setOpenAccordionPanel(openAccordionPanel === 'deployed' ? null : 'deployed')}
+              >
+                <h4><FiAward /> Deployed Colleagues</h4>
+                {openAccordionPanel === 'deployed' ? <FiChevronUp /> : <FiChevronDown />}
+              </div>
+              <AnimatePresence>
+                {openAccordionPanel === 'deployed' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className={styles.accordionContent}
+                  >
+                    <div className={styles.deployedGrid}>
+                      {filteredDeployedEmployees().length > 0 ? (
+                        filteredDeployedEmployees().map(employee => (
+                          <motion.div 
+                            key={employee.id} 
+                            className={styles.deployedCard}
+                            whileHover={{ scale: 1.02 }}
+                          >
+                            <div className={styles.deployedHeader}>
+                              <div className={styles.avatar}>
+                                {employee.name.charAt(0)}
+                              </div>
+                              <div>
+                                <h5>{employee.name}</h5>
+                                <div className={styles.deployedMeta}>
+                                  <span className={styles.techBadge}>{employee.technology}</span>
+                                  <span className={styles.resourceBadge}>{employee.resourceType}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className={styles.deployedDetails}>
+                              <p><strong>Client:</strong> {employee.client}</p>
+                              <p><strong>Deployed on:</strong> {formatDate(employee.date)}</p>
+                            </div>
+                          </motion.div>
+                        ))
+                      ) : (
+                        <motion.div className={styles.emptyState}>
+                          <FiHelpCircle size={48} />
+                          <p>No Deployed Colleagues Found</p>
+                        </motion.div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         );
 
       case 'performance':
         return renderPerformanceSection();
+
+      case 'questions':
+        return (
+          <div className={styles.questionsContainer}>
+            <div className={styles.questionsHeader}>
+              <h4>Interview Questions Bank</h4>
+              <button 
+                className={styles.primaryButton}
+                onClick={() => setShowQuestionModal(true)}
+              >
+                <FiShare2 /> Share a Question
+              </button>
+            </div>
+            <div className={styles.questionsList}>
+              {filteredInterviewQuestions.length > 0 ? (
+                filteredInterviewQuestions.map(question => (
+                  <motion.div 
+                    key={question.id} 
+                    className={styles.questionCard}
+                    whileHover={{ scale: 1.01 }}
+                  >
+                    <div className={styles.questionMeta}>
+                      <span className={styles.techBadge}>{question.technology}</span>
+                      <span className={styles.questionDate}>{formatDate(question.date)}</span>
+                      <span className={styles.questionUser}>by {question.user}</span>
+                    </div>
+                    <p className={styles.questionText}>{question.question}</p>
+                  </motion.div>
+                ))
+              ) : (
+                <motion.div className={styles.emptyState}>
+                  <FiHelpCircle size={48} />
+                  <p>No Questions Found</p>
+                </motion.div>
+              )}
+            </div>
+          </div>
+        );
 
       default:
         return null;
@@ -911,6 +992,7 @@ const EmployeeDashboard = () => {
           <div className={styles.userInfo}>
             <span className={styles.userName}>{employeeData.name}</span>
             <span className={styles.userRole}>{employeeData.technology} Developer ({employeeData.resourceType})</span>
+            <span className={styles.userRole}>{employeeData.userEmail || 'n.amasannagari@ajacs.in'}</span>
           </div>
         </div>
       </div>
@@ -920,7 +1002,8 @@ const EmployeeDashboard = () => {
           { id: 'jd', label: 'Job Descriptions', icon: <FiFileText /> },
           { id: 'resume', label: 'Resume Preparation', icon: <FiUpload /> },
           { id: 'interviews', label: 'Interviews', icon: <FiMessageSquare /> },
-          { id: 'performance', label: 'Performance', icon: <FiBarChart2 /> }
+          { id: 'performance', label: 'Performance', icon: <FiBarChart2 /> },
+          { id: 'questions', label: 'Interview Questions', icon: <FiBook /> }
         ].map(tab => (
           <motion.button 
             key={tab.id}
