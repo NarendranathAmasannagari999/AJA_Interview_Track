@@ -361,47 +361,47 @@ const DeliveryTeamDashboard = () => {
             return;
         }
 
-        setIsSubmitting(true);
-        setIsFeedbackLoading(true);
-        setError(null);
+    setIsSubmitting(true);
+    setIsFeedbackLoading(true);
+    setError(null);
 
         // Combine feedback
         const combinedFeedback = `Technical Feedback: ${feedback.technical} | Communication Feedback: ${feedback.communication}`;
 
         // Update feedback using the API
-        const updatedInterview = await updateMockInterviewFeedback(
+      const updatedInterview = await updateMockInterviewFeedback(
             selectedInterview.id,
-            combinedFeedback,
+        combinedFeedback,
             ratings.technical,
             ratings.communication
-        );
-
-        if (updatedInterview) {
-            // Update the interviews list with the new feedback
-            setMockInterviews(prev => 
-                prev.map(interview => 
+      );
+      
+      if (updatedInterview) {
+        // Update the interviews list with the new feedback
+        setMockInterviews(prev => 
+          prev.map(interview => 
                     interview.id === selectedInterview.id ? {
                         ...interview,
-                        ...updatedInterview,
+              ...updatedInterview,
                         employeeName: employees.find(e => e.id === updatedInterview.employeeId)?.user?.fullName || 'Unknown Employee'
-                    } : interview
-                )
-            );
-
-            // Show success message
+            } : interview
+          )
+        );
+        
+        // Show success message
             setError('Feedback updated successfully!');
-            
+        
             // Close the modal and reset state
             setSelectedInterview(null);
             setFeedback({ technical: '', communication: '' });
             setRatings({ technical: 0, communication: 0 });
-        }
+      }
     } catch (error) {
-        console.error('Error updating feedback:', error);
+      console.error('Error updating feedback:', error);
         setError(error.message || 'Failed to update feedback. Please try again.');
     } finally {
-        setIsSubmitting(false);
-        setIsFeedbackLoading(false);
+      setIsSubmitting(false);
+      setIsFeedbackLoading(false);
     }
   };
 
@@ -771,15 +771,15 @@ const DeliveryTeamDashboard = () => {
                           onClick={() => {
                             setSelectedInterview(interview);
                             setRatings({
-                                technical: interview.technicalRating || 0,
-                                communication: interview.communicationRating || 0
+                              technical: interview.technicalRating || 0,
+                              communication: interview.communicationRating || 0
                             });
                             const feedbackParts = interview.technicalFeedback?.split(' | ');
                             const techFeedback = feedbackParts && feedbackParts[0]?.replace('Technical Feedback: ', '');
                             const commFeedback = feedbackParts && feedbackParts[1]?.replace('Communication Feedback: ', '');
                             setFeedback({
-                                technical: techFeedback || '',
-                                communication: commFeedback || ''
+                              technical: techFeedback || '',
+                              communication: commFeedback || ''
                             });
                           }}
                         >
