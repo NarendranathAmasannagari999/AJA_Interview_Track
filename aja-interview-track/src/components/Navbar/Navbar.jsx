@@ -60,6 +60,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
       <div className={styles.navContainer}>
         <div className={styles.logo}>
           <Link to="/" className={styles.logoLink}>
+            <img src="/images/logo-aja.png" alt="AJA Logo" className={styles.navLogo} />
             <span className={styles.logoText}>AJA Interview Prep</span>
           </Link>
         </div>

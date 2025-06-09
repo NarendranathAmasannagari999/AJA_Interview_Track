@@ -96,19 +96,19 @@ const LandingPage = () => {
   const testimonials = [
     {
       quote: "The AJA preparation track helped me transition from mock interviews to FTE placement in just 3 months!",
-      author: "Sarah Johnson",
+      author: "Shravani reddy",
       role: "Java Developer at TechCorp",
       avatar: "/images/avatar1.jpg"
     },
     {
       quote: "I went through 5 client interviews before landing my dream job. The AJA team supported me through every step.",
-      author: "Michael Chen",
+      author: "Rahul kumar",
       role: "Python Developer at DataSystems",
       avatar: "/images/avatar2.jpg"
     },
     {
       quote: "The technical training and mock interviews were exactly what I needed to boost my confidence.",
-      author: "Priya Patel",
+      author: "Arjun ram",
       role: ".NET Developer at FinTech Solutions",
       avatar: "/images/avatar3.jpg"
     }
@@ -140,10 +140,10 @@ const LandingPage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <span>🚀</span> Transform Your Career
+            <img src="/images/logo-aja.png" alt="AJA Logo" className={styles.heroLogo} /> Transform Your Career with AJA
           </motion.p>
           <h1 className={styles.heroTitle}>
-            Ace Your <span className={styles.highlight}>Technical</span> Interviews
+            Ace Your <span className={styles.highlight}>Technical & Communication</span> Interviews
           </h1>
           <p className={styles.heroSubtitle}>
             AJA's comprehensive preparation track bridges the gap between your skills 
