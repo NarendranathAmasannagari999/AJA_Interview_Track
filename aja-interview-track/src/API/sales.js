@@ -145,7 +145,7 @@ export const addClient = async (name, contactEmail, activePositions, technologie
         name,
         contactEmail,
         activePositions,
-        technologies: technologies.join(',')
+        technologies
       }
     });
     return response.data;
@@ -219,6 +219,25 @@ export const addJobDescription = async (title, client, receivedDate, deadline, t
     }
     if (error.response?.status === 400) {
       throw new Error(error.response.data || 'Invalid input data');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Get all job descriptions
+ * @returns {Promise<Array>} List of all job descriptions
+ */
+export const getAllJobDescriptions = async () => {
+  try {
+    const response = await axiosInstance.get(`${BASE_URL}/job-descriptions`);
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('Access denied: Only sales team members can view all job descriptions');
     }
     throw error.response?.data || error.message;
   }

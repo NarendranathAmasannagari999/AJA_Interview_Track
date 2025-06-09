@@ -22,7 +22,8 @@ import {
   getClients,
   addJobDescription,
   downloadJobDescription,
-  deleteJobDescription
+  deleteJobDescription,
+  getAllJobDescriptions
 } from '../../API/sales';
 
 const ClientModal = ({
@@ -514,7 +515,7 @@ const SalesTeamDashboard = () => {
     setError(null);
     try {
       // Fetch all data in parallel with proper error handling
-      const [candidatesData, interviewsData, clientsData] = await Promise.all([
+      const [candidatesData, interviewsData, clientsData, jobDescriptionsData] = await Promise.all([
         getCandidates(filterTech, filterStatus, filterResourceType).catch(error => {
           console.error('Error fetching candidates:', error);
           if (error.response?.status === 401) {
@@ -544,6 +545,16 @@ const SalesTeamDashboard = () => {
             throw new Error('Invalid search parameters');
           }
           return [];
+        }),
+        getAllJobDescriptions().catch(error => {
+          console.error('Error fetching job descriptions:', error);
+          if (error.response?.status === 401) {
+            throw new Error('Please log in to view job descriptions');
+          }
+          if (error.response?.status === 403) {
+            throw new Error('Access denied: Only sales team members can view all job descriptions');
+          }
+          return [];
         })
       ]);
 
@@ -565,6 +576,7 @@ const SalesTeamDashboard = () => {
       setCandidates(validatedCandidates);
       setClientInterviews(validatedInterviews);
       setClients(clientsData);
+      setJobDescriptions(jobDescriptionsData);
 
       // Calculate deployment stats
       const stats = {
@@ -783,7 +795,13 @@ const SalesTeamDashboard = () => {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading job description:', error);
-      setError(error.message || 'Failed to download job description');
+      if (error.response?.status === 401) {
+        setError('Please log in to download job descriptions');
+      } else if (error.response?.status === 400) {
+        setError('Job description not found or invalid ID');
+      } else {
+        setError(error.message || 'Failed to download job description');
+      }
     }
   };
 
@@ -792,9 +810,16 @@ const SalesTeamDashboard = () => {
     try {
       await deleteJobDescription(jdId);
       setJobDescriptions(prev => prev.filter(jd => jd.id !== jdId));
+      setError({ type: 'success', message: 'Job description deleted successfully' });
     } catch (error) {
       console.error('Error deleting job description:', error);
-      setError(error.message || 'Failed to delete job description');
+      if (error.response?.status === 401) {
+        setError('Please log in to delete job descriptions');
+      } else if (error.response?.status === 400) {
+        setError('Job description not found or invalid ID');
+      } else {
+        setError(error.message || 'Failed to delete job description');
+      }
     }
   };
 
@@ -819,13 +844,21 @@ const SalesTeamDashboard = () => {
 
   const filterInterviews = (interviews) => {
     return interviews.filter(interview => {
-      const matchesSearch = interview.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          interview.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          interview.jd.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesLevel = filterInterviewLevel === 'all' || 
-                         interview.levels.some(level => level.number.toString() === filterInterviewLevel);
+      if (!interview) return false;
+
+      const candidateName = interview.candidateName || '';
+      const client = interview.client || '';
+      const jd = interview.jd || '';
+      const levels = interview.levels || [];
+
+      const searchMatch = candidateName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         client.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         jd.toLowerCase().includes(searchTerm.toLowerCase());
       
-      return matchesSearch && matchesLevel;
+      const levelMatch = filterInterviewLevel === 'all' || 
+                        levels.some(level => level && level.number && level.number.toString() === filterInterviewLevel);
+      
+      return searchMatch && levelMatch;
     });
   };
 
@@ -1933,6 +1966,7 @@ const SalesTeamDashboard = () => {
     e.preventDefault();
     setClientModalError('');
     setClientModalSuccess('');
+    
     // Validation
     if (!clientModalFields.name.trim()) {
       setClientModalError('Client name is required');
@@ -1950,6 +1984,7 @@ const SalesTeamDashboard = () => {
       setClientModalError('At least one technology must be selected');
       return;
     }
+
     setClientModalLoading(true);
     try {
       const response = await addClient(
@@ -1960,12 +1995,19 @@ const SalesTeamDashboard = () => {
       );
       setClients(prev => [...prev, response]);
       setClientModalSuccess('Client added successfully!');
-      setClientModalLoading(false);
       setTimeout(() => {
         resetClientModal();
       }, 1500);
     } catch (error) {
-      setClientModalError(error.message || 'Failed to add client');
+      console.error('Error adding client:', error);
+      if (error.response?.status === 401) {
+        setClientModalError('Please log in to add clients');
+      } else if (error.response?.status === 400) {
+        setClientModalError(error.response.data || 'Invalid client data');
+      } else {
+        setClientModalError(error.message || 'Failed to add client');
+      }
+    } finally {
       setClientModalLoading(false);
     }
   };

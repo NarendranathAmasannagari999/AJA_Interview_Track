@@ -48,11 +48,11 @@ function AppContent() {
           transition: 'margin-left 0.3s ease',
         }}
       >
-        <Navbar
+        {!sidebarVisible && (<Navbar
           toggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
           darkMode={darkMode}
           toggleDarkMode={toggleDarkMode}
-        />
+        />)}
         <div className="page-content">
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
@@ -68,7 +68,7 @@ function AppContent() {
             </Routes>
           </AnimatePresence>
         </div>
-        <Footer darkMode={darkMode} />
+        {!sidebarVisible && (<Footer darkMode={darkMode} />)}
       </main>
     </div>
   );

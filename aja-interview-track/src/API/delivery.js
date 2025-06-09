@@ -50,6 +50,12 @@ export const scheduleInterview = async ({
 // Update mock interview feedback
 export const updateMockInterviewFeedback = async (interviewId, feedback, technicalScore, communicationScore) => {
     try {
+        // Check if user is logged in
+        const token = localStorage.getItem('jwt_token');
+        if (!token) {
+            throw new Error('Please log in to update feedback');
+        }
+
         const response = await axiosInstance.put(`${API_BASE_URL}/mock-interviews/${interviewId}/feedback`, null, {
             params: {
                 feedback,
@@ -60,11 +66,16 @@ export const updateMockInterviewFeedback = async (interviewId, feedback, technic
         return response.data;
     } catch (error) {
         if (error.response?.status === 401) {
+            // Clear token and redirect to login
+            localStorage.removeItem('jwt_token');
+            window.location.href = '/login';
             throw new Error('Please log in to update feedback');
         } else if (error.response?.status === 403) {
-            throw new Error('You are not authorized to update this feedback');
+            throw new Error('You do not have permission to update feedback. Please ensure you are logged in as a Delivery Team member.');
         } else if (error.response?.status === 404) {
             throw new Error('Interview not found');
+        } else if (error.response?.status === 400) {
+            throw new Error(error.response.data || 'Invalid feedback data');
         }
         throw error.response?.data || error.message;
     }

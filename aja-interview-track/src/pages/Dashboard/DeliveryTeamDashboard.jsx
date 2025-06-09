@@ -59,6 +59,7 @@ const DeliveryTeamDashboard = () => {
     location: '',
     notes: ''
   });
+  const [selectedInterview, setSelectedInterview] = useState(null);
 
   const technologies = ['Java', 'Python', '.NET', 'DevOps', 'SalesForce', 'UI Development', 'Testing'];
   const resourceTypes = ['OM', 'TCT1', 'TCT2'];
@@ -111,17 +112,7 @@ const DeliveryTeamDashboard = () => {
       // Fetch employees with filters
       const employeesData = await getEmployees(technologyFilter, resourceTypeFilter);
       if (Array.isArray(employeesData)) {
-        // Validate each employee has the required structure
-        const validEmployees = employeesData.filter(employee => 
-          employee && 
-          employee.id && 
-          employee.user && 
-          employee.user.fullName && 
-          employee.empId && 
-          employee.technology && 
-          employee.resourceType
-        );
-        setEmployees(validEmployees);
+        setEmployees(employeesData);
       } else {
         console.error('Invalid employees data received:', employeesData);
         setEmployees([]);
@@ -328,7 +319,7 @@ const DeliveryTeamDashboard = () => {
         setMockInterviews(prev => {
           const newInterview = {
             ...response,
-            employeeName: employees.find(e => e.id === response.employeeId)?.name || 'Unknown Employee'
+            employeeName: employees.find(e => e.id === response.employeeId)?.user?.fullName || 'Unknown Employee'
           };
           return [...prev, newInterview];
         });
@@ -355,53 +346,70 @@ const DeliveryTeamDashboard = () => {
     }
   };
 
-  const handleUpdateFeedback = async (interviewId, feedback, technicalScore, communicationScore) => {
-    setIsSubmitting(true);
-    setIsFeedbackLoading(true);
-    setError(null);
-    try {
-      // Combine technical and communication feedback into a single string
-      const combinedFeedback = `Technical Feedback: ${feedback.technical || 'N/A'} | Communication Feedback: ${feedback.communication || 'N/A'}`;
+  const handleUpdateFeedback = async () => {
+    if (!selectedInterview) return;
 
-      const updatedInterview = await updateMockInterviewFeedback(
-        interviewId,
-        combinedFeedback,
-        technicalScore,
-        communicationScore
-      );
-      
-      if (updatedInterview) {
-        // Update the interviews list with the new feedback
-        setMockInterviews(prev => 
-          prev.map(interview => 
-            interview.id === interviewId ? {
-              ...updatedInterview,
-              employeeName: employees.find(e => e.id === updatedInterview.employeeId)?.name || 'Unknown Employee'
-            } : interview
-          )
+    try {
+        // Validate input
+        if (!feedback.technical || !feedback.communication) {
+            setError('Please provide both technical and communication feedback');
+            return;
+        }
+
+        if (ratings.technical < 0 || ratings.technical > 10 || ratings.communication < 0 || ratings.communication > 10) {
+            setError('Scores must be between 0 and 10');
+            return;
+        }
+
+        setIsSubmitting(true);
+        setIsFeedbackLoading(true);
+        setError(null);
+
+        // Combine feedback
+        const combinedFeedback = `Technical Feedback: ${feedback.technical} | Communication Feedback: ${feedback.communication}`;
+
+        // Update feedback using the API
+        const updatedInterview = await updateMockInterviewFeedback(
+            selectedInterview.id,
+            combinedFeedback,
+            ratings.technical,
+            ratings.communication
         );
-        
-        // Reset the form
-        setSelectedEmployee(null);
-        setFeedback({ technical: '', communication: '' });
-        setRatings({ technical: 0, communication: 0 });
-        
-        // Show success message
-        setError({ type: 'success', message: 'Feedback updated successfully!' });
-        
-        // Refresh the data to ensure consistency
-        await fetchData();
-      }
+
+        if (updatedInterview) {
+            // Update the interviews list with the new feedback
+            setMockInterviews(prev => 
+                prev.map(interview => 
+                    interview.id === selectedInterview.id ? {
+                        ...interview,
+                        ...updatedInterview,
+                        employeeName: employees.find(e => e.id === updatedInterview.employeeId)?.user?.fullName || 'Unknown Employee'
+                    } : interview
+                )
+            );
+
+            // Show success message
+            setError('Feedback updated successfully!');
+            
+            // Close the modal and reset state
+            setSelectedInterview(null);
+            setFeedback({ technical: '', communication: '' });
+            setRatings({ technical: 0, communication: 0 });
+        }
     } catch (error) {
-      console.error('Error updating feedback:', error);
-      setError({ 
-        type: 'error', 
-        message: error.message || 'Failed to update feedback. Please try again.' 
-      });
+        console.error('Error updating feedback:', error);
+        setError(error.message || 'Failed to update feedback. Please try again.');
     } finally {
-      setIsSubmitting(false);
-      setIsFeedbackLoading(false);
+        setIsSubmitting(false);
+        setIsFeedbackLoading(false);
     }
+  };
+
+  const handleCloseFeedbackModal = () => {
+    setSelectedInterview(null);
+    setFeedback({ technical: '', communication: '' });
+    setRatings({ technical: 0, communication: 0 });
+    setError(null);
   };
 
   const sendToSales = async (employeeId) => {
@@ -542,7 +550,7 @@ const DeliveryTeamDashboard = () => {
               <button 
                 className={`${styles.interviewTabButton} ${styles.active}`}
               >
-                All Interviews
+                Upcoming Interviews
               </button>
             </div>
             
@@ -658,7 +666,21 @@ const DeliveryTeamDashboard = () => {
                   );
                 })
               )}
-              
+            </div>
+          </div>
+        );
+      case 'completed':
+        return (
+          <div className={styles.sectionContainer}>
+            <div className={styles.interviewTabs}>
+              <button 
+                className={`${styles.interviewTabButton} ${styles.active}`}
+              >
+                Completed Interviews
+              </button>
+            </div>
+            
+            <div className={styles.interviewList}>
               <div className={styles.interviewListHeader}>
                 <h4>Completed Mock Interviews</h4>
               </div>
@@ -747,17 +769,17 @@ const DeliveryTeamDashboard = () => {
                         <button 
                           className={styles.secondaryButton}
                           onClick={() => {
-                            setSelectedEmployee(interview.employee);
+                            setSelectedInterview(interview);
                             setRatings({
-                              technical: interview.technicalRating || 0,
-                              communication: interview.communicationRating || 0
+                                technical: interview.technicalRating || 0,
+                                communication: interview.communicationRating || 0
                             });
                             const feedbackParts = interview.technicalFeedback?.split(' | ');
                             const techFeedback = feedbackParts && feedbackParts[0]?.replace('Technical Feedback: ', '');
                             const commFeedback = feedbackParts && feedbackParts[1]?.replace('Communication Feedback: ', '');
                             setFeedback({
-                              technical: techFeedback || '',
-                              communication: commFeedback || ''
+                                technical: techFeedback || '',
+                                communication: commFeedback || ''
                             });
                           }}
                         >
@@ -979,17 +1001,8 @@ const DeliveryTeamDashboard = () => {
     <div className={styles.modalActions}>
       <button 
         className={styles.primaryButton}
-        disabled={isSubmitting || isFeedbackLoading}
-        onClick={() => {
-          if (selectedEmployee) {
-            handleUpdateFeedback(
-              selectedEmployee.id,
-              feedback,
-              ratings.technical,
-              ratings.communication
-            );
-          }
-        }}
+        disabled={isSubmitting || isFeedbackLoading || !feedback.technical || !feedback.communication}
+        onClick={handleUpdateFeedback}
       >
         {isSubmitting || isFeedbackLoading ? (
           <>
@@ -1004,12 +1017,13 @@ const DeliveryTeamDashboard = () => {
         className={styles.secondaryButton}
         disabled={isSubmitting || isFeedbackLoading}
         onClick={() => {
-          setSelectedEmployee(null);
+          setSelectedInterview(null);
           setFeedback({ technical: '', communication: '' });
           setRatings({ technical: 0, communication: 0 });
+          setError(null);
         }}
       >
-        Cancel
+        Close
       </button>
     </div>
   );
@@ -1091,7 +1105,15 @@ const DeliveryTeamDashboard = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
-          <FiCalendar /> Interviews
+          <FiCalendar /> Upcoming Interviews
+        </motion.button>
+        <motion.button
+          className={`${styles.tab} ${activeTab === 'completed' ? styles.active : ''}`}
+          onClick={() => setActiveTab('completed')}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <FiCheckCircle /> Completed Interviews
         </motion.button>
         <motion.button
           className={`${styles.tab} ${activeTab === 'analytics' ? styles.active : ''}`}
@@ -1113,13 +1135,13 @@ const DeliveryTeamDashboard = () => {
       </motion.div>
       
       <AnimatePresence>
-        {selectedEmployee && !isScheduling && (
+        {selectedInterview && (
           <motion.div 
             className={styles.modalOverlay}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setSelectedEmployee(null)}
+            onClick={() => setSelectedInterview(null)}
           >
             <motion.div 
               className={styles.modalContent}
@@ -1129,10 +1151,10 @@ const DeliveryTeamDashboard = () => {
               onClick={(e) => e.stopPropagation()}
             >
               <div className={styles.modalHeader}>
-                <h3>{selectedEmployee.name}'s Evaluation</h3>
+                <h3>{selectedInterview.employee?.user?.fullName || 'Unknown Employee'}'s Evaluation</h3>
                 <button 
                   className={styles.closeButton}
-                  onClick={() => setSelectedEmployee(null)}
+                  onClick={() => setSelectedInterview(null)}
                 >
                   &times;
                 </button>
@@ -1145,13 +1167,13 @@ const DeliveryTeamDashboard = () => {
                       <FiUser />
                     </div>
                     <div>
-                      <h4>{selectedEmployee.name}</h4>
+                      <h4>{selectedInterview.employee?.user?.fullName || 'Unknown Employee'}</h4>
                       <div className={styles.profileMeta}>
-                        <span className={`${styles.techBadge} ${styles[selectedEmployee.technology.replace(' ', '')]}`}>
-                          {selectedEmployee.technology}
+                        <span className={`${styles.techBadge} ${styles[selectedInterview.employee?.technology?.replace(' ', '')]}`}>
+                          {selectedInterview.employee?.technology || 'Unknown'}
                         </span>
-                        <span className={`${styles.resourceBadge} ${styles[selectedEmployee.resourceType]}`}>
-                          {selectedEmployee.resourceType}
+                        <span className={`${styles.resourceBadge} ${styles[selectedInterview.employee?.resourceType]}`}>
+                          {selectedInterview.employee?.resourceType || 'Unknown'}
                         </span>
                       </div>
                     </div>
@@ -1161,23 +1183,23 @@ const DeliveryTeamDashboard = () => {
                     <div className={styles.statItem}>
                       <span>Mock Interviews</span>
                       <strong>
-                        {mockInterviews.filter(i => i.employeeId === selectedEmployee.id).length}
+                        {mockInterviews.filter(i => i.employeeId === selectedInterview.employee?.id).length}
                       </strong>
                     </div>
                     <div className={styles.statItem}>
                       <span>Avg Technical</span>
                       <strong>
-                        {mockInterviews.filter(i => i.employeeId === selectedEmployee.id && i.ratings)
+                        {mockInterviews.filter(i => i.employeeId === selectedInterview.employee?.id && i.ratings)
                           .reduce((sum, i) => sum + i.ratings.technical, 0) / 
-                          mockInterviews.filter(i => i.employeeId === selectedEmployee.id && i.ratings).length || 'N/A'}
+                          mockInterviews.filter(i => i.employeeId === selectedInterview.employee?.id && i.ratings).length || 'N/A'}
                       </strong>
                     </div>
                     <div className={styles.statItem}>
                       <span>Avg Communication</span>
                       <strong>
-                        {mockInterviews.filter(i => i.employeeId === selectedEmployee.id && i.ratings)
+                        {mockInterviews.filter(i => i.employeeId === selectedInterview.employee?.id && i.ratings)
                           .reduce((sum, i) => sum + i.ratings.communication, 0) / 
-                          mockInterviews.filter(i => i.employeeId === selectedEmployee.id && i.ratings).length || 'N/A'}
+                          mockInterviews.filter(i => i.employeeId === selectedInterview.employee?.id && i.ratings).length || 'N/A'}
                       </strong>
                     </div>
                   </div>
