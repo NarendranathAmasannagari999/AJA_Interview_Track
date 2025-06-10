@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   FiUsers, FiCalendar, FiCheckCircle, FiClock, FiFileText, 
   FiSend, FiEdit, FiPlus, FiFilter, FiSearch, FiBarChart2,
-  FiChevronDown, FiChevronUp, FiExternalLink, FiMail, FiUser, FiX
+  FiChevronDown, FiChevronUp, FiExternalLink, FiMail, FiUser, FiX, FiPlay
 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -17,7 +17,8 @@ import {
   updateMockInterviewFeedback,
   getUpcomingInterviews,
   getCompletedInterviews,
-  updateReadyForDeployment
+  updateReadyForDeployment,
+  updateInterviewStatus
 } from '../../API/delivery';
 import ScheduleInterviewModal from './ScheduleInterviewModal';
 import EvaluationModal from '../../components/EvaluationModal';
@@ -329,13 +330,22 @@ const DeliveryTeamDashboard = () => {
     setError(null);
 
     try {
+      // Call the API to update feedback
+      const updatedInterview = await updateMockInterviewFeedback(
+        data.interviewId,
+        data.technicalFeedback,
+        data.communicationFeedback,
+        data.technicalRating,
+        data.communicationRating,
+        data.sentToSales || false
+      );
+
       // Update the interview in the mockInterviews array
       const updatedInterviews = mockInterviews.map(interview => {
         if (interview.id === data.interviewId) {
           return {
             ...interview,
-            feedback: data.feedback,
-            ratings: data.ratings,
+            ...updatedInterview,
             status: 'completed'
           };
         }
@@ -344,7 +354,7 @@ const DeliveryTeamDashboard = () => {
 
       setMockInterviews(updatedInterviews);
       setSelectedInterviewId(null);
-      setError(null);
+      setError({ type: 'success', message: 'Feedback updated successfully!' });
 
       // Refresh completed interviews data
       const completedData = await getCompletedInterviews();
@@ -363,10 +373,13 @@ const DeliveryTeamDashboard = () => {
         setMockInterviews(allInterviews);
       }
 
-      return data;
+      return updatedInterview;
     } catch (error) {
       console.error('Error updating feedback:', error);
-      setError(error.message || 'Failed to update feedback. Please try again.');
+      setError({ 
+        type: 'error', 
+        message: error.message || 'Failed to update feedback. Please try again.' 
+      });
       throw error;
     } finally {
       setIsFeedbackLoading(false);
@@ -393,6 +406,27 @@ const DeliveryTeamDashboard = () => {
       setError('Failed to send profile to sales. Please try again.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateInterviewStatus = async (interviewId) => {
+    try {
+      setIsLoading(true);
+      await updateInterviewStatus(interviewId);
+      
+      // Show success message
+      setError({ type: 'success', message: 'Interview status updated successfully!' });
+      
+      // Refresh the data to show updated status
+      await fetchData();
+    } catch (error) {
+      console.error('Error updating interview status:', error);
+      setError({ 
+        type: 'error', 
+        message: error.message || 'Failed to update interview status. Please try again.' 
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -524,6 +558,36 @@ const DeliveryTeamDashboard = () => {
               </button>
             </div>
             
+            <div className={styles.filterControls}>
+              <div className={styles.filterGroup}>
+                <label>Technology</label>
+                <select
+                  value={technologyFilter}
+                  onChange={(e) => setTechnologyFilter(e.target.value)}
+                  className={styles.filterSelect}
+                >
+                  <option value="all">All Technologies</option>
+                  {technologies.map(tech => (
+                    <option key={tech} value={tech}>{tech}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className={styles.filterGroup}>
+                <label>Resource Type</label>
+                <select
+                  value={resourceTypeFilter}
+                  onChange={(e) => setResourceTypeFilter(e.target.value)}
+                  className={styles.filterSelect}
+                >
+                  <option value="all">All Types</option>
+                  {resourceTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
             <div className={styles.interviewSummary}>
               <div className={styles.summaryCard}>
                 <h4>Upcoming Interviews</h4>
@@ -549,52 +613,21 @@ const DeliveryTeamDashboard = () => {
               </div>
               
               {upcomingInterviews.length === 0 ? (
-                <div className={styles.employeeList}>
-                  {employees.map(employee => (
-                    <motion.div
-                      key={employee.id}
-                      className={styles.interviewCard}
-                      whileHover={{ scale: 1.01 }}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div className={styles.interviewHeader}>
-                        <div>
-                          <h4>{employee.user?.fullName || 'Unknown Employee'}</h4>
-                          <div className={styles.interviewMeta}>
-                            <span className={`${styles.techBadge} ${styles[employee.technology?.replace(' ', '')]}`}>
-                              {employee.technology || 'Unknown'}
-                            </span>
-                            <span className={`${styles.resourceBadge} ${styles[employee.resourceType]}`}>
-                              {employee.resourceType || 'Unknown'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className={styles.employeeId}>
-                          <FiUser /> {employee.empId || 'N/A'}
-                        </div>
-                      </div>
-                      <div className={styles.interviewDetails}>
-                        <p><strong>Status:</strong> {employee.status || 'N/A'}</p>
-                      </div>
-                      <div className={styles.interviewActions}>
-                        <button 
-                          className={styles.primaryButton}
-                          onClick={() => {
-                            setSelectedEmployeeForScheduling(employee);
-                            setShowInterviewScheduler(true);
-                          }}
-                        >
-                          Schedule Interview
-                        </button>
-                      </div>
-                    </motion.div>
-                  ))}
+                <div className={styles.emptyState}>
+                  <FiCalendar size={48} />
+                  <p>No upcoming interviews scheduled</p>
                 </div>
               ) : (
-                upcomingInterviews.map(interview => {
-                  return (
+                <div className={styles.employeeList}>
+                  {upcomingInterviews
+                    .filter(interview => {
+                      const matchesTechnology = technologyFilter === 'all' || 
+                        interview.employee?.technology === technologyFilter;
+                      const matchesResourceType = resourceTypeFilter === 'all' || 
+                        interview.employee?.resourceType === resourceTypeFilter;
+                      return matchesTechnology && matchesResourceType;
+                    })
+                    .map(interview => (
                     <motion.div
                       key={interview.id}
                       className={styles.interviewCard}
@@ -604,7 +637,7 @@ const DeliveryTeamDashboard = () => {
                       transition={{ duration: 0.3 }}
                     >
                       <div className={styles.interviewHeader}>
-                        <div>
+                        <div className={styles.interviewHeaderLeft}>
                           <h4>{interview.employee?.user?.fullName || 'Unknown Employee'}</h4>
                           <div className={styles.interviewMeta}>
                             <span className={`${styles.techBadge} ${styles[interview.employee?.technology?.replace(' ', '')]}`}>
@@ -619,22 +652,43 @@ const DeliveryTeamDashboard = () => {
                           <FiCalendar /> {interview.date} at {interview.time}
                         </div>
                       </div>
+                      
                       <div className={styles.interviewDetails}>
-                        <p><strong>Employee ID:</strong> {interview.employee?.empId || 'N/A'}</p>
-                        <p><strong>Status:</strong> {interview.status || 'N/A'}</p>
-                        <p><strong>Interviewer:</strong> {interview.interviewer?.fullName || 'N/A'}</p>
+                        <div className={styles.detailRow}>
+                          <p><strong>Employee ID:</strong> {interview.employee?.empId || 'N/A'}</p>
+                          <p><strong>Status:</strong> {interview.status || 'N/A'}</p>
+                        </div>
+                        <div className={styles.detailRow}>
+                          <p><strong>Interviewer:</strong> {interview.interviewer?.fullName || 'N/A'}</p>
+                        </div>
                       </div>
+                      
                       <div className={styles.interviewActions}>
-                        <button className={styles.primaryButton}>
-                          Start Interview
-                        </button>
-                        <button className={styles.secondaryButton}>
-                          Reschedule
-                        </button>
+                        <div className={styles.actionButtons}>
+                          <button 
+                            className={`${styles.button} ${styles.primary}`}
+                            onClick={() => {/* handle start interview */}}
+                          >
+                            <FiPlay /> Start Interview
+                          </button>
+                          <button 
+                            className={`${styles.button} ${styles.secondary}`}
+                            onClick={() => {/* handle reschedule */}}
+                          >
+                            <FiCalendar /> Reschedule
+                          </button>
+                          <button 
+                            className={`${styles.button} ${styles.success}`}
+                            onClick={() => handleUpdateInterviewStatus(interview.id)}
+                            disabled={isLoading}
+                          >
+                            <FiCheckCircle /> Update Interview
+                          </button>
+                        </div>
                       </div>
                     </motion.div>
-                  );
-                })
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -729,10 +783,10 @@ const DeliveryTeamDashboard = () => {
                       
                       <div className={styles.feedback}>
                         <h5>Technical Feedback</h5>
-                        <p>{interview.technicalFeedback?.split(' | ')[0]?.replace('Technical Feedback: ', '') || 'N/A'}</p>
+                        <p>{interview.technicalFeedback || 'N/A'}</p>
                         
                         <h5>Communication Feedback</h5>
-                        <p>{interview.technicalFeedback?.split(' | ')[1]?.replace('Communication Feedback: ', '') || 'N/A'}</p>
+                        <p>{interview.communicationFeedback || 'N/A'}</p>
                       </div>
                       
                       <div className={styles.interviewActions}>
@@ -745,13 +799,14 @@ const DeliveryTeamDashboard = () => {
                           <FiEdit /> Edit Feedback
                         </button>
                         
-
+                        {!interview.sentToSales && (
                           <button
                             className={styles.successButton}
                             onClick={() => sendToSales(interview)}
                           >
                             <FiSend /> Send to Sales
                           </button>
+                        )}
                       </div>
                     </motion.div>
                   );

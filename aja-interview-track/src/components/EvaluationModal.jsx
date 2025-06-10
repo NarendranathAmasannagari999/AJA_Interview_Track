@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiUser } from 'react-icons/fi';
+import { FiUser, FiX } from 'react-icons/fi';
 import styles from '../pages/Dashboard/DeliveryTeamDashboard.module.css';
 import { updateMockInterviewFeedback } from '../API/delivery';
 
@@ -10,87 +10,39 @@ const EvaluationModal = ({
   mockInterviews,
   onUpdate,
 }) => {
-  // Local state for form fields
-  const [feedback, setFeedback] = useState({
-    technical: '',
-    communication: '',
-    overall: ''
+  const [formData, setFormData] = useState({
+    technicalFeedback: '',
+    communicationFeedback: '',
+    technicalRating: 0,
+    communicationRating: 0,
+    sentToSales: false
   });
-  const [ratings, setRatings] = useState({
-    technical: 0,
-    communication: 0
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState(null);
 
-  // Reset form when modal is opened or selected interview changes
   useEffect(() => {
     if (selectedInterview) {
-      // Initialize feedback from existing data
-      setFeedback({
-        technical: selectedInterview.technicalFeedback || '',
-        communication: selectedInterview.communicationFeedback || '',
-        overall: selectedInterview.overallFeedback || ''
+      setFormData({
+        technicalFeedback: selectedInterview.technicalFeedback || '',
+        communicationFeedback: selectedInterview.communicationFeedback || '',
+        technicalRating: selectedInterview.technicalRating || 0,
+        communicationRating: selectedInterview.communicationRating || 0,
+        sentToSales: selectedInterview.sentToSales || false
       });
-
-      // Initialize ratings from existing data
-      setRatings({
-        technical: selectedInterview.technicalRating || 0,
-        communication: selectedInterview.communicationRating || 0
-      });
-
-      setError(null);
-      setIsSubmitting(false);
     }
   }, [selectedInterview]);
 
-  if (!selectedInterview) return null;
-
-  const handleRatingChange = (type, value) => {
-    setRatings(prev => ({
-      ...prev,
-      [type]: value
-    }));
-  };
-
-  const handleFeedbackChange = (type, value) => {
-    setFeedback(prev => ({
-      ...prev,
-      [type]: value
-    }));
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
-
     try {
-      // Send feedback data directly without feedback[] format
-      await updateMockInterviewFeedback(
-        selectedInterview.id,
-        feedback.technical,
-        feedback.communication,
-        ratings.technical,
-        ratings.communication,
-        false
-      );
-
-      // Call the onUpdate prop with the updated data
       await onUpdate({
         interviewId: selectedInterview.id,
-        feedback,
-        ratings
+        ...formData
       });
-
-      setSelectedInterview(null);
-    } catch (err) {
-      console.error('Error updating feedback:', err);
-      setError(err.message || 'Failed to update feedback. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
     }
   };
+
+  if (!selectedInterview) return null;
 
   const getScoreColor = (score) => {
     if (score >= 8) return styles.scoreHigh;
@@ -113,7 +65,7 @@ const EvaluationModal = ({
             className={styles.closeButton}
             onClick={() => setSelectedInterview(null)}
           >
-            ×
+            <FiX />
           </button>
         </div>
 
@@ -162,91 +114,76 @@ const EvaluationModal = ({
             <div className={styles.feedbackSection}>
               <h4>Interview Feedback</h4>
               
-              <div className={styles.ratingSection}>
-                <div className={styles.ratingGroup}>
-                  <label>Technical Rating:</label>
-                  <div className={styles.starRating}>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(star => (
-                      <span
-                        key={`tech-${star}`}
-                        className={`${styles.star} ${star <= ratings.technical ? styles.filled : ''}`}
-                        onClick={() => handleRatingChange('technical', star)}
-                        style={{ color: getScoreColor(star) }}
-                      >
-                        ★
-                      </span>
-                    ))}
-                    <span className={styles.ratingValue}>{ratings.technical}/10</span>
-                  </div>
+              <div className={styles.formGroup}>
+                <label>Technical Feedback</label>
+                <textarea
+                  value={formData.technicalFeedback}
+                  onChange={(e) => setFormData(prev => ({ ...prev, technicalFeedback: e.target.value }))}
+                  required
+                />
+              </div>
+              
+              <div className={styles.formGroup}>
+                <label>Communication Feedback</label>
+                <textarea
+                  value={formData.communicationFeedback}
+                  onChange={(e) => setFormData(prev => ({ ...prev, communicationFeedback: e.target.value }))}
+                  required
+                />
+              </div>
+              
+              <div className={styles.ratingGroup}>
+                <div className={styles.formGroup}>
+                  <label>Technical Rating (0-10)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={formData.technicalRating}
+                    onChange={(e) => setFormData(prev => ({ ...prev, technicalRating: parseInt(e.target.value) }))}
+                    required
+                  />
                 </div>
-
-                <div className={styles.ratingGroup}>
-                  <label>Communication Rating:</label>
-                  <div className={styles.starRating}>
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(star => (
-                      <span
-                        key={`comm-${star}`}
-                        className={`${styles.star} ${star <= ratings.communication ? styles.filled : ''}`}
-                        onClick={() => handleRatingChange('communication', star)}
-                        style={{ color: getScoreColor(star) }}
-                      >
-                        ★
-                      </span>
-                    ))}
-                    <span className={styles.ratingValue}>{ratings.communication}/10</span>
-                  </div>
+                
+                <div className={styles.formGroup}>
+                  <label>Communication Rating (0-10)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={formData.communicationRating}
+                    onChange={(e) => setFormData(prev => ({ ...prev, communicationRating: parseInt(e.target.value) }))}
+                    required
+                  />
                 </div>
               </div>
-
-              <div className={styles.feedbackGroup}>
-                <label>Technical Feedback:</label>
-                <textarea
-                  placeholder="Enter technical feedback..."
-                  value={feedback.technical}
-                  onChange={(e) => handleFeedbackChange('technical', e.target.value)}
-                  className={styles.feedbackTextarea}
-                />
-              </div>
-
-              <div className={styles.feedbackGroup}>
-                <label>Communication Feedback:</label>
-                <textarea
-                  placeholder="Enter communication feedback..."
-                  value={feedback.communication}
-                  onChange={(e) => handleFeedbackChange('communication', e.target.value)}
-                  className={styles.feedbackTextarea}
-                />
-              </div>
-
-              <div className={styles.feedbackGroup}>
-                <label>Overall Feedback:</label>
-                <textarea
-                  placeholder="Enter overall feedback..."
-                  value={feedback.overall}
-                  onChange={(e) => handleFeedbackChange('overall', e.target.value)}
-                  className={styles.feedbackTextarea}
-                />
+              
+              <div className={styles.formGroup}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={formData.sentToSales}
+                    onChange={(e) => setFormData(prev => ({ ...prev, sentToSales: e.target.checked }))}
+                  />
+                  Send to Sales Team
+                </label>
               </div>
             </div>
           </div>
-
-          {error && <div className={styles.error}>{error}</div>}
 
           <div className={styles.modalActions}>
             <button
               type="button"
               className={styles.secondaryButton}
               onClick={() => setSelectedInterview(null)}
-              disabled={isSubmitting}
             >
               Cancel
             </button>
             <button
               type="submit"
               className={styles.primaryButton}
-              disabled={isSubmitting}
             >
-              {isSubmitting ? 'Updating...' : 'Update Feedback'}
+              Submit Feedback
             </button>
           </div>
         </form>

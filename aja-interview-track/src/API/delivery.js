@@ -129,6 +129,25 @@ export const updateReadyForDeployment = async (employeeId, readyForDeployment) =
     }
 };
 
+// Update interview status from scheduled to completed
+export const updateInterviewStatus = async (interviewId) => {
+    try {
+        const response = await axiosInstance.put(`${API_BASE_URL}/mock-interviews/${interviewId}/update-status`);
+        return response.data;
+    } catch (error) {
+        if (error.response?.status === 401) {
+            throw new Error('Please log in to update interview status');
+        } else if (error.response?.status === 403) {
+            throw new Error('You do not have permission to update interview status');
+        } else if (error.response?.status === 404) {
+            throw new Error('Interview not found');
+        } else if (error.response?.status === 400) {
+            throw new Error(error.response.data || 'Invalid interview status update request');
+        }
+        throw error.response?.data || error.message;
+    }
+};
+
 
     
     
