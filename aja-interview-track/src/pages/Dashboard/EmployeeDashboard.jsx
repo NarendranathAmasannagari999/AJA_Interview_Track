@@ -76,6 +76,15 @@ const EmployeeDashboard = () => {
   const [deployedEmployees, setDeployedEmployees] = useState([]);
   const [resumeStatus, setResumeStatus] = useState('pending');
   const [openAccordionPanel, setOpenAccordionPanel] = useState('mock');
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedInterviewDetails, setSelectedInterviewDetails] = useState(null);
+
+  const dashboardTabs = [
+    { id: 'jd', label: 'Job Descriptions', icon: <FiFileText /> },
+    { id: 'resume', label: 'Resume Preparation', icon: <FiUpload /> },
+    { id: 'interviews', label: 'Client Interviews', icon: <FiMessageSquare /> },
+    { id: 'performance', label: 'Performance', icon: <FiBarChart2 /> }
+  ];
 
   useEffect(() => {
     if (employeeData.technology && employeeData.name) {
@@ -772,16 +781,34 @@ const EmployeeDashboard = () => {
                               {interview.status}
                             </span>
                           </div>
-                          {interview.status === 'scheduled' && interview.meetingLink && (
+                          <div className={styles.interviewActions}>
+                            <button 
+                              className={styles.primaryButton}
+                              onClick={() => {
+                                console.log('Technology from employeeData:', employeeData.technology);
+                                console.log('User name from employeeData:', employeeData.name);
+                                setNewQuestion(prev => ({
+                                  ...prev,
+                                  technology: interview.employee?.technology || employeeData.technology,
+                                  user: employeeData.name
+                                }));
+                                setShowQuestionModal(true);
+                              }}
+                            >
+                              <FiShare2 /> Share a Question
+                            </button>
+                          </div>
+                          {(interview.status === 'scheduled' || interview.result) && (
                             <div className={styles.interviewActions}>
-                              <a 
-                                href={interview.meetingLink} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
+                              <button 
+                                onClick={() => {
+                                  setSelectedInterviewDetails(interview);
+                                  setShowDetailsModal(true);
+                                }}
                                 className={styles.primaryButton}
                               >
-                                Join Interview
-                              </a>
+                                Details
+                              </button>
                             </div>
                           )}
                           {interview.resume && (
@@ -808,77 +835,6 @@ const EmployeeDashboard = () => {
                         <p>No Client Interviews Found</p>
                       </motion.div>
                     )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Interview Questions Accordion Panel */}
-            <div className={styles.accordionPanel}>
-              <div 
-                className={styles.accordionHeader}
-                onClick={() => setOpenAccordionPanel(openAccordionPanel === 'questions' ? null : 'questions')}
-              >
-                <h4><FiBook /> Interview Questions</h4>
-                {openAccordionPanel === 'questions' ? <FiChevronUp /> : <FiChevronDown />}
-              </div>
-              <AnimatePresence>
-                {openAccordionPanel === 'questions' && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className={styles.accordionContent}
-                  >
-                    <div className={styles.questionsHeader}>
-                      <button 
-                        className={styles.primaryButton}
-                        onClick={() => {
-                          console.log('Technology from employeeData:', employeeData.technology);
-                          console.log('User name from employeeData:', employeeData.name);
-                          setNewQuestion(prev => ({
-                            ...prev,
-                            technology: employeeData.technology,
-                            user: employeeData.name
-                          }));
-                          setShowQuestionModal(true);
-                        }}
-                      >
-                        <FiShare2 /> Share a Question
-                      </button>
-                    </div>
-                    <div className={styles.questionsList}>
-                      {filteredInterviewQuestions.length > 0 ? (
-                        <ol>
-                          {filteredInterviewQuestions.map(question => (
-                            <li key={question.id} className={styles.questionCard}>
-                              <motion.div 
-                                whileHover={{ scale: 1.01 }}
-                              >
-                                <div className={styles.questionMeta}>
-                                  <span className={styles.techBadge}>{question.technology}</span>
-                                  <span className={styles.questionDate}>{formatDate(question.date)}</span>
-                                  <span className={styles.questionUser}>by {question.user}</span>
-                                </div>
-                                <div className={styles.questionText}>
-                                  <ol>
-                                    {question.question.split('\n').map((line, index) => (
-                                      <li key={index}>{line}</li>
-                                    ))}
-                                  </ol>
-                                </div>
-                              </motion.div>
-                            </li>
-                          ))}
-                        </ol>
-                      ) : (
-                        <motion.div className={styles.emptyState}>
-                          <FiHelpCircle size={48} />
-                          <p>No Questions Found</p>
-                        </motion.div>
-                      )}
-                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -945,61 +901,6 @@ const EmployeeDashboard = () => {
       case 'performance':
         return renderPerformanceSection();
 
-      case 'questions':
-        return (
-          <div className={styles.questionsContainer}>
-            <div className={styles.questionsHeader}>
-              <h4>Interview Questions Bank</h4>
-              <button 
-                className={styles.primaryButton}
-                onClick={() => {
-                  console.log('Technology from employeeData:', employeeData.technology);
-                  console.log('User name from employeeData:', employeeData.name);
-                  setNewQuestion(prev => ({
-                    ...prev,
-                    technology: employeeData.technology,
-                    user: employeeData.name
-                  }));
-                  setShowQuestionModal(true);
-                }}
-              >
-                <FiShare2 /> Share a Question
-              </button>
-            </div>
-            <div className={styles.questionsList}>
-              {filteredInterviewQuestions.length > 0 ? (
-                <ol>
-                  {filteredInterviewQuestions.map(question => (
-                    <li key={question.id} className={styles.questionCard}>
-                      <motion.div 
-                        whileHover={{ scale: 1.01 }}
-                      >
-                        <div className={styles.questionMeta}>
-                          <span className={styles.techBadge}>{question.technology}</span>
-                          <span className={styles.questionDate}>{formatDate(question.date)}</span>
-                          <span className={styles.questionUser}>by {question.user}</span>
-                        </div>
-                        <div className={styles.questionText}>
-                          <ol>
-                            {question.question.split('\n').map((line, index) => (
-                              <li key={index}>{line}</li>
-                            ))}
-                          </ol>
-                        </div>
-                      </motion.div>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <motion.div className={styles.emptyState}>
-                  <FiHelpCircle size={48} />
-                  <p>No Questions Found</p>
-                </motion.div>
-              )}
-            </div>
-          </div>
-        );
-
       default:
         return null;
     }
@@ -1042,13 +943,7 @@ const EmployeeDashboard = () => {
       </div>
 
       <div className={styles.tabs}>
-        {[
-          { id: 'jd', label: 'Job Descriptions', icon: <FiFileText /> },
-          { id: 'resume', label: 'Resume Preparation', icon: <FiUpload /> },
-          { id: 'interviews', label: 'Interviews', icon: <FiMessageSquare /> },
-          { id: 'performance', label: 'Performance', icon: <FiBarChart2 /> },
-          { id: 'questions', label: 'Interview Questions', icon: <FiBook /> }
-        ].map(tab => (
+        {dashboardTabs.map(tab => (
           <motion.button 
             key={tab.id}
             className={`${styles.tab} ${activeTab === tab.id ? styles.active : ''}`}
@@ -1268,6 +1163,48 @@ const EmployeeDashboard = () => {
                 </button>
               </div>
             </form>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Interview Details Modal */}
+      {showDetailsModal && (
+        <motion.div 
+          className={styles.modalOverlay}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          onClick={() => setShowDetailsModal(false)}
+        >
+          <motion.div 
+            className={styles.modalContent}
+            onClick={e => e.stopPropagation()}
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+          >
+            <h3>Interview Details</h3>
+            {selectedInterviewDetails && (
+              <>
+                <p><strong>Technology:</strong> {selectedInterviewDetails.employee?.technology}</p>
+                <p><strong>Resource Type:</strong> {selectedInterviewDetails.employee?.resourceType}</p>
+                <p><strong>Date:</strong> {formatDate(selectedInterviewDetails.date)}</p>
+                <p><strong>Status:</strong> {selectedInterviewDetails.status}</p>
+                {selectedInterviewDetails.result && (
+                  <p><strong>Result:</strong> {selectedInterviewDetails.result}</p>
+                )}
+                {selectedInterviewDetails.meetingLink && (
+                  <p><strong>Meeting Link:</strong> <a href={selectedInterviewDetails.meetingLink} target="_blank" rel="noopener noreferrer">{selectedInterviewDetails.meetingLink}</a></p>
+                )}
+              </>
+            )}
+            <div className={styles.modalActions}>
+              <button 
+                type="button" 
+                className={styles.secondaryButton}
+                onClick={() => setShowDetailsModal(false)}
+              >
+                Close
+              </button>
+            </div>
           </motion.div>
         </motion.div>
       )}

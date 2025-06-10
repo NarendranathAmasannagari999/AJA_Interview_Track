@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   FiUsers, FiCalendar, FiCheckCircle, FiClock, FiFileText, 
   FiSend, FiEdit, FiPlus, FiFilter, FiSearch, FiBarChart2,
@@ -19,14 +19,14 @@ import {
   getCompletedInterviews 
 } from '../../API/delivery';
 import ScheduleInterviewModal from './ScheduleInterviewModal';
+import EvaluationModal from '../../components/EvaluationModal';
+import axiosInstance from '../../API/axiosConfig';
 
 const DeliveryTeamDashboard = () => {
   const [activeTab, setActiveTab] = useState('employees');
   const [employees, setEmployees] = useState([]);
   const [mockInterviews, setMockInterviews] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [feedback, setFeedback] = useState({ technical: '', communication: '' });
-  const [ratings, setRatings] = useState({ technical: 0, communication: 0 });
   const [searchTerm, setSearchTerm] = useState('');
   const [technologyFilter, setTechnologyFilter] = useState('all');
   const [resourceTypeFilter, setResourceTypeFilter] = useState('all');
@@ -50,16 +50,7 @@ const DeliveryTeamDashboard = () => {
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
   const [showInterviewScheduler, setShowInterviewScheduler] = useState(false);
   const [selectedEmployeeForScheduling, setSelectedEmployeeForScheduling] = useState(null);
-  const [interviewDetails, setInterviewDetails] = useState({
-    level: 1,
-    date: '',
-    time: '',
-    mode: 'virtual',
-    link: '',
-    location: '',
-    notes: ''
-  });
-  const [selectedInterview, setSelectedInterview] = useState(null);
+  const [selectedInterviewId, setSelectedInterviewId] = useState(null);
 
   const technologies = ['Java', 'Python', '.NET', 'DevOps', 'SalesForce', 'UI Development', 'Testing'];
   const resourceTypes = ['OM', 'TCT1', 'TCT2'];
@@ -288,20 +279,6 @@ const DeliveryTeamDashboard = () => {
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
-  const handleRatingChange = (type, value) => {
-    setRatings(prev => ({
-      ...prev,
-      [type]: value
-    }));
-  };
-
-  const handleFeedbackChange = (type, value) => {
-    setFeedback(prev => ({
-      ...prev,
-      [type]: value
-    }));
-  };
-
   const handleScheduleInterviewSubmit = async (interviewData) => {
     setIsLoading(true);
     setIsInterviewsLoading(true);
@@ -346,69 +323,57 @@ const DeliveryTeamDashboard = () => {
     }
   };
 
-  const handleUpdateFeedback = async () => {
-    if (!selectedInterview) return;
-
-    try {
-        // Validate input
-        if (!feedback.technical || !feedback.communication) {
-            setError('Please provide both technical and communication feedback');
-            return;
-        }
-
-        if (ratings.technical < 0 || ratings.technical > 10 || ratings.communication < 0 || ratings.communication > 10) {
-            setError('Scores must be between 0 and 10');
-            return;
-        }
-
-    setIsSubmitting(true);
+  const handleUpdateFeedback = async (data) => {
     setIsFeedbackLoading(true);
     setError(null);
 
-        // Combine feedback
-        const combinedFeedback = `Technical Feedback: ${feedback.technical} | Communication Feedback: ${feedback.communication}`;
+    try {
+      // Update the interview in the mockInterviews array
+      const updatedInterviews = mockInterviews.map(interview => {
+        if (interview.id === data.interviewId) {
+          return {
+            ...interview,
+            feedback: data.feedback,
+            ratings: data.ratings,
+            status: 'completed'
+          };
+        }
+        return interview;
+      });
 
-        // Update feedback using the API
-      const updatedInterview = await updateMockInterviewFeedback(
-            selectedInterview.id,
-        combinedFeedback,
-            ratings.technical,
-            ratings.communication
-      );
-      
-      if (updatedInterview) {
-        // Update the interviews list with the new feedback
-        setMockInterviews(prev => 
-          prev.map(interview => 
-                    interview.id === selectedInterview.id ? {
-                        ...interview,
-              ...updatedInterview,
-                        employeeName: employees.find(e => e.id === updatedInterview.employeeId)?.user?.fullName || 'Unknown Employee'
-            } : interview
-          )
-        );
-        
-        // Show success message
-            setError('Feedback updated successfully!');
-        
-            // Close the modal and reset state
-            setSelectedInterview(null);
-            setFeedback({ technical: '', communication: '' });
-            setRatings({ technical: 0, communication: 0 });
+      setMockInterviews(updatedInterviews);
+      setSelectedInterviewId(null);
+      setError(null);
+
+      // Refresh completed interviews data
+      const completedData = await getCompletedInterviews();
+      if (Array.isArray(completedData)) {
+        // Update mockInterviews with fresh data
+        const allInterviews = [
+          ...mockInterviews.filter(i => i.status === 'scheduled'),
+          ...completedData
+        ].map(interview => {
+          const employee = employees.find(e => e && e.id === interview.employeeId);
+          return {
+            ...interview,
+            employeeName: employee?.user?.fullName || 'Unknown Employee'
+          };
+        });
+        setMockInterviews(allInterviews);
       }
+
+      return data;
     } catch (error) {
       console.error('Error updating feedback:', error);
-        setError(error.message || 'Failed to update feedback. Please try again.');
+      setError(error.message || 'Failed to update feedback. Please try again.');
+      throw error;
     } finally {
-      setIsSubmitting(false);
       setIsFeedbackLoading(false);
     }
   };
 
   const handleCloseFeedbackModal = () => {
-    setSelectedInterview(null);
-    setFeedback({ technical: '', communication: '' });
-    setRatings({ technical: 0, communication: 0 });
+    setSelectedInterviewId(null);
     setError(null);
   };
 
@@ -769,18 +734,7 @@ const DeliveryTeamDashboard = () => {
                         <button 
                           className={styles.secondaryButton}
                           onClick={() => {
-                            setSelectedInterview(interview);
-                            setRatings({
-                              technical: interview.technicalRating || 0,
-                              communication: interview.communicationRating || 0
-                            });
-                            const feedbackParts = interview.technicalFeedback?.split(' | ');
-                            const techFeedback = feedbackParts && feedbackParts[0]?.replace('Technical Feedback: ', '');
-                            const commFeedback = feedbackParts && feedbackParts[1]?.replace('Communication Feedback: ', '');
-                            setFeedback({
-                              technical: techFeedback || '',
-                              communication: commFeedback || ''
-                            });
+                            setSelectedInterviewId(interview.id);
                           }}
                         >
                           <FiEdit /> Edit Feedback
@@ -990,43 +944,32 @@ const DeliveryTeamDashboard = () => {
     }
   };
 
-  const getScoreColor = (score) => {
-    if (score >= 9) return '#10b981';
-    if (score >= 7) return '#3b82f6';
-    if (score >= 5) return '#f59e0b';
-    return '#ef4444';
-  };
+  const getScoreColor = useCallback((score) => {
+    if (score >= 8) return '#28a745'; // Green
+    if (score >= 5) return '#ffc107'; // Yellow
+    return '#dc3545'; // Red
+  }, []);
 
-  const renderModalActions = () => (
+  const renderModalActions = useCallback(() => (
     <div className={styles.modalActions}>
       <button 
-        className={styles.primaryButton}
-        disabled={isSubmitting || isFeedbackLoading || !feedback.technical || !feedback.communication}
-        onClick={handleUpdateFeedback}
+        type="button" 
+        className={styles.secondaryButton}
+        onClick={handleCloseFeedbackModal}
+        disabled={isSubmitting || isFeedbackLoading}
       >
-        {isSubmitting || isFeedbackLoading ? (
-          <>
-            <div className={styles.spinner} style={{ width: '20px', height: '20px', margin: '0' }} />
-            Saving...
-          </>
-        ) : (
-          'Save Evaluation'
-        )}
+        Cancel
       </button>
       <button 
-        className={styles.secondaryButton}
+        type="submit" 
+        className={styles.primaryButton}
+        onClick={handleUpdateFeedback}
         disabled={isSubmitting || isFeedbackLoading}
-        onClick={() => {
-          setSelectedInterview(null);
-          setFeedback({ technical: '', communication: '' });
-          setRatings({ technical: 0, communication: 0 });
-          setError(null);
-        }}
       >
-        Close
+        {isSubmitting ? 'Updating...' : 'Update Feedback'}
       </button>
     </div>
-  );
+  ), [isSubmitting, isFeedbackLoading, handleCloseFeedbackModal, handleUpdateFeedback]);
 
   // Add error boundary component
   const ErrorBoundary = ({ children }) => {
@@ -1058,6 +1001,9 @@ const DeliveryTeamDashboard = () => {
       <p>{isInitialLoading ? 'Loading dashboard...' : 'Updating data...'}</p>
     </div>
   );
+
+  // Derive the full selected interview object from the ID
+  const currentSelectedInterview = mockInterviews.find(interview => interview.id === selectedInterviewId) || null;
 
   // Wrap the main content with error boundary
   return (
@@ -1135,138 +1081,13 @@ const DeliveryTeamDashboard = () => {
       </motion.div>
       
       <AnimatePresence>
-        {selectedInterview && (
-          <motion.div 
-            className={styles.modalOverlay}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSelectedInterview(null)}
-          >
-            <motion.div 
-              className={styles.modalContent}
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className={styles.modalHeader}>
-                <h3>{selectedInterview.employee?.user?.fullName || 'Unknown Employee'}'s Evaluation</h3>
-                <button 
-                  className={styles.closeButton}
-                  onClick={() => setSelectedInterview(null)}
-                >
-                  &times;
-                </button>
-              </div>
-              
-              <div className={styles.profileDetails}>
-                <div className={styles.profileSummary}>
-                  <div className={styles.profileBadge}>
-                    <div className={styles.userAvatarLarge}>
-                      <FiUser />
-                    </div>
-                    <div>
-                      <h4>{selectedInterview.employee?.user?.fullName || 'Unknown Employee'}</h4>
-                      <div className={styles.profileMeta}>
-                        <span className={`${styles.techBadge} ${styles[selectedInterview.employee?.technology?.replace(' ', '')]}`}>
-                          {selectedInterview.employee?.technology || 'Unknown'}
-                        </span>
-                        <span className={`${styles.resourceBadge} ${styles[selectedInterview.employee?.resourceType]}`}>
-                          {selectedInterview.employee?.resourceType || 'Unknown'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className={styles.profileStats}>
-                    <div className={styles.statItem}>
-                      <span>Mock Interviews</span>
-                      <strong>
-                        {mockInterviews.filter(i => i.employeeId === selectedInterview.employee?.id).length}
-                      </strong>
-                    </div>
-                    <div className={styles.statItem}>
-                      <span>Avg Technical</span>
-                      <strong>
-                        {mockInterviews.filter(i => i.employeeId === selectedInterview.employee?.id && i.ratings)
-                          .reduce((sum, i) => sum + i.ratings.technical, 0) / 
-                          mockInterviews.filter(i => i.employeeId === selectedInterview.employee?.id && i.ratings).length || 'N/A'}
-                      </strong>
-                    </div>
-                    <div className={styles.statItem}>
-                      <span>Avg Communication</span>
-                      <strong>
-                        {mockInterviews.filter(i => i.employeeId === selectedInterview.employee?.id && i.ratings)
-                          .reduce((sum, i) => sum + i.ratings.communication, 0) / 
-                          mockInterviews.filter(i => i.employeeId === selectedInterview.employee?.id && i.ratings).length || 'N/A'}
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className={styles.feedbackSection}>
-                  <h4>Interview Feedback</h4>
-                  
-                  <div className={styles.ratingSection}>
-                    <div className={styles.ratingGroup}>
-                      <label>Technical Rating:</label>
-                      <div className={styles.starRating}>
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(star => (
-                          <span
-                            key={`tech-${star}`}
-                            className={`${styles.star} ${star <= ratings.technical ? styles.filled : ''}`}
-                            onClick={() => handleRatingChange('technical', star)}
-                            style={{ color: getScoreColor(star) }}
-                          >
-                            ★
-                          </span>
-                        ))}
-                        <span className={styles.ratingValue}>{ratings.technical}/10</span>
-                      </div>
-                    </div>
-                    
-                    <div className={styles.ratingGroup}>
-                      <label>Communication Rating:</label>
-                      <div className={styles.starRating}>
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(star => (
-                          <span
-                            key={`comm-${star}`}
-                            className={`${styles.star} ${star <= ratings.communication ? styles.filled : ''}`}
-                            onClick={() => handleRatingChange('communication', star)}
-                            style={{ color: getScoreColor(star) }}
-                          >
-                            ★
-                          </span>
-                        ))}
-                        <span className={styles.ratingValue}>{ratings.communication}/10</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className={styles.feedbackGroup}>
-                    <label>Technical Feedback:</label>
-                    <textarea
-                      placeholder="Enter technical feedback..."
-                      value={feedback.technical}
-                      onChange={(e) => handleFeedbackChange('technical', e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className={styles.feedbackGroup}>
-                    <label>Communication Feedback:</label>
-                    <textarea
-                      placeholder="Enter communication feedback..."
-                      value={feedback.communication}
-                      onChange={(e) => handleFeedbackChange('communication', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              {renderModalActions()}
-            </motion.div>
-          </motion.div>
+        {selectedInterviewId && (
+          <EvaluationModal
+            selectedInterview={currentSelectedInterview}
+            setSelectedInterview={setSelectedInterviewId}
+            mockInterviews={mockInterviews}
+            onUpdate={handleUpdateFeedback}
+          />
         )}
       </AnimatePresence>
       

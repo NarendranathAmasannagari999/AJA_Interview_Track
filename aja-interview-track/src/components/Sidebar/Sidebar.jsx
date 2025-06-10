@@ -4,11 +4,11 @@ import { motion } from "framer-motion";
 import {
   FaHome, FaChartLine, FaTruck, FaShoppingCart, FaInfoCircle,
   FaChevronLeft, FaChevronRight, FaSignInAlt, FaUserPlus, FaCog,
-  FaSignOutAlt, FaMoon, FaSun
+  FaSignOutAlt, FaMoon, FaSun, FaBook
 } from "react-icons/fa";
 import {
   FiHome, FiBarChart2, FiTruck, FiShoppingCart, FiInfo,
-  FiLogIn, FiUserPlus, FiSettings, FiLogOut
+  FiLogIn, FiUserPlus, FiSettings, FiLogOut, FiBook
 } from "react-icons/fi";
 import styles from './Sidebar.module.css';
 
@@ -27,10 +27,14 @@ const Sidebar = ({ darkMode, toggleDarkMode, onToggle }) => {
     //   { path: "/dashboard/employee", icon: <FiBarChart2 size={20} />, activeIcon: <FaChartLine size={20} />, label: "Employee" },
     // ] : []),
     ...(userRole === 'ROLE_DELIVERY_TEAM' ? [
-      { path: "/dashboard/delivery-team", icon: <FiTruck size={20} />, activeIcon: <FaTruck size={20} />, label: "Delivery" },
+      { path: "/dashboard/delivery-team", icon: <FiHome size={20} />, activeIcon: <FaHome size={20} />, label: "Dashboard" },
     ] : []),
     ...(userRole === 'ROLE_SALES_TEAM' ? [
       { path: "/dashboard/sales-team", icon: <FiShoppingCart size={20} />, activeIcon: <FaShoppingCart size={20} />, label: "Sales" },
+    ] : []),
+    ...(userRole === 'ROLE_EMPLOYEE' ? [
+      { path: "/dashboard/employee", icon: <FiHome size={20} />, activeIcon: <FaHome size={20} />, label: "Dashboard" },
+      { path: "/dashboard/employee/questions", icon: <FiBook size={20} />, activeIcon: <FaBook size={20} />, label: "Interview Questions" },
     ] : []),
     // { path: "/about", icon: <FiInfo size={20} />, activeIcon: <FaInfoCircle size={20} />, label: "About" },
     { path: "/dashboard/admin", icon: <FiBarChart2 size={20} />, activeIcon: <FaChartLine size={20} />, label: "Admin" }

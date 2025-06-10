@@ -13,6 +13,7 @@ import EmployeeDashboard from "./pages/Dashboard/EmployeeDashboard";
 import DeliveryTeamDashboard from "./pages/Dashboard/DeliveryTeamDashboard";
 import SalesTeamDashboard from "./pages/Dashboard/SalesTeamDashboard";
 import AdminDashboard from "./pages/Dashboard/AdminDashboard";
+import InterviewQuestions from './pages/InterviewQuestions/InterviewQuestions';
 import "./assets/styles/global.css";
 
 function AppContent() {
@@ -62,6 +63,7 @@ function AppContent() {
               <Route path="/register" element={<Register />} />
               <Route path="/about" element={<About />} />
               <Route path="/dashboard/employee" element={<EmployeeDashboard />} />
+              <Route path="/dashboard/employee/questions" element={<InterviewQuestions />} />
               <Route path="/dashboard/delivery-team" element={<DeliveryTeamDashboard />} />
               <Route path="/dashboard/sales-team" element={<SalesTeamDashboard />} />
               <Route path="/dashboard/admin" element={<AdminDashboard />} />
