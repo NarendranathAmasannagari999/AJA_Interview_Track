@@ -1,6 +1,7 @@
 import axiosInstance from './axiosConfig';
 
 const API_BASE_URL = '/api/delivery';
+const API_BASE_URL_EMP = '/api/employee';
 
 // Get employees with optional technology and resource type filters
 export const getEmployees = async (technology = 'all', resourceType = 'all') => {
@@ -48,7 +49,7 @@ export const scheduleInterview = async ({
 };
 
 // Update mock interview feedback
-export const updateMockInterviewFeedback = async (interviewId, feedback, technicalScore, communicationScore) => {
+export const updateMockInterviewFeedback = async (interviewId, technicalFeedback,communicationFeedback, technicalScore, communicationScore,sentToSales) => {
     try {
         // Check if user is logged in
         const token = localStorage.getItem('jwt_token');
@@ -58,9 +59,11 @@ export const updateMockInterviewFeedback = async (interviewId, feedback, technic
 
         const response = await axiosInstance.put(`${API_BASE_URL}/mock-interviews/${interviewId}/feedback`, null, {
             params: {
-                feedback,
+                technicalFeedback,
+                communicationFeedback,
                 technicalScore,
-                communicationScore
+                communicationScore,
+                sentToSales
             }
         });
         return response.data;
@@ -106,3 +109,26 @@ export const getCompletedInterviews = async () => {
         throw error.response?.data || error.message;
     }
 };
+
+// Update employee's ready for deployment status
+export const updateReadyForDeployment = async (employeeId, readyForDeployment) => {
+    try {
+        const response = await axiosInstance.put(`${API_BASE_URL_EMP}/ready-for-deployment/${employeeId}`, null, {
+            params: { readyForDeployment }
+        });
+        return response.data;
+    } catch (error) {
+        if (error.response?.status === 401) {
+            throw new Error('Please log in to update deployment status');
+        } else if (error.response?.status === 403) {
+            throw new Error('You do not have permission to update deployment status');
+        } else if (error.response?.status === 404) {
+            throw new Error('Employee not found');
+        }
+        throw error.response?.data || error.message;
+    }
+};
+
+
+    
+    

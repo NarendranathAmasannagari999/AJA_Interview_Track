@@ -69,9 +69,11 @@ const EvaluationModal = ({
       // Send feedback data directly without feedback[] format
       await updateMockInterviewFeedback(
         selectedInterview.id,
-        feedback.overall,
+        feedback.technical,
+        feedback.communication,
         ratings.technical,
-        ratings.communication
+        ratings.communication,
+        false
       );
 
       // Call the onUpdate prop with the updated data

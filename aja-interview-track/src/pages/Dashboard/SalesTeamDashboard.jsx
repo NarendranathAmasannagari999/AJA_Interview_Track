@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FiUsers, FiCalendar, FiFileText, FiCheck, FiX, FiSend, 
   FiDollarSign, FiFilter, FiSearch, FiChevronDown, FiChevronUp,
   FiBarChart2, FiPieChart, FiUpload, FiDownload, FiMessageSquare,
   FiMail, FiUserPlus, FiBriefcase, FiAward, FiClock, FiLayers,
   FiBook, FiUserCheck, FiUserX, FiShare2, FiToggleLeft, FiToggleRight,
-  FiRefreshCw, FiUser
+  FiRefreshCw, FiUser, FiEdit
 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -23,7 +23,9 @@ import {
   addJobDescription,
   downloadJobDescription,
   deleteJobDescription,
-  getAllJobDescriptions
+  getAllJobDescriptions,
+  getReadyForDeploymentEmployees,
+  updateReadyForDeployment
 } from '../../API/sales';
 
 const ClientModal = ({
@@ -968,45 +970,27 @@ const SalesTeamDashboard = () => {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className={styles.contentSection}
+        exit={{ opacity: 0 }}
+        className={styles.tabContent}
       >
-        <div className={styles.filterSection}>
-          <div className={styles.searchBox}>
-            <FiSearch className={styles.searchIcon} />
-            <input 
-              type="text" 
-              placeholder="Search resumes..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={styles.searchInput}
-            />
-          </div>
-          <button 
-            className={`${styles.button} ${styles.primary}`}
-            onClick={() => {/* Open bulk upload modal */}}
-          >
-            <FiUpload /> Bulk Upload
-          </button>
-        </div>
-
-        {filteredResumes.length > 0 ? (
-          <div className={styles.tableContainer}>
-            <table className={styles.resumeTable}>
+        <div className={styles.tableContainer}>
+          {filteredResumes.length > 0 ? (
+            <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Candidate</th>
+                  <th>Name</th>
                   <th>Technology</th>
                   <th>Resource Type</th>
-                  <th>Received</th>
+                  <th>Received Date</th>
                   <th>Status</th>
+                  <th>Ready for Deployment</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredResumes.map(resume => (
+                {filteredResumes.map((resume) => (
                   <tr key={resume.id}>
-                    <td>{resume.candidateName}</td>
+                    <td>{resume.name}</td>
                     <td>
                       <span className={`${styles.techBadge} ${styles[resume.technology.toLowerCase()]}`}>
                         {resume.technology}
@@ -1024,6 +1008,18 @@ const SalesTeamDashboard = () => {
                       </span>
                     </td>
                     <td>
+                      <button
+                        className={`${styles.button} ${styles.small} ${
+                          resume.readyForDeployment ? styles.success : styles.secondary
+                        }`}
+                        onClick={() => handleDeploymentStatusChange(resume.id, !resume.readyForDeployment)}
+                        disabled={isDeploymentLoading}
+                      >
+                        {resume.readyForDeployment ? <FiCheck /> : <FiX />}
+                        {resume.readyForDeployment ? 'Ready' : 'Not Ready'}
+                      </button>
+                    </td>
+                    <td>
                       <button className={`${styles.button} ${styles.small}`}>
                         <FiDownload /> Download
                       </button>
@@ -1035,14 +1031,14 @@ const SalesTeamDashboard = () => {
                 ))}
               </tbody>
             </table>
-          </div>
-        ) : (
-          <div className={styles.emptyState}>
-            <FiUpload size={48} />
-            <h4>No resumes in pool</h4>
-            <p>Upload resumes received from candidates or adjust your search.</p>
-          </div>
-        )}
+          ) : (
+            <div className={styles.emptyState}>
+              <FiUpload size={48} />
+              <h4>No resumes in pool</h4>
+              <p>Upload resumes received from candidates or adjust your search.</p>
+            </div>
+          )}
+        </div>
       </motion.div>
     );
   };
@@ -1056,95 +1052,109 @@ const SalesTeamDashboard = () => {
   };
 
   const ShortlistedTab = () => {
-    const filteredShortlisted = shortlistedCandidates.filter(candidate => 
-      candidate.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      candidate.technology.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
     return (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className={styles.contentSection}
+        exit={{ opacity: 0 }}
+        className={styles.tabContent}
       >
-        <div className={styles.filterSection}>
-          <div className={styles.searchBox}>
-            <FiSearch className={styles.searchIcon} />
-            <input 
-              type="text" 
-              placeholder="Search shortlisted..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={styles.searchInput}
-            />
-          </div>
-          <button 
-            className={`${styles.button} ${styles.primary}`}
-            onClick={() => openInterviewScheduler(bulkSelectedCandidates)}
-            disabled={bulkSelectedCandidates.length === 0}
-          >
-            <FiCalendar /> Schedule Interview
-          </button>
+        <div className={styles.tableContainer}>
+          {readyForDeploymentEmployees.length > 0 ? (
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={readyForDeploymentEmployees.every(emp => 
+                        bulkSelectedCandidates.includes(emp.id)
+                      )}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setBulkSelectedCandidates(readyForDeploymentEmployees.map(emp => emp.id));
+                        } else {
+                          setBulkSelectedCandidates([]);
+                        }
+                      }}
+                    />
+                  </th>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Technology</th>
+                  <th>Resource Type</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {readyForDeploymentEmployees.map((employee) => (
+                  <tr key={employee.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={bulkSelectedCandidates.includes(employee.id)}
+                        onChange={(e) => handleSelectCandidateForBulkScheduling(employee.id, e.target.checked)}
+                      />
+                    </td>
+                    <td>{employee.empId}</td>
+                    <td>{employee.user.fullName}</td>
+                    <td>
+                      <span className={`${styles.techBadge} ${styles[employee.technology.toLowerCase().replace(' ', '')]}`}>
+                        {employee.technology}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`${styles.resourceBadge} ${styles[employee.resourceType.toLowerCase()]}`}>
+                        {employee.resourceType}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`${styles.statusBadge} ${styles[employee.status.toLowerCase()]}`}>
+                        {employee.status}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className={`${styles.button} ${styles.small} ${styles.primary}`}
+                        onClick={() => handleScheduleInterview(employee.id)}
+                      >
+                        <FiCalendar /> Schedule Interview
+                      </button>
+                      <button
+                        className={`${styles.button} ${styles.small} ${styles.secondary}`}
+                        onClick={() => handleUpdateFeedback(employee.id)}
+                      >
+                        <FiEdit /> Update Feedback
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className={styles.emptyState}>
+              <FiUsers size={48} />
+              <h4>No ready for deployment employees found</h4>
+              <p>No employees are currently ready for deployment.</p>
+            </div>
+          )}
         </div>
 
-        {filteredShortlisted.length > 0 ? (
-          <div className={styles.cardGrid}>
-            {filteredShortlisted.map(candidate => (
-              <motion.div
-                key={candidate.id}
-                layout
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
-                className={styles.profileCard}
-              >
-                <div className={styles.profileSelection}>
-                  <input 
-                    type="checkbox"
-                    checked={bulkSelectedCandidates.includes(candidate.id)}
-                    onChange={(e) => handleSelectCandidateForBulkScheduling(candidate.id, e.target.checked)}
-                  />
-                </div>
-                <div className={styles.profileHeader}>
-                  <h3 className={styles.profileName}>{candidate.candidateName}</h3>
-                  <span className={`${styles.statusBadge} ${styles.shortlisted}`}>
-                    Shortlisted
-                  </span>
-                </div>
-
-                <div className={styles.profileDetails}>
-                  <p>
-                    <strong>Technology:</strong> 
-                    <span className={`${styles.techBadge} ${styles[candidate.technology.toLowerCase()]}`}>
-                      {candidate.technology}
-                    </span>
-                    <span className={`${styles.resourceBadge} ${styles[candidate.resourceType.toLowerCase()]}`}>
-                      {candidate.resourceType}
-                    </span>
-                  </p>
-                  <p><strong>For JD:</strong> {candidate.jdTitle}</p>
-                </div>
-
-                <div className={styles.profileActions}>
-                  <button className={`${styles.button} ${styles.secondary}`}>
-                    <FiFileText /> View Resume
-                  </button>
-                  <button 
-                    className={`${styles.button} ${styles.primary}`}
-                    onClick={() => openInterviewScheduler([candidate.candidateId])}
-                  >
-                    <FiCalendar /> Schedule Interview
-                  </button>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        ) : (
-          <div className={styles.emptyState}>
-            <FiUserCheck size={48} />
-            <h4>No shortlisted candidates</h4>
-            <p>Shortlist candidates from the resume pool to proceed with client submission.</p>
+        {bulkSelectedCandidates.length > 0 && (
+          <div className={styles.bulkActions}>
+            <button
+              className={`${styles.button} ${styles.primary}`}
+              onClick={() => openInterviewScheduler(bulkSelectedCandidates)}
+            >
+              <FiCalendar /> Schedule Bulk Interview
+            </button>
+            <button
+              className={`${styles.button} ${styles.secondary}`}
+              onClick={() => setBulkSelectedCandidates([])}
+            >
+              <FiX /> Clear Selection
+            </button>
           </div>
         )}
       </motion.div>
@@ -2111,6 +2121,63 @@ const SalesTeamDashboard = () => {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const [readyForDeploymentEmployees, setReadyForDeploymentEmployees] = useState([]);
+  const [isDeploymentLoading, setIsDeploymentLoading] = useState(false);
+
+  // Get unique technologies and resource types from the data
+  const technologies = useMemo(() => {
+    const techSet = new Set(readyForDeploymentEmployees.map(emp => emp.technology));
+    return ['all', ...Array.from(techSet)];
+  }, [readyForDeploymentEmployees]);
+
+  const resourceTypes = useMemo(() => {
+    const typeSet = new Set(readyForDeploymentEmployees.map(emp => emp.resourceType));
+    return ['all', ...Array.from(typeSet)];
+  }, [readyForDeploymentEmployees]);
+
+  // Filter employees based on search and filters
+  // const filteredEmployees = useMemo(() => {
+  //   return readyForDeploymentEmployees.filter(employee => {
+  //     const matchesSearch = employee.user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //                         employee.empId.toLowerCase().includes(searchTerm.toLowerCase());
+  //     const matchesTechnology = technologyFilter === 'all' || employee.technology === technologyFilter;
+  //     const matchesResourceType = resourceTypeFilter === 'all' || employee.resourceType === resourceTypeFilter;
+      
+  //     return matchesSearch && matchesTechnology && matchesResourceType;
+  //   });
+  // }, [readyForDeploymentEmployees, searchTerm, technologyFilter, resourceTypeFilter]);
+
+  // Add this to your fetchData function
+  const fetchReadyForDeploymentEmployees = async () => {
+    try {
+      setIsDeploymentLoading(true);
+      const employees = await getReadyForDeploymentEmployees();
+      setReadyForDeploymentEmployees(employees);
+    } catch (error) {
+      console.error('Error fetching ready for deployment employees:', error);
+      toast.error(error.message || 'Failed to fetch ready for deployment employees');
+    } finally {
+      setIsDeploymentLoading(false);
+    }
+  };
+
+  // Add this to your useEffect or where you fetch initial data
+  useEffect(() => {
+    fetchReadyForDeploymentEmployees();
+  }, [filterTech, filterResourceType]);
+
+  // Add this function to handle deployment status updates
+  const handleDeploymentStatusChange = async (employeeId, readyForDeployment) => {
+    try {
+      await updateReadyForDeployment(employeeId, readyForDeployment);
+      toast.success(`Employee ${readyForDeployment ? 'marked as' : 'unmarked from'} ready for deployment`);
+      fetchReadyForDeploymentEmployees(); // Refresh the list
+    } catch (error) {
+      console.error('Error updating deployment status:', error);
+      toast.error(error.message || 'Failed to update deployment status');
     }
   };
 

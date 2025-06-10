@@ -16,7 +16,8 @@ import {
   scheduleInterview,
   updateMockInterviewFeedback,
   getUpcomingInterviews,
-  getCompletedInterviews 
+  getCompletedInterviews,
+  updateReadyForDeployment
 } from '../../API/delivery';
 import ScheduleInterviewModal from './ScheduleInterviewModal';
 import EvaluationModal from '../../components/EvaluationModal';
@@ -377,12 +378,16 @@ const DeliveryTeamDashboard = () => {
     setError(null);
   };
 
-  const sendToSales = async (employeeId) => {
+  const sendToSales = async (interview) => {
     setIsSubmitting(true);
     setError(null);
     try {
-      await sendToSales(employeeId);
-      setProfilesSentToSales(prev => [...prev, employeeId]);
+
+
+      // Call the new API to update ready for deployment status
+      await updateReadyForDeployment(interview.employee.id, true);
+
+
     } catch (error) {
       console.error('Error sending to sales:', error);
       setError('Failed to send profile to sales. Please try again.');
@@ -740,22 +745,13 @@ const DeliveryTeamDashboard = () => {
                           <FiEdit /> Edit Feedback
                         </button>
                         
-                        {interview.deployed ? (
-                          <span className={styles.deployedBadge}>
-                            <FiCheckCircle /> Deployed to Client
-                          </span>
-                        ) : interview.sentToSales ? (
-                          <span className={styles.sentBadge}>
-                            <FiSend /> Sent to Sales
-                          </span>
-                        ) : (
+
                           <button
                             className={styles.successButton}
-                            onClick={() => sendToSales(interview.employee.id)}
+                            onClick={() => sendToSales(interview)}
                           >
                             <FiSend /> Send to Sales
                           </button>
-                        )}
                       </div>
                     </motion.div>
                   );

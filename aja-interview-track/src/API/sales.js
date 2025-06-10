@@ -3,6 +3,7 @@ import axiosInstance from './axiosConfig';
 
 // Base URL for sales-related endpoints
 const BASE_URL = '/api/sales';
+const API_BASE_URL_EMP = '/api/employee';
 
 /**
  * Get candidates with optional filters
@@ -287,6 +288,50 @@ export const deleteJobDescription = async (jdId) => {
     }
     if (error.response?.status === 400) {
       throw new Error(error.response.data || 'Job description not found or invalid ID');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Get employees ready for deployment
+ * @param {string} technology - Optional technology filter
+ * @param {string} resourceType - Optional resource type filter
+ * @returns {Promise<Array>} List of employees ready for deployment
+ */
+export const getReadyForDeploymentEmployees = async () => {
+  try {
+    const response = await axiosInstance.get(`${API_BASE_URL_EMP}/ready-for-deployment`);
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Update employee's ready for deployment status
+ * @param {number} employeeId - Employee ID
+ * @param {boolean} readyForDeployment - New deployment status
+ * @returns {Promise<Object>} Updated employee object
+ */
+export const updateReadyForDeployment = async (employeeId, readyForDeployment) => {
+  try {
+    const response = await axiosInstance.put(`${API_BASE_URL_EMP}/ready-for-deployment/${employeeId}`, null, {
+      params: { readyForDeployment }
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('You do not have permission to update deployment status');
+    }
+    if (error.response?.status === 404) {
+      throw new Error('Employee not found');
     }
     throw error.response?.data || error.message;
   }

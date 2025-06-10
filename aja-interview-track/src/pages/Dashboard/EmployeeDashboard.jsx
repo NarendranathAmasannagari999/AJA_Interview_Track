@@ -781,9 +781,9 @@ const EmployeeDashboard = () => {
                               {interview.status}
                             </span>
                           </div>
-                          <div className={styles.interviewActions}>
+                            <div className={styles.interviewActions}>
                             <button 
-                              className={styles.primaryButton}
+                                className={styles.primaryButton}
                               onClick={() => {
                                 console.log('Technology from employeeData:', employeeData.technology);
                                 console.log('User name from employeeData:', employeeData.name);
