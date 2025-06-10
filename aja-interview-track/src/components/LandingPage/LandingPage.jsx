@@ -96,19 +96,19 @@ const LandingPage = () => {
   const testimonials = [
     {
       quote: "The AJA preparation track helped me transition from mock interviews to FTE placement in just 3 months!",
-      author: "Shravani reddy",
+      author: "Pradeep Kumar Reddy Perumalla",
       role: "Java Developer at TechCorp",
       avatar: "/images/avatar1.jpg"
     },
     {
       quote: "I went through 5 client interviews before landing my dream job. The AJA team supported me through every step.",
-      author: "Rahul kumar",
+      author: "Bala Shankar Kornepati",
       role: "Python Developer at DataSystems",
       avatar: "/images/avatar2.jpg"
     },
     {
       quote: "The technical training and mock interviews were exactly what I needed to boost my confidence.",
-      author: "Arjun ram",
+      author: "Annavaram Dasari",
       role: ".NET Developer at FinTech Solutions",
       avatar: "/images/avatar3.jpg"
     }
