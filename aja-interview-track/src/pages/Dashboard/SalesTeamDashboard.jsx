@@ -867,8 +867,8 @@ const SalesTeamDashboard = () => {
   // Tab components
   const JDTab = () => {
     const filteredJDs = jobDescriptions.filter(jd => 
-      jd.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      jd.clientName.toLowerCase().includes(searchTerm.toLowerCase())
+      (jd.title?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (jd.clientName?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -1059,6 +1059,33 @@ const SalesTeamDashboard = () => {
         exit={{ opacity: 0 }}
         className={styles.tabContent}
       >
+        <div className={styles.filterSection}>
+          <div className={styles.searchBox}>
+            <FiSearch className={styles.searchIcon} />
+            <input 
+              type="text" 
+              placeholder="Search candidates..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
+          <div className={styles.filterGroup}>
+            <label>Technology</label>
+            <select 
+              value={filterTech} 
+              onChange={(e) => setFilterTech(e.target.value)}
+              className={styles.filterSelect}
+            >
+              <option value="all">All Technologies</option>
+              <option value="java">Java</option>
+              <option value="python">Python</option>
+              <option value="react">React</option>
+              <option value="angular">Angular</option>
+              <option value="node">Node.js</option>
+            </select>
+          </div>
+        </div>
         <div className={styles.tableContainer}>
           {readyForDeploymentEmployees.length > 0 ? (
             <table className={styles.table}>

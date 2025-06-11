@@ -53,6 +53,11 @@ const DeliveryTeamDashboard = () => {
   const [showInterviewScheduler, setShowInterviewScheduler] = useState(false);
   const [selectedEmployeeForScheduling, setSelectedEmployeeForScheduling] = useState(null);
   const [selectedInterviewId, setSelectedInterviewId] = useState(null);
+  const [expandedSections, setExpandedSections] = useState({
+    readyForSales: true,
+    otherInterviews: true
+  });
+  const [completedTab, setCompletedTab] = useState('readyForSales');
 
   const technologies = ['Java', 'Python', '.NET', 'DevOps', 'SalesForce', 'UI Development', 'Testing'];
   const resourceTypes = ['OM', 'TCT1', 'TCT2'];
@@ -308,17 +313,14 @@ const DeliveryTeamDashboard = () => {
         setSelectedEmployeeForScheduling(null);
         
         // Show success message
-        setError({ type: 'success', message: 'Interview scheduled successfully!' });
+        setError('Interview scheduled successfully!');
         
         // Refresh the data to ensure consistency
         await fetchData();
       }
     } catch (error) {
       console.error('Error scheduling interview:', error);
-      setError({ 
-        type: 'error', 
-        message: error.message || 'Failed to schedule interview. Please try again.' 
-      });
+      setError(error.message || 'Failed to schedule interview. Please try again.');
     } finally {
       setIsLoading(false);
       setIsInterviewsLoading(false);
@@ -354,7 +356,7 @@ const DeliveryTeamDashboard = () => {
 
       setMockInterviews(updatedInterviews);
       setSelectedInterviewId(null);
-      setError({ type: 'success', message: 'Feedback updated successfully!' });
+      setError('Feedback updated successfully!');
 
       // Refresh completed interviews data
       const completedData = await getCompletedInterviews();
@@ -376,10 +378,7 @@ const DeliveryTeamDashboard = () => {
       return updatedInterview;
     } catch (error) {
       console.error('Error updating feedback:', error);
-      setError({ 
-        type: 'error', 
-        message: error.message || 'Failed to update feedback. Please try again.' 
-      });
+      setError(error.message || 'Failed to update feedback. Please try again.');
       throw error;
     } finally {
       setIsFeedbackLoading(false);
@@ -395,15 +394,12 @@ const DeliveryTeamDashboard = () => {
     setIsSubmitting(true);
     setError(null);
     try {
-
-
       // Call the new API to update ready for deployment status
       await updateReadyForDeployment(interview.employee.id, true);
-
-
+      setError('Profile sent to sales successfully!');
     } catch (error) {
       console.error('Error sending to sales:', error);
-      setError('Failed to send profile to sales. Please try again.');
+      setError(error.message || 'Failed to send profile to sales. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -415,19 +411,23 @@ const DeliveryTeamDashboard = () => {
       await updateInterviewStatus(interviewId);
       
       // Show success message
-      setError({ type: 'success', message: 'Interview status updated successfully!' });
+      setError('Interview status updated successfully!');
       
       // Refresh the data to show updated status
       await fetchData();
     } catch (error) {
       console.error('Error updating interview status:', error);
-      setError({ 
-        type: 'error', 
-        message: error.message || 'Failed to update interview status. Please try again.' 
-      });
+      setError(error.message || 'Failed to update interview status. Please try again.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
   };
 
   const renderTabContent = () => {
@@ -698,119 +698,261 @@ const DeliveryTeamDashboard = () => {
           <div className={styles.sectionContainer}>
             <div className={styles.interviewTabs}>
               <button 
-                className={`${styles.interviewTabButton} ${styles.active}`}
+                className={`${styles.interviewTabButton} ${completedTab === 'readyForSales' ? styles.active : ''}`}
+                onClick={() => setCompletedTab('readyForSales')}
               >
-                Completed Interviews
+                Ready for Sales
+              </button>
+              <button 
+                className={`${styles.interviewTabButton} ${completedTab === 'otherInterviews' ? styles.active : ''}`}
+                onClick={() => setCompletedTab('otherInterviews')}
+              >
+                Other Completed Interviews
               </button>
             </div>
             
             <div className={styles.interviewList}>
-              <div className={styles.interviewListHeader}>
-                <h4>Completed Mock Interviews</h4>
-              </div>
-              
-              {completedInterviews.length === 0 ? (
-                <div className={styles.emptyState}>
-                  <FiCheckCircle size={48} />
-                  <p>No interviews completed yet</p>
-                </div>
-              ) : (
-                completedInterviews.map(interview => {
-                  return (
-                    <motion.div
-                      key={interview.id}
-                      className={styles.interviewCard}
-                      whileHover={{ scale: 1.01 }}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div className={styles.interviewHeader}>
-                        <div>
-                          <h4>{interview.employee?.user?.fullName || 'Unknown Employee'}</h4>
-                          <div className={styles.interviewMeta}>
-                            <span className={`${styles.techBadge} ${styles[interview.employee?.technology?.replace(' ', '')]}`}>
-                              {interview.employee?.technology || 'Unknown'}
-                            </span>
-                            <span className={`${styles.resourceBadge} ${styles[interview.employee?.resourceType]}`}>
-                              {interview.employee?.resourceType || 'Unknown'}
-                            </span>
-                            <span className={styles.status}>
-                              {interview.status}
-                            </span>
-                          </div>
-                        </div>
-                        <div className={styles.interviewDate}>
-                          <FiCalendar /> {interview.date} at {interview.time}
-                        </div>
-                      </div>
-                      
-                      <div className={styles.interviewDetails}>
-                        <p><strong>Employee ID:</strong> {interview.employee?.empId || 'N/A'}</p>
-                        <p><strong>Interviewer:</strong> {interview.interviewer?.fullName || 'N/A'}</p>
-                      </div>
-                      
-                      <div className={styles.interviewScores}>
-                        <div className={styles.scoreMeter}>
-                          <div className={styles.scoreLabel}>
-                            Technical: {interview.technicalRating || 'N/A'}/10
-                          </div>
-                          <div className={styles.scoreBar}>
-                            <div 
-                              className={styles.scoreFill} 
-                              style={{
-                                width: `${(interview.technicalRating || 0) * 10}%`,
-                                backgroundColor: getScoreColor(interview.technicalRating || 0)
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div className={styles.scoreMeter}>
-                          <div className={styles.scoreLabel}>
-                            Communication: {interview.communicationRating || 'N/A'}/10
-                          </div>
-                          <div className={styles.scoreBar}>
-                            <div 
-                              className={styles.scoreFill} 
-                              style={{
-                                width: `${(interview.communicationRating || 0) * 10}%`,
-                                backgroundColor: getScoreColor(interview.communicationRating || 0)
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className={styles.feedback}>
-                        <h5>Technical Feedback</h5>
-                        <p>{interview.technicalFeedback || 'N/A'}</p>
-                        
-                        <h5>Communication Feedback</h5>
-                        <p>{interview.communicationFeedback || 'N/A'}</p>
-                      </div>
-                      
-                      <div className={styles.interviewActions}>
-                        <button 
-                          className={styles.secondaryButton}
-                          onClick={() => {
-                            setSelectedInterviewId(interview.id);
-                          }}
+              {completedTab === 'readyForSales' ? (
+                <>
+                  <div className={styles.interviewListHeader}>
+                    <h4>Ready for Sales</h4>
+                    <p className={styles.sectionDescription}>Interviews with good ratings that can be sent to sales</p>
+                  </div>
+                  
+                  {completedInterviews.filter(interview => 
+                    !interview.sentToSales && 
+                    interview.status === 'completed' && 
+                    interview.technicalRating && 
+                    interview.communicationRating && 
+                    ((interview.technicalRating + interview.communicationRating) / 2 >= 7)
+                  ).length === 0 ? (
+                    <div className={styles.emptyState}>
+                      <FiCheckCircle size={48} />
+                      <p>No interviews ready for sales</p>
+                    </div>
+                  ) : (
+                    completedInterviews
+                      .filter(interview => 
+                        !interview.sentToSales && 
+                        interview.status === 'completed' && 
+                        interview.technicalRating && 
+                        interview.communicationRating && 
+                        ((interview.technicalRating + interview.communicationRating) / 2 >= 7)
+                      )
+                      .map(interview => (
+                        <motion.div
+                          key={interview.id}
+                          className={styles.interviewCard}
+                          whileHover={{ scale: 1.01 }}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3 }}
                         >
-                          <FiEdit /> Edit Feedback
-                        </button>
-                        
-                        {!interview.sentToSales && (
-                          <button
-                            className={styles.successButton}
-                            onClick={() => sendToSales(interview)}
-                          >
-                            <FiSend /> Send to Sales
-                          </button>
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })
+                          <div className={styles.interviewHeader}>
+                            <div>
+                              <h4>{interview.employee?.user?.fullName || 'Unknown Employee'}</h4>
+                              <div className={styles.interviewMeta}>
+                                <span className={`${styles.techBadge} ${styles[interview.employee?.technology?.replace(' ', '')]}`}>
+                                  {interview.employee?.technology || 'Unknown'}
+                                </span>
+                                <span className={`${styles.resourceBadge} ${styles[interview.employee?.resourceType]}`}>
+                                  {interview.employee?.resourceType || 'Unknown'}
+                                </span>
+                                <span className={styles.status}>
+                                  {interview.status}
+                                </span>
+                              </div>
+                            </div>
+                            <div className={styles.interviewDate}>
+                              <FiCalendar /> {interview.date} at {interview.time}
+                            </div>
+                          </div>
+                          
+                          <div className={styles.interviewDetails}>
+                            <p><strong>Employee ID:</strong> {interview.employee?.empId || 'N/A'}</p>
+                            <p><strong>Interviewer:</strong> {interview.interviewer?.fullName || 'N/A'}</p>
+                          </div>
+                          
+                          <div className={styles.interviewScores}>
+                            <div className={styles.scoreMeter}>
+                              <div className={styles.scoreLabel}>
+                                Technical: {interview.technicalRating || 'N/A'}/10
+                              </div>
+                              <div className={styles.scoreBar}>
+                                <div 
+                                  className={styles.scoreFill} 
+                                  style={{
+                                    width: `${(interview.technicalRating || 0) * 10}%`,
+                                    backgroundColor: getScoreColor(interview.technicalRating || 0)
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className={styles.scoreMeter}>
+                              <div className={styles.scoreLabel}>
+                                Communication: {interview.communicationRating || 'N/A'}/10
+                              </div>
+                              <div className={styles.scoreBar}>
+                                <div 
+                                  className={styles.scoreFill} 
+                                  style={{
+                                    width: `${(interview.communicationRating || 0) * 10}%`,
+                                    backgroundColor: getScoreColor(interview.communicationRating || 0)
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className={styles.feedback}>
+                            <h5>Technical Feedback</h5>
+                            <p>{interview.technicalFeedback || 'N/A'}</p>
+                            
+                            <h5>Communication Feedback</h5>
+                            <p>{interview.communicationFeedback || 'N/A'}</p>
+                          </div>
+                          
+                          <div className={styles.interviewActions}>
+                            <button 
+                              className={styles.secondaryButton}
+                              onClick={() => {
+                                setSelectedInterviewId(interview.id);
+                              }}
+                            >
+                              <FiEdit /> Edit Feedback
+                            </button>
+                            
+                            <button
+                              className={styles.successButton}
+                              onClick={() => sendToSales(interview)}
+                              disabled={isSubmitting}
+                            >
+                              <FiSend /> Send to Sales
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className={styles.interviewListHeader}>
+                    <h4>Other Completed Interviews</h4>
+                    <p className={styles.sectionDescription}>Interviews that need improvement or have already been sent to sales</p>
+                  </div>
+                  
+                  {completedInterviews.filter(interview => 
+                    interview.sentToSales || 
+                    !interview.status === 'completed' || 
+                    !interview.technicalRating || 
+                    !interview.communicationRating || 
+                    ((interview.technicalRating + interview.communicationRating) / 2 < 7)
+                  ).length === 0 ? (
+                    <div className={styles.emptyState}>
+                      <FiCheckCircle size={48} />
+                      <p>No other completed interviews</p>
+                    </div>
+                  ) : (
+                    completedInterviews
+                      .filter(interview => 
+                        interview.sentToSales || 
+                        !interview.status === 'completed' || 
+                        !interview.technicalRating || 
+                        !interview.communicationRating || 
+                        ((interview.technicalRating + interview.communicationRating) / 2 < 7)
+                      )
+                      .map(interview => (
+                        <motion.div
+                          key={interview.id}
+                          className={styles.interviewCard}
+                          whileHover={{ scale: 1.01 }}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3 }}
+                        >
+                          <div className={styles.interviewHeader}>
+                            <div>
+                              <h4>{interview.employee?.user?.fullName || 'Unknown Employee'}</h4>
+                              <div className={styles.interviewMeta}>
+                                <span className={`${styles.techBadge} ${styles[interview.employee?.technology?.replace(' ', '')]}`}>
+                                  {interview.employee?.technology || 'Unknown'}
+                                </span>
+                                <span className={`${styles.resourceBadge} ${styles[interview.employee?.resourceType]}`}>
+                                  {interview.employee?.resourceType || 'Unknown'}
+                                </span>
+                                <span className={styles.status}>
+                                  {interview.status}
+                                </span>
+                                {interview.sentToSales && (
+                                  <span className={styles.sentToSalesBadge}>
+                                    Sent to Sales
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className={styles.interviewDate}>
+                              <FiCalendar /> {interview.date} at {interview.time}
+                            </div>
+                          </div>
+                          
+                          <div className={styles.interviewDetails}>
+                            <p><strong>Employee ID:</strong> {interview.employee?.empId || 'N/A'}</p>
+                            <p><strong>Interviewer:</strong> {interview.interviewer?.fullName || 'N/A'}</p>
+                          </div>
+                          
+                          <div className={styles.interviewScores}>
+                            <div className={styles.scoreMeter}>
+                              <div className={styles.scoreLabel}>
+                                Technical: {interview.technicalRating || 'N/A'}/10
+                              </div>
+                              <div className={styles.scoreBar}>
+                                <div 
+                                  className={styles.scoreFill} 
+                                  style={{
+                                    width: `${(interview.technicalRating || 0) * 10}%`,
+                                    backgroundColor: getScoreColor(interview.technicalRating || 0)
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className={styles.scoreMeter}>
+                              <div className={styles.scoreLabel}>
+                                Communication: {interview.communicationRating || 'N/A'}/10
+                              </div>
+                              <div className={styles.scoreBar}>
+                                <div 
+                                  className={styles.scoreFill} 
+                                  style={{
+                                    width: `${(interview.communicationRating || 0) * 10}%`,
+                                    backgroundColor: getScoreColor(interview.communicationRating || 0)
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className={styles.feedback}>
+                            <h5>Technical Feedback</h5>
+                            <p>{interview.technicalFeedback || 'N/A'}</p>
+                            
+                            <h5>Communication Feedback</h5>
+                            <p>{interview.communicationFeedback || 'N/A'}</p>
+                          </div>
+                          
+                          <div className={styles.interviewActions}>
+                            <button 
+                              className={styles.secondaryButton}
+                              onClick={() => {
+                                setSelectedInterviewId(interview.id);
+                              }}
+                            >
+                              <FiEdit /> Edit Feedback
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -925,7 +1067,8 @@ const DeliveryTeamDashboard = () => {
             <div className={styles.chartRow}>
               <div className={styles.chartCard}>
                 <h4>Interview Conversion</h4>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={300}>ls
+                  
                   <PieChart>
                     <Pie
                       data={conversionData}

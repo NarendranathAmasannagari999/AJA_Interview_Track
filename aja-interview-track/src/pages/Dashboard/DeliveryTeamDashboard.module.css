@@ -1477,3 +1477,52 @@
   background-color: #e0e7ff;
   color: #4f46e5;
 }
+
+.accordionSection {
+  margin-bottom: 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.accordionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.accordionHeader:hover {
+  background-color: #e9ecef;
+}
+
+.accordionTitle {
+  flex: 1;
+}
+
+.accordionTitle h4 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.accordionTitle .sectionDescription {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.accordionIcon {
+  display: flex;
+  align-items: center;
+  color: #6c757d;
+  transition: transform 0.2s ease;
+}
+
+.accordionContent {
+  padding: 1rem;
+  background-color: #ffffff;
+  border-top: 1px solid #e0e0e0;
+}
