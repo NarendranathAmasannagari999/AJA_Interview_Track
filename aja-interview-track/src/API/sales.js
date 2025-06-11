@@ -38,9 +38,10 @@ export const getCandidates = async (technology = 'all', status = 'all', resource
  * @param {number} level - Interview level
  * @param {string} jobDescriptionTitle - Job description title
  * @param {string} meetingLink - Meeting link
+ * @param {boolean} deployedStatus - Deployment status (True or False)
  * @returns {Promise<Object>} Scheduled interview object
  */
-export const scheduleClientInterview = async (empId, client, date, time, level, jobDescriptionTitle, meetingLink) => {
+export const scheduleClientInterview = async (empId, client, date, time, level, jobDescriptionTitle, meetingLink, deployedStatus) => {
   try {
     if (!empId || !client || !date || !time || !level || !jobDescriptionTitle || !meetingLink) {
       throw new Error('All fields are required for scheduling a client interview');
@@ -55,7 +56,8 @@ export const scheduleClientInterview = async (empId, client, date, time, level, 
         client,
         level,
         jobDescriptionTitle,
-        meetingLink
+        meetingLink,
+        deployedStatus
       }
     });
     return response.data;
@@ -80,21 +82,21 @@ export const scheduleClientInterview = async (empId, client, date, time, level, 
  * @param {string} feedback - Interview feedback
  * @param {number} technicalScore - Technical score
  * @param {number} communicationScore - Communication score
+ * @param {boolean} deployedStatus - Optional: New deployment status
  * @returns {Promise<Object>} Updated interview object
  */
-export const updateClientInterview = async (interviewId, result, feedback, technicalScore, communicationScore) => {
+export const updateClientInterview = async (interviewId, result, feedback, technicalScore, communicationScore, deployedStatus) => {
   try {
     if (!interviewId || !result || !feedback || technicalScore === undefined || communicationScore === undefined) {
       throw new Error('All fields are required for updating interview feedback');
     }
 
-    const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, null, {
-      params: {
-        result,
-        feedback,
-        technicalScore,
-        communicationScore
-      }
+    const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, {
+      result,
+      feedback,
+      technicalScore,
+      communicationScore,
+      deployedStatus
     });
     return response.data;
   } catch (error) {
@@ -332,6 +334,71 @@ export const updateReadyForDeployment = async (employeeId, readyForDeployment) =
     }
     if (error.response?.status === 404) {
       throw new Error('Employee not found');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Get filtered resumes by technology and resource type
+ * @param {string} technology - Optional technology filter (defaults to 'all')
+ * @param {string} resourceType - Optional resource type filter (defaults to 'all')
+ * @returns {Promise<Array>} List of filtered employee resumes
+ */
+export const getFilteredResumes = async (technology = 'all', resourceType = 'all') => {
+  try {
+    const response = await axiosInstance.get(`${BASE_URL}/resumes/filter`, {
+      params: { technology, resourceType }
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid filter parameters');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Get client interview feedback by ID
+ * @param {number} interviewId - The ID of the client interview
+ * @returns {Promise<Object>} Object containing feedback details (feedback, technicalScore, communicationScore, result, overallStatus)
+ */
+export const getClientInterviewFeedback = async (interviewId) => {
+  try {
+    if (!interviewId) {
+      throw new Error('Interview ID is required to fetch feedback');
+    }
+    const response = await axiosInstance.get(`${BASE_URL}/client-interviews/${interviewId}/feedback`);
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 404) {
+      throw new Error('Interview feedback not found');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid interview ID');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Get a list of all deployed employees.
+ * @returns {Promise<Array>} List of deployed employees
+ */
+export const getDeployedEmployees = async () => {
+  try {
+    const response = await axiosInstance.get(`${BASE_URL}/employees/deployed`);
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
     }
     throw error.response?.data || error.message;
   }

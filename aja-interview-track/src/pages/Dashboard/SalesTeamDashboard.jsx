@@ -5,7 +5,7 @@ import {
   FiBarChart2, FiPieChart, FiUpload, FiDownload, FiMessageSquare,
   FiMail, FiUserPlus, FiBriefcase, FiAward, FiClock, FiLayers,
   FiBook, FiUserCheck, FiUserX, FiShare2, FiToggleLeft, FiToggleRight,
-  FiRefreshCw, FiUser, FiEdit
+  FiRefreshCw, FiUser, FiEdit, FiAlertCircle, FiChevronLeft, FiChevronRight
 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -25,7 +25,10 @@ import {
   deleteJobDescription,
   getAllJobDescriptions,
   getReadyForDeploymentEmployees,
-  updateReadyForDeployment
+  updateReadyForDeployment,
+  getFilteredResumes,
+  getClientInterviewFeedback,
+  getDeployedEmployees // Import the new API
 } from '../../API/sales';
 
 const ClientModal = ({
@@ -139,18 +142,52 @@ const ScheduleInterviewModal = ({
     show,
     onClose,
     onSubmit,
-    selectedCandidates, // Array of selected candidate objects/IDs
+    selectedCandidates,
     interviewDetails,
     setInterviewDetails,
-    clients, // Pass clients to the modal for the client dropdown
-    jobDescriptions // Pass job descriptions for the JD dropdown
+    clients,
+    jobDescriptions
 }) => {
     if (!show) return null;
 
-    // Find the selected candidates' names for display
-    // Assuming selectedCandidates is an array of candidate objects with a 'name' property
-    const candidateNames = selectedCandidates.map(c => c.name).join(', ');
+    const candidateNames = selectedCandidates.map(c => c.user?.fullName || 'N/A').join(', ');
+    const [error, setError] = useState(''); // Local error state for the modal
 
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        setError(''); // Clear previous errors
+        
+        try {
+            // Validate required fields
+            if (!interviewDetails.client?.trim()) {
+                throw new Error('Client name is required');
+            }
+            if (!interviewDetails.date) {
+                throw new Error('Interview date is required');
+            }
+            if (!interviewDetails.time) {
+                throw new Error('Interview time is required');
+            }
+            if (!interviewDetails.level) {
+                throw new Error('Interview level is required');
+            }
+            if (!interviewDetails.jobDescriptionTitle?.trim()) {
+                throw new Error('Job description title is required');
+            }
+            if (interviewDetails.mode === 'virtual' && (!interviewDetails.link?.trim())) {
+                throw new Error('Meeting link is required for virtual interviews');
+            }
+            if (interviewDetails.mode === 'in-person' && (!interviewDetails.location?.trim())) {
+                throw new Error('Location is required for in-person interviews');
+            }
+
+            onSubmit(selectedCandidates.map(c => c.id), interviewDetails); // Pass candidate IDs and details
+            onClose(); // Close the modal on successful submission
+
+        } catch (err) {
+            setError(err.message || 'An unknown error occurred. Please try again.');
+        }
+    };
 
     return (
         <div className={styles.modalOverlay}>
@@ -160,11 +197,7 @@ const ScheduleInterviewModal = ({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
             >
-                <form onSubmit={(e) => {
-                    e.preventDefault();
-                    // Pass only the interviewDetails object to onSubmit
-                    onSubmit(selectedCandidates.map(c => c.id), interviewDetails);
-                }}>
+                <form onSubmit={handleSubmit}>
                     <div className={styles.modalHeader}>
                         <h3>Schedule Client Interview</h3>
                         <button
@@ -176,6 +209,8 @@ const ScheduleInterviewModal = ({
                         </button>
                     </div>
                     <div className={styles.modalContent}>
+                        {error && <div className={styles.errorMessage}>{error}</div>}
+                        
                         {/* Display selected candidates */}
                         <div className={styles.formGroup}>
                             <label>Candidate(s)</label>
@@ -183,7 +218,7 @@ const ScheduleInterviewModal = ({
                                 type="text"
                                 value={candidateNames}
                                 className={styles.input}
-                                readOnly // Display only, not editable
+                                readOnly
                             />
                         </div>
 
@@ -191,7 +226,7 @@ const ScheduleInterviewModal = ({
                          <div className={styles.formGroup}>
                             <label>Client *</label>
                             <select
-                                value={interviewDetails.client}
+                                value={interviewDetails.client || ''}
                                 onChange={(e) => setInterviewDetails({
                                     ...interviewDetails,
                                     client: e.target.value
@@ -200,17 +235,17 @@ const ScheduleInterviewModal = ({
                                 required
                             >
                                 <option value="">Select Client</option>
-                                {clients.map(client => (
+                                {clients && clients.map(client => (
                                     <option key={client.id} value={client.name}>{client.name}</option>
                                 ))}
                             </select>
                         </div>
 
-                        {/* JD dropdown */}
+                        {/* Job Description dropdown */}
                          <div className={styles.formGroup}>
                             <label>Job Description *</label>
                             <select
-                                value={interviewDetails.jobDescriptionTitle}
+                                value={interviewDetails.jobDescriptionTitle || ''}
                                 onChange={(e) => setInterviewDetails({
                                     ...interviewDetails,
                                     jobDescriptionTitle: e.target.value
@@ -219,7 +254,7 @@ const ScheduleInterviewModal = ({
                                 required
                             >
                                 <option value="">Select JD</option>
-                                {jobDescriptions.map(jd => (
+                                {jobDescriptions && jobDescriptions.map(jd => (
                                     <option key={jd.id} value={jd.title}>{jd.title} ({jd.clientName})</option>
                                 ))}
                             </select>
@@ -227,11 +262,10 @@ const ScheduleInterviewModal = ({
 
                         {/* Date & Time */}
                         <div className={styles.formGroup}>
-                            <label>Date & Time *</label>
-                            <div className={styles.dateTimeGroup}>
+                            <label>Date *</label>
                                 <input
                                     type="date"
-                                    value={interviewDetails.date}
+                                value={interviewDetails.date || ''}
                                     onChange={(e) => setInterviewDetails({
                                         ...interviewDetails,
                                         date: e.target.value
@@ -239,9 +273,13 @@ const ScheduleInterviewModal = ({
                                     className={styles.input}
                                     required
                                 />
+                        </div>
+
+                        <div className={styles.formGroup}>
+                            <label>Time *</label>
                                 <input
                                     type="time"
-                                    value={interviewDetails.time}
+                                value={interviewDetails.time || ''}
                                     onChange={(e) => setInterviewDetails({
                                         ...interviewDetails,
                                         time: e.target.value
@@ -249,35 +287,38 @@ const ScheduleInterviewModal = ({
                                     className={styles.input}
                                     required
                                 />
-                            </div>
                         </div>
 
-                        {/* Interview Level */}
+                        {/* Level */}
                          <div className={styles.formGroup}>
-                            <label>Interview Level *</label>
+                            <label>Level *</label>
                             <select
-                                value={interviewDetails.level}
+                                value={interviewDetails.level || ''}
                                 onChange={(e) => setInterviewDetails({
                                     ...interviewDetails,
-                                    level: parseInt(e.target.value) || 1
+                                    level: e.target.value
                                 })}
                                 className={styles.input}
                                 required
                             >
-                                <option value={1}>Level 1</option>
-                                <option value={2}>Level 2</option>
-                                <option value={3}>Level 3</option>
+                                <option value="">Select Level</option>
+                                <option value="1">Level 1</option>
+                                <option value="2">Level 2</option>
+                                <option value="3">Level 3</option>
+                                <option value="4">Level 4</option>
                             </select>
                         </div>
 
-                         {/* Mode */}
+                        {/* Interview Mode */}
                         <div className={styles.formGroup}>
                             <label>Mode *</label>
                             <select
-                                value={interviewDetails.mode}
+                                value={interviewDetails.mode || 'virtual'}
                                 onChange={(e) => setInterviewDetails({
                                     ...interviewDetails,
-                                    mode: e.target.value
+                                    mode: e.target.value,
+                                    link: '',
+                                    location: ''
                                 })}
                                 className={styles.input}
                                 required
@@ -287,71 +328,53 @@ const ScheduleInterviewModal = ({
                             </select>
                         </div>
 
-                         {/* Link/Location based on mode */}
-                        {interviewDetails.mode === 'virtual' && (
+                        {/* Meeting Link or Location based on mode */}
+                        {interviewDetails.mode === 'virtual' ? (
                             <div className={styles.formGroup}>
                                 <label>Meeting Link *</label>
                                 <input
-                                    type="text"
-                                    value={interviewDetails.link}
+                                    type="url"
+                                    value={interviewDetails.link || ''}
                                     onChange={(e) => setInterviewDetails({
                                         ...interviewDetails,
                                         link: e.target.value
                                     })}
                                     className={styles.input}
-                                    placeholder="Enter meeting link"
                                     required
+                                    placeholder="Enter meeting link"
                                 />
                             </div>
-                        )}
-                        {interviewDetails.mode === 'in-person' && (
+                        ) : (
                             <div className={styles.formGroup}>
                                 <label>Location *</label>
                                 <input
                                     type="text"
-                                    value={interviewDetails.location}
+                                    value={interviewDetails.location || ''}
                                     onChange={(e) => setInterviewDetails({
                                         ...interviewDetails,
                                         location: e.target.value
                                     })}
                                     className={styles.input}
-                                    placeholder="Enter interview location"
                                     required
+                                    placeholder="Enter interview location"
                                 />
                             </div>
                         )}
 
-                        {/* Interviewer (Optional based on backend) */}
-                        {/* Keeping this as per image, but backend might not use it */}
+                        {/* Deployed Status Checkbox */}
                          <div className={styles.formGroup}>
-                            <label>Interviewer</label>
+                            <label className={styles.checkboxLabel}>
                             <input
-                                type="text"
-                                value={interviewDetails.interviewerName} // Assuming you add this to interviewDetails state
+                                    type="checkbox"
+                                    checked={interviewDetails.deployedStatus}
                                 onChange={(e) => setInterviewDetails({
                                     ...interviewDetails,
-                                    interviewerName: e.target.value
+                                        deployedStatus: e.target.checked
                                 })}
-                                className={styles.input}
-                                placeholder="Enter interviewer name"
                             />
+                                <span>Mark as Deployed</span>
+                            </label>
                         </div>
-
-
-                         {/* Notes */}
-                        <div className={styles.formGroup}>
-                            <label>Notes</label>
-                            <textarea
-                                value={interviewDetails.notes}
-                                onChange={(e) => setInterviewDetails({
-                                    ...interviewDetails,
-                                    notes: e.target.value
-                                })}
-                                className={styles.input}
-                                placeholder="Add notes about the interview..."
-                            />
-                        </div>
-
 
                         <div className={styles.modalFooter}>
                             <button
@@ -364,7 +387,6 @@ const ScheduleInterviewModal = ({
                             <button
                                 className={`${styles.button} ${styles.primary}`}
                                 type="submit"
-                                disabled={false} // Add loading state logic here if needed
                             >
                                 Schedule Interview
                             </button>
@@ -372,6 +394,68 @@ const ScheduleInterviewModal = ({
                     </div>
                 </form>
             </motion.div>
+        </div>
+    );
+};
+
+const ITEMS_PER_PAGE = 10;
+
+const LoadingState = () => (
+  <div className={styles.loadingState}>
+    <div className={styles.spinner}></div>
+    <p>Loading...</p>
+  </div>
+);
+
+const ErrorState = ({ error }) => {
+  if (!error) return null;
+  
+  const message = typeof error === 'object' && error !== null && 'message' in error ? error.message : String(error);
+  const type = typeof error === 'object' && error !== null && 'type' in error ? error.type : 'error';
+  const detailedError = typeof error === 'object' && error !== null && 'response' in error && 'data' in error.response ? error.response.data : null;
+
+  return (
+    <div className={`${styles.errorContainer} ${styles[type]}`}>
+      <p>{message}</p>
+      {detailedError && <p className={styles.detailedErrorMessage}>{detailedError}</p>}
+    </div>
+  );
+};
+
+const Pagination = ({ totalItems, currentPage, onPageChange }) => {
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className={styles.pagination}>
+      <button
+        className={`${styles.button} ${styles.secondary}`}
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+      >
+        <FiChevronLeft /> Previous
+      </button>
+      
+      <div className={styles.pageNumbers}>
+        {[...Array(totalPages)].map((_, index) => (
+          <button
+            key={index + 1}
+            className={`${styles.pageButton} ${currentPage === index + 1 ? styles.active : ''}`}
+            onClick={() => onPageChange(index + 1)}
+          >
+            {index + 1}
+          </button>
+        ))}
+      </div>
+
+      <button
+        className={`${styles.button} ${styles.secondary}`}
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+      >
+        Next <FiChevronRight />
+      </button>
         </div>
     );
 };
@@ -400,6 +484,9 @@ const SalesTeamDashboard = () => {
   const [resumePool, setResumePool] = useState([]);
   const [shortlistedCandidates, setShortlistedCandidates] = useState([]);
   
+  // New state for deployed employees
+  const [deployedEmployees, setDeployedEmployees] = useState([]);
+  
   // Deployment statistics
   const [deploymentStats, setDeploymentStats] = useState({
     profilesSent: 0,
@@ -422,7 +509,8 @@ const SalesTeamDashboard = () => {
     notes: '',
     client: '',
     jobDescriptionTitle: '',
-    interviewerName: ''
+    interviewerName: '',
+    deployedStatus: false // Add deployedStatus with a default false
   });
 
   // Add loading and error states
@@ -432,7 +520,6 @@ const SalesTeamDashboard = () => {
 
   // Add new state for pagination and search
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
   const [searchTimeout, setSearchTimeout] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -517,7 +604,7 @@ const SalesTeamDashboard = () => {
     setError(null);
     try {
       // Fetch all data in parallel with proper error handling
-      const [candidatesData, interviewsData, clientsData, jobDescriptionsData] = await Promise.all([
+      const [candidatesData, interviewsData, clientsData, jobDescriptionsData, deployedEmployeesData] = await Promise.all([
         getCandidates(filterTech, filterStatus, filterResourceType).catch(error => {
           console.error('Error fetching candidates:', error);
           if (error.response?.status === 401) {
@@ -557,6 +644,13 @@ const SalesTeamDashboard = () => {
             throw new Error('Access denied: Only sales team members can view all job descriptions');
           }
           return [];
+        }),
+        getDeployedEmployees().catch(error => { // Fetch deployed employees
+          console.error('Error fetching deployed employees:', error);
+          if (error.response?.status === 401) {
+            throw new Error('Please log in to view deployed employees');
+          }
+          return [];
         })
       ]);
 
@@ -579,6 +673,7 @@ const SalesTeamDashboard = () => {
       setClientInterviews(validatedInterviews);
       setClients(clientsData);
       setJobDescriptions(jobDescriptionsData);
+      setDeployedEmployees(deployedEmployeesData); // Set deployed employees state
 
       // Calculate deployment stats
       const stats = {
@@ -697,17 +792,24 @@ const SalesTeamDashboard = () => {
     setError(null); // Clear previous errors
 
     try {
-      const interviewPromises = candidateIds.map(candidateId => 
-        scheduleClientInterview(
-          candidateId, // empId
-          interviewDetails.client, // client
+      const interviewPromises = candidateIds.map(id => {
+        const candidate = readyForDeploymentEmployees.find(emp => emp.id === id);
+
+        if (!candidate) {
+          throw new Error(`Employee not found for ID: ${id}`);
+        }
+
+        return scheduleClientInterview(
+          candidate.empId, // Use candidate.empId here
+          interviewDetails.client?.trim(), // client
           interviewDetails.date, // date
           interviewDetails.time, // time
-          interviewDetails.level, // level
-          interviewDetails.jobDescriptionTitle, // jobDescriptionTitle
-          interviewDetails.mode === 'virtual' ? interviewDetails.link : interviewDetails.location // meetingLink or location
-        )
-      );
+          parseInt(interviewDetails.level), // level
+          interviewDetails.jobDescriptionTitle?.trim(), // jobDescriptionTitle
+          interviewDetails.mode === 'virtual' ? interviewDetails.link?.trim() : interviewDetails.location?.trim(), // meetingLink or location
+          interviewDetails.deployedStatus // Pass the value from the checkbox
+        );
+      });
 
       const results = await Promise.all(interviewPromises);
       
@@ -718,13 +820,13 @@ const SalesTeamDashboard = () => {
       setClientInterviews(prev => [...prev, ...successfulResults]);
 
       // Update the status of scheduled candidates to 'interview_scheduled'
-      setCandidates(prev => prev.map(candidate => 
-          candidateIds.includes(candidate.id) 
-              ? { ...candidate, status: 'interview_scheduled' } 
-              : candidate
+      setCandidates(prev => prev.map(c => 
+        candidateIds.includes(c.id) 
+          ? { ...c, status: 'interview_scheduled' } 
+          : c
       ));
 
-      // Show success message using the general error state (or a dedicated success state if added)
+      // Show success message
       setError({ type: 'success', message: `Successfully scheduled ${successfulResults.length} interview(s)!` });
 
     // Close the scheduler
@@ -740,7 +842,8 @@ const SalesTeamDashboard = () => {
       notes: '',
       client: '',
       jobDescriptionTitle: '',
-      interviewerName: '' // This might not be needed based on backend schedule API
+      interviewerName: '',
+      deployedStatus: false // Reset deployedStatus
     });
     setBulkSelectedCandidates([]); // Clear bulk selections
 
@@ -961,10 +1064,56 @@ const SalesTeamDashboard = () => {
   };
 
   const ResumePoolTab = () => {
-    const filteredResumes = resumePool.filter(resume => 
-      resume.candidateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      resume.technology.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const [filteredResumes, setFilteredResumes] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+      fetchFilteredResumes();
+    }, [filterTech, filterResourceType, searchTerm]);
+
+    const fetchFilteredResumes = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const resumes = await getFilteredResumes(filterTech, filterResourceType);
+        // Apply search filter locally
+        const searchFilteredResumes = resumes.filter(resume => 
+          resume.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          resume.technology?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredResumes(searchFilteredResumes);
+      } catch (error) {
+        console.error('Error fetching filtered resumes:', error);
+        setError(error.message || 'Failed to fetch resumes');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (isLoading) {
+      return (
+        <div className={styles.loadingContainer}>
+          <div className={styles.spinner}></div>
+          <p>Loading resumes...</p>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className={styles.errorContainer}>
+          <h3>Error</h3>
+          <p>{error}</p>
+          <button 
+            className={`${styles.button} ${styles.primary}`}
+            onClick={fetchFilteredResumes}
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
 
     return (
       <motion.div
@@ -973,6 +1122,48 @@ const SalesTeamDashboard = () => {
         exit={{ opacity: 0 }}
         className={styles.tabContent}
       >
+        <div className={styles.filterSection}>
+          <div className={styles.searchBox}>
+            <FiSearch className={styles.searchIcon} />
+            <input 
+              type="text" 
+              placeholder="Search resumes..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
+          <div className={styles.filterGroup}>
+            <label>Technology</label>
+            <select 
+              value={filterTech} 
+              onChange={(e) => setFilterTech(e.target.value)}
+              className={styles.filterSelect}
+            >
+              <option value="all">All Technologies</option>
+              <option value="Java">Java</option>
+              <option value="Python">Python</option>
+              <option value=".NET">.NET</option>
+              <option value="DevOps">DevOps</option>
+              <option value="SalesForce">SalesForce</option>
+              <option value="UI">UI</option>
+              <option value="Testing">Testing</option>
+            </select>
+          </div>
+          <div className={styles.filterGroup}>
+            <label>Resource Type</label>
+            <select 
+              value={filterResourceType} 
+              onChange={(e) => setFilterResourceType(e.target.value)}
+              className={styles.filterSelect}
+            >
+              <option value="all">All Types</option>
+              <option value="OM">OM</option>
+              <option value="TCT1">TCT1</option>
+            </select>
+          </div>
+        </div>
+
         <div className={styles.tableContainer}>
           {filteredResumes.length > 0 ? (
             <table className={styles.table}>
@@ -990,20 +1181,20 @@ const SalesTeamDashboard = () => {
               <tbody>
                 {filteredResumes.map((resume) => (
                   <tr key={resume.id}>
-                    <td>{resume.name}</td>
+                    <td>{resume.user?.fullName || 'N/A'}</td>
                     <td>
-                      <span className={`${styles.techBadge} ${styles[resume.technology.toLowerCase()]}`}>
+                      <span className={`${styles.techBadge} ${styles[resume.technology?.toLowerCase()]}`}>
                         {resume.technology}
                       </span>
                     </td>
                     <td>
-                      <span className={`${styles.resourceBadge} ${styles[resume.resourceType.toLowerCase()]}`}>
+                      <span className={`${styles.resourceBadge} ${styles[resume.resourceType?.toLowerCase()]}`}>
                         {resume.resourceType}
                       </span>
                     </td>
-                    <td>{resume.receivedDate}</td>
+                    <td>{new Date(resume.receivedDate).toLocaleDateString()}</td>
                     <td>
-                      <span className={`${styles.statusBadge} ${styles[resume.status]}`}>
+                      <span className={`${styles.statusBadge} ${styles[resume.status?.toLowerCase()]}`}>
                         {resume.status}
                       </span>
                     </td>
@@ -1020,10 +1211,16 @@ const SalesTeamDashboard = () => {
                       </button>
                     </td>
                     <td>
-                      <button className={`${styles.button} ${styles.small}`}>
+                      <button 
+                        className={`${styles.button} ${styles.small}`}
+                        onClick={() => handleDownloadResume(resume.id)}
+                      >
                         <FiDownload /> Download
                       </button>
-                      <button className={`${styles.button} ${styles.small} ${styles.primary}`}>
+                      <button 
+                        className={`${styles.button} ${styles.small} ${styles.primary}`}
+                        onClick={() => handleShortlistResume(resume.id)}
+                      >
                         <FiCheck /> Shortlist
                       </button>
                     </td>
@@ -1034,13 +1231,34 @@ const SalesTeamDashboard = () => {
           ) : (
             <div className={styles.emptyState}>
               <FiUpload size={48} />
-              <h4>No resumes in pool</h4>
-              <p>Upload resumes received from candidates or adjust your search.</p>
+              <h4>No resumes found</h4>
+              <p>Upload resumes or adjust your search filters.</p>
             </div>
           )}
         </div>
       </motion.div>
     );
+  };
+
+  // Add these new handler functions
+  const handleDownloadResume = async (resumeId) => {
+    try {
+      // Implement resume download functionality
+      console.log('Downloading resume:', resumeId);
+    } catch (error) {
+      console.error('Error downloading resume:', error);
+      setError('Failed to download resume');
+    }
+  };
+
+  const handleShortlistResume = async (resumeId) => {
+    try {
+      // Implement resume shortlisting functionality
+      console.log('Shortlisting resume:', resumeId);
+    } catch (error) {
+      console.error('Error shortlisting resume:', error);
+      setError('Failed to shortlist resume');
+    }
   };
 
   const handleSelectCandidateForBulkScheduling = (candidateId, isSelected) => {
@@ -1051,7 +1269,27 @@ const SalesTeamDashboard = () => {
     );
   };
 
+  // This function will handle opening the interview scheduler for selected candidates
+  const openBulkInterviewScheduler = () => {
+    if (bulkSelectedCandidates.length === 0) {
+      setError({ type: 'error', message: 'Please select at least one candidate to schedule an interview.' });
+      return;
+    }
+    setSelectedForInterview(bulkSelectedCandidates); // Set the selected IDs from bulk selection
+    setShowInterviewScheduler(true); // Open the modal
+  };
+
   const ShortlistedTab = () => {
+    // Filter shortlisted candidates (which are now specifically 'ready for deployment' employees)
+    // based on search term and other filters
+    const filteredShortlisted = readyForDeploymentEmployees.filter(employee => 
+      (employee.user?.fullName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (employee.technology?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+    ).filter(employee => 
+      (filterTech === 'all' || employee.technology === filterTech) &&
+      (filterResourceType === 'all' || employee.resourceType === filterResourceType)
+    );
+
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -1078,44 +1316,74 @@ const SalesTeamDashboard = () => {
               className={styles.filterSelect}
             >
               <option value="all">All Technologies</option>
-              <option value="java">Java</option>
-              <option value="python">Python</option>
-              <option value="react">React</option>
-              <option value="angular">Angular</option>
-              <option value="node">Node.js</option>
+              <option value="Java">Java</option>
+              <option value="Python">Python</option>
+              <option value=".NET">.NET</option>
+              <option value="DevOps">DevOps</option>
+              <option value="SalesForce">SalesForce</option>
+              <option value="UI">UI</option>
+              <option value="Testing">Testing</option>
             </select>
           </div>
+          <div className={styles.filterGroup}>
+            <label>Resource Type</label>
+            <select 
+              value={filterResourceType} 
+              onChange={(e) => setFilterResourceType(e.target.value)}
+              className={styles.filterSelect}
+            >
+              <option value="all">All Types</option>
+              <option value="OM">OM</option>
+              <option value="TCT1">TCT1</option>
+            </select>
         </div>
+        </div>
+
+        {bulkSelectedCandidates.length > 0 && (
+          <div className={styles.bulkActions}>
+            <button
+              className={`${styles.button} ${styles.primary}`}
+              onClick={openBulkInterviewScheduler} // This will open the modal for selected candidates
+            >
+              <FiCalendar /> Schedule Selected Interviews ({bulkSelectedCandidates.length})
+            </button>
+            <button
+              className={`${styles.button} ${styles.secondary}`}
+              onClick={() => setBulkSelectedCandidates([])}
+            >
+              <FiX /> Clear Selection
+            </button>
+          </div>
+        )}
+
         <div className={styles.tableContainer}>
-          {readyForDeploymentEmployees.length > 0 ? (
+          {filteredShortlisted.length > 0 ? (
             <table className={styles.table}>
               <thead>
                 <tr>
                   <th>
                     <input
                       type="checkbox"
-                      checked={readyForDeploymentEmployees.every(emp => 
-                        bulkSelectedCandidates.includes(emp.id)
-                      )}
+                      checked={bulkSelectedCandidates.length === filteredShortlisted.length && filteredShortlisted.length > 0}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setBulkSelectedCandidates(readyForDeploymentEmployees.map(emp => emp.id));
+                          setBulkSelectedCandidates(filteredShortlisted.map(emp => emp.id));
                         } else {
                           setBulkSelectedCandidates([]);
                         }
                       }}
                     />
                   </th>
-                  <th>Employee ID</th>
                   <th>Name</th>
                   <th>Technology</th>
                   <th>Resource Type</th>
+                  <th>Received Date</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {readyForDeploymentEmployees.map((employee) => (
+                {filteredShortlisted.map((employee) => (
                   <tr key={employee.id}>
                     <td>
                       <input
@@ -1124,35 +1392,30 @@ const SalesTeamDashboard = () => {
                         onChange={(e) => handleSelectCandidateForBulkScheduling(employee.id, e.target.checked)}
                       />
                     </td>
-                    <td>{employee.empId}</td>
-                    <td>{employee.user.fullName}</td>
+                    <td>{employee.user?.fullName || 'N/A'}</td>
                     <td>
-                      <span className={`${styles.techBadge} ${styles[employee.technology.toLowerCase().replace(' ', '')]}`}>
+                      <span className={`${styles.techBadge} ${styles[employee.technology?.toLowerCase()]}`}>
                         {employee.technology}
                       </span>
                     </td>
                     <td>
-                      <span className={`${styles.resourceBadge} ${styles[employee.resourceType.toLowerCase()]}`}>
+                      <span className={`${styles.resourceBadge} ${styles[employee.resourceType?.toLowerCase()]}`}>
                         {employee.resourceType}
                       </span>
                     </td>
+                    <td>{new Date(employee.receivedDate).toLocaleDateString()}</td>
                     <td>
-                      <span className={`${styles.statusBadge} ${styles[employee.status.toLowerCase()]}`}>
+                      <span className={`${styles.statusBadge} ${styles[employee.status?.toLowerCase()]}`}>
                         {employee.status}
                       </span>
                     </td>
                     <td>
+                      {/* Actions for individual shortlisted candidates, excluding schedule/feedback buttons */}
                       <button
-                        className={`${styles.button} ${styles.small} ${styles.primary}`}
-                        onClick={() => handleScheduleInterview(employee.id)}
+                        className={`${styles.button} ${styles.small}`}
+                        onClick={() => handleDownloadResume(employee.id)}
                       >
-                        <FiCalendar /> Schedule Interview
-                      </button>
-                      <button
-                        className={`${styles.button} ${styles.small} ${styles.secondary}`}
-                        onClick={() => handleUpdateFeedback(employee.id)}
-                      >
-                        <FiEdit /> Update Feedback
+                        <FiDownload /> Resume
                       </button>
                     </td>
                   </tr>
@@ -1163,33 +1426,78 @@ const SalesTeamDashboard = () => {
             <div className={styles.emptyState}>
               <FiUsers size={48} />
               <h4>No ready for deployment employees found</h4>
-              <p>No employees are currently ready for deployment.</p>
+              <p>No employees are currently marked as ready for deployment or match the current filters.</p>
             </div>
           )}
         </div>
 
-        {bulkSelectedCandidates.length > 0 && (
-          <div className={styles.bulkActions}>
-            <button
-              className={`${styles.button} ${styles.primary}`}
-              onClick={() => openInterviewScheduler(bulkSelectedCandidates)}
-            >
-              <FiCalendar /> Schedule Bulk Interview
-            </button>
-            <button
-              className={`${styles.button} ${styles.secondary}`}
-              onClick={() => setBulkSelectedCandidates([])}
-            >
-              <FiX /> Clear Selection
-            </button>
-          </div>
+        {/* Interview Scheduler Modal - now controlled by the top-level state */}
+        <AnimatePresence>
+          {showInterviewScheduler && (
+            <ScheduleInterviewModal
+              show={showInterviewScheduler}
+              onClose={() => {
+                setShowInterviewScheduler(false);
+                setSelectedForInterview([]);
+                setInterviewDetails({ // Reset interview details on close
+                  level: 1,
+                  date: '',
+                  time: '',
+                  mode: 'virtual',
+                  link: '',
+                  location: '',
+                  notes: '',
+                  client: '',
+                  jobDescriptionTitle: '',
+                  interviewerName: '',
+                  deployedStatus: false // Reset deployedStatus
+                });
+              }}
+              onSubmit={handleScheduleInterview} // Use the main handleScheduleInterview
+              selectedCandidates={readyForDeploymentEmployees.filter(c => selectedForInterview.includes(c.id))} // Pass actual candidate objects from readyForDeploymentEmployees
+              interviewDetails={interviewDetails}
+              setInterviewDetails={setInterviewDetails}
+              clients={clients}
+              jobDescriptions={jobDescriptions}
+            />
         )}
+        </AnimatePresence>
       </motion.div>
     );
   };
 
   const InterviewsTab = () => {
     const filteredInterviews = filterInterviews(clientInterviews);
+
+    const handleMarkAsCompleted = async (interviewId) => {
+      setIsLoading(true); // Indicate loading
+      setError(null);
+      try {
+        const updatedInterview = await updateClientInterview(
+          interviewId,
+          'N/A', // result - can be 'N/A' or 'pending' as it will be updated later with actual feedback
+          'Interview marked as completed.', // feedback - provide a default feedback
+          0, // technicalScore
+          0  // communicationScore
+        );
+
+        // Update the interviews state with the updated interview, specifically overallStatus
+        setClientInterviews(prev =>
+          prev.map(interview =>
+            interview.id === interviewId
+              ? { ...interview, overallStatus: 'completed', result: updatedInterview.result, feedback: updatedInterview.feedback } // Ensure result and feedback are also updated from backend response
+              : interview
+          )
+        );
+        setError({ type: 'success', message: 'Interview marked as completed successfully!' });
+
+      } catch (error) {
+        console.error('Error marking interview as completed:', error);
+        setError({ type: 'error', message: error.message || 'Failed to mark interview as completed' });
+      } finally {
+        setIsLoading(false); // End loading
+      }
+    };
 
     return (
       <motion.div
@@ -1238,118 +1546,125 @@ const SalesTeamDashboard = () => {
                 <div className={styles.interviewHeader}>
                   <div>
                     <h4 className={styles.interviewTitle}>
-                      {interview.client} - {interview.candidateName}
+                      {interview.client}
                     </h4>
-                    <div className={styles.interviewMeta}>
-                      <span><FiFileText /> {interview.jd}</span>
-                      <span className={`${styles.statusBadge} ${styles[interview.overallStatus]}`}>
-                        {interview.overallStatus.replace('_', ' ')}
+                    <span className={`${styles.statusBadge} ${styles[interview.overallStatus?.toLowerCase()]}`}>
+                      {interview.overallStatus?.replace('_', ' ')}
                       </span>
                     </div>
-                  </div>
-                </div>
-
-                <div className={styles.interviewLevels}>
-                  {interview.levels.map(level => (
-                    <div 
-                      key={level.number} 
-                      className={`${styles.level} ${styles[level.status]}`}
-                    >
-                      <div className={styles.levelHeader}>
-                        <span className={styles.levelNumber}>Level {level.number}</span>
-                        <span className={styles.levelDate}>{level.date} at {level.time}</span>
-                        <span className={styles.levelStatus}>
-                          {level.status}
-                          {level.notified && <FiCheck className={styles.notifiedIcon} title="Candidate notified" />}
-                        </span>
-                      </div>
-                      
-                      {level.status === 'scheduled' && (
-                        <div className={styles.levelDetails}>
-                          <p><strong>Mode:</strong> {level.mode}</p>
-                          {level.mode === 'virtual' && (
-                            <p><strong>Link:</strong> <a href={level.link} target="_blank" rel="noopener noreferrer">{level.link}</a></p>
-                          )}
-                          {level.mode === 'in-person' && (
-                            <p><strong>Location:</strong> {level.location}</p>
-                          )}
-                          {!level.notified && (
-                            <button 
-                              className={`${styles.button} ${styles.small} ${styles.primary}`}
-                              onClick={() => openInterviewScheduler([interview.candidateId])}
-                            >
-                              <FiMail /> Send Schedule to Candidate
-                            </button>
-                          )}
-                        </div>
-                      )}
-                      
-                      {level.status === 'completed' && (
-                        <div className={styles.levelDetails}>
-                          <div className={styles.scoreMeter}>
-                            <span>Technical: {level.techScore}/10</span>
-                            <div className={styles.scoreBar}>
-                              <div 
-                                className={styles.scoreFill}
-                                style={{ width: `${level.techScore * 10}%` }}
-                              />
-                            </div>
-                          </div>
-                          <div className={styles.scoreMeter}>
-                            <span>Communication: {level.commScore}/10</span>
-                            <div className={styles.scoreBar}>
-                              <div 
-                                className={styles.scoreFill}
-                                style={{ width: `${level.commScore * 10}%` }}
-                              />
-                            </div>
-                          </div>
-                          {level.feedback && (
-                            <div className={styles.feedback}>
-                              <strong>Feedback:</strong> {level.feedback}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {interview.overallStatus === 'completed' && (
-                  <div className={styles.interviewOutcome}>
-                    <h5>Final Outcome</h5>
-                    {interview.result === 'hired' ? (
-                      <div className={styles.outcomeHired}>
-                        <FiUserCheck /> Candidate Hired
-                      </div>
-                    ) : (
-                      <div className={styles.outcomeRejected}>
-                        <FiUserX /> Candidate Rejected
-                        <FeedbackSection 
-                          candidate={interview.candidateName} 
-                          interview={interview} 
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div className={styles.interviewActions}>
-                  {interview.levels.some(l => l.status === 'scheduled') && (
-                    <>
-                      <button className={`${styles.button} ${styles.primary}`}>
-                        Confirm Interview
-                      </button>
-                      <button className={`${styles.button} ${styles.secondary}`}>
-                        Reschedule
-                      </button>
-                    </>
+                    {(interview.overallStatus?.toLowerCase() === 'scheduled' || interview.overallStatus?.toLowerCase() === 'pending') && (
+            <button 
+              className={`${styles.button} ${styles.primary}`}
+              onClick={async () => {
+                          // Before opening the modal, fetch the latest feedback details
+                          setIsLoading(true); // Show loading state
+                          setError(null); // Clear previous errors
+                          try {
+                            const latestFeedback = await getClientInterviewFeedback(interview.id);
+                            setSelectedInterviewForFeedback(latestFeedback);
+                            setShowFeedbackModal(true);
+                          } catch (err) {
+                            console.error('Error fetching interview feedback:', err);
+                            setError({ type: 'error', message: err.message || 'Failed to load feedback details.' });
+                          } finally {
+                            setIsLoading(false); // Hide loading state
+                          }
+                        }}
+                      >
+                        <FiMessageSquare /> Give Feedback
+            </button>
+                    )}
+
+                    {interview.overallStatus === 'completed' && (
+        <button
+                        className={`${styles.button} ${styles.secondary}`}
+                        onClick={async () => {
+                          // Before opening the modal, fetch the latest feedback details
+                          setIsLoading(true); // Show loading state
+                          setError(null); // Clear previous errors
+                          try {
+                            const latestFeedback = await getClientInterviewFeedback(interview.id);
+                            setSelectedInterviewForFeedback(latestFeedback);
+                            setShowFeedbackModal(true);
+                          } catch (err) {
+                            console.error('Error fetching interview feedback:', err);
+                            setError({ type: 'error', message: err.message || 'Failed to load feedback details for update.' });
+                          } finally {
+                            setIsLoading(false); // Hide loading state
+                          }
+                        }}
+                      >
+                        <FiMessageSquare /> Update Interview
+        </button>
+      )}
+    </div>
+      </div>
+                <div className={styles.interviewDetails}>
+                  <div className={styles.detailItem}>
+                    <span className={styles.label}>Date:</span>
+                    <span>{new Date(interview.date).toLocaleDateString()}</span>
+    </div>
+                  <div className={styles.detailItem}>
+                    <span className={styles.label}>Time:</span>
+                    <span>{interview.time}</span>
+          </div>
+                  <div className={styles.detailItem}>
+                    <span className={styles.label}>Level:</span>
+                    <span>{interview.level}</span>
+          </div>
+                  {interview.meetingLink && (
+                    <div className={styles.detailItem}>
+                      <span className={styles.label}>Meeting Link:</span>
+                      <a href={interview.meetingLink} target="_blank" rel="noopener noreferrer">
+                        Join Meeting
+                      </a>
+          </div>
                   )}
-                  
-                  {interview.overallStatus === 'in_process' && (
-                    <button className={`${styles.button} ${styles.success}`}>
-                      Mark as Completed
-                    </button>
+                  {/* Display Employee Details */}
+                  {interview.employee && (
+                    <div className={styles.employeeDetailsSection}>
+                      <strong>Employee Details:</strong>
+                      <div className={styles.detailItem}>
+                        <span className={styles.label}>Full Name:</span>
+                        <span>{interview.employee.user?.fullName || 'N/A'}</span>
+        </div> 
+                      <div className={styles.detailItem}>
+                        <span className={styles.label}>Email:</span>
+                        <span>{interview.employee.user?.email || 'N/A'}</span>
+        </div> 
+                      <div className={styles.detailItem}>
+                        <span className={styles.label}>Employee ID:</span>
+                        <span>{interview.employee.empId || 'N/A'}</span>
+      </div> 
+                      <div className={styles.detailItem}>
+                        <span className={styles.label}>Technology:</span>
+                        <span>{interview.employee.technology || 'N/A'}</span>
+    </div>
+                      <div className={styles.detailItem}>
+                        <span className={styles.label}>Resource Type:</span>
+                        <span>{interview.employee.resourceType || 'N/A'}</span>
+          </div>
+        </div>
+                  )}
+                  {/* Display Feedback details if available and interview is completed */}
+                  {interview.overallStatus?.toLowerCase() === 'completed' && interview.feedback && (
+                    <div className={styles.feedbackDetailsSection}>
+                      <strong>Feedback:</strong>
+                      <div className={styles.detailItem}>
+                        <span className={styles.label}>Technical:</span>
+                        <span>{interview.technicalScore !== undefined ? `${interview.technicalScore}/10` : 'N/A'}</span>
+                </div>
+                      <div className={styles.detailItem}>
+                        <span className={styles.label}>Communication:</span>
+                        <span>{interview.communicationScore !== undefined ? `${interview.communicationScore}/10` : 'N/A'}</span>
+                  </div>
+                      <p><strong>Technical Feedback</strong></p>
+                      <p>{interview.feedback}</p> {/* Assuming 'feedback' field contains both technical and communication feedback combined or is general feedback */}
+                      {/* If backend provides separate technical and communication feedback fields, use them here */}
+                      <p><strong>Communication Feedback</strong></p>
+                      <p>{interview.feedback}</p>
+                </div>
                   )}
                 </div>
               </motion.div>
@@ -1362,360 +1677,15 @@ const SalesTeamDashboard = () => {
             <p>When candidates are sent to clients, their interviews will appear here.</p>
           </div>
         )}
-
-        {/* Interview Scheduler Modal */}
-        <AnimatePresence>
-          {showInterviewScheduler && (
-            <ScheduleInterviewModal
-              show={showInterviewScheduler}
-              onClose={() => {
-                setShowInterviewScheduler(false);
-                setSelectedForInterview([]); // Clear selected candidates on close
-                setInterviewDetails({ // Reset interview details on close
-                  level: 1,
-                  date: '',
-                  time: '',
-                  mode: 'virtual',
-                  link: '',
-                  location: '',
-                  notes: '',
-                  client: '',
-                  jobDescriptionTitle: '',
-                  interviewerName: ''
-                });
-              }}
-              onSubmit={notifyShortlistedCandidates} // Use the existing function to handle submission
-              selectedCandidates={candidates.filter(c => selectedForInterview.includes(c.id))} // Pass selected candidate objects to the modal
-              interviewDetails={interviewDetails}
-              setInterviewDetails={setInterviewDetails}
-              clients={clients} // Pass clients data to the modal
-              jobDescriptions={jobDescriptions} // Pass job descriptions data to the modal
-            />
-          )}
-        </AnimatePresence>
       </motion.div>
     );
   };
 
   const DeploymentsTab = () => {
-    const deploymentData = [
-      { name: 'Profiles Sent', value: deploymentStats.profilesSent, color: '#6366F1' },
-      { name: 'Resumes Sent', value: deploymentStats.resumesSent, color: '#8B5CF6' },
-      { name: 'Interviews', value: deploymentStats.interviewsScheduled, color: '#EC4899' },
-      { name: 'Deployed', value: deploymentStats.deployed, color: '#10B981' },
-      { name: 'Rejected', value: deploymentStats.rejected, color: '#EF4444' }
-    ];
-
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        className={styles.contentSection}
-      >
-        <div className={styles.deploymentOverview}>
-          <h3>Deployment Pipeline</h3>
-          
-          <div className={styles.pipeline}>
-            {deploymentData.map((stage, index) => (
-              <motion.div 
-                key={stage.name}
-                className={styles.pipelineStage}
-                whileHover={{ scale: 1.05 }}
-              >
-                <div 
-                  className={styles.stageIndicator}
-                  style={{ backgroundColor: stage.color }}
-                />
-                <div className={styles.stageContent}>
-                  <div className={styles.stageName}>{stage.name}</div>
-                  <div className={styles.stageValue}>{stage.value}</div>
-                </div>
-                {index < deploymentData.length - 1 && (
-                  <div className={styles.stageConnector} />
-                )}
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
-        <div className={styles.chartGrid}>
-          <div className={styles.chartContainer}>
-            <h4>Deployment Conversion</h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={deploymentData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                >
-                  {deploymentData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className={styles.chartContainer}>
-            <h4>Monthly Placements</h4>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={[
-                  { name: 'Jan', deployed: 5, rejected: 2 },
-                  { name: 'Feb', deployed: 8, rejected: 3 },
-                  { name: 'Mar', deployed: 12, rejected: 4 },
-                  { name: 'Apr', deployed: 10, rejected: 3 },
-                  { name: 'May', deployed: 7, rejected: 1 }
-                ]}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="deployed" fill="#10B981" name="Deployed" />
-                <Bar dataKey="rejected" fill="#EF4444" name="Rejected" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className={styles.techPlacementContainer}>
-          <h4>Placements by Technology</h4>
-          <ResponsiveContainer width="100%" height={400}>
-            <BarChart
-              data={[
-                { name: 'Java', deployed: 15, rejected: 5 },
-                { name: 'Python', deployed: 12, rejected: 4 },
-                { name: '.NET', deployed: 8, rejected: 3 },
-                { name: 'DevOps', deployed: 10, rejected: 2 },
-                { name: 'SalesForce', deployed: 5, rejected: 2 },
-                { name: 'UI', deployed: 7, rejected: 3 },
-                { name: 'Testing', deployed: 3, rejected: 1 }
-              ]}
-              layout="vertical"
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="name" type="category" width={100} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="deployed" fill="#10B981" name="Deployed" />
-              <Bar dataKey="rejected" fill="#EF4444" name="Rejected" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </motion.div>
-    );
-  };
-
-  const FeedbackSection = ({ candidate, interview }) => {
-    const [techScore, setTechScore] = useState(0);
-    const [commScore, setCommScore] = useState(0);
-    const [feedback, setFeedback] = useState('');
-
-    return (
-      <div className={styles.feedbackForm}>
-        <div className={styles.feedbackToggle}>
-          <span>Send feedback to candidate</span>
-          <label className={styles.toggleSwitch}>
-            <input 
-              type="checkbox" 
-              checked={sendFeedback}
-              onChange={() => setSendFeedback(!sendFeedback)}
-            />
-            <span className={styles.slider}></span>
-          </label>
-        </div>
-
-        {sendFeedback && (
-          <div className={styles.feedbackFields}>
-            <div className={styles.scoreInput}>
-              <label>Technical Score (1-10)</label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={techScore}
-                onChange={(e) => setTechScore(e.target.value)}
-              />
-            </div>
-            
-            <div className={styles.scoreInput}>
-              <label>Communication Score (1-10)</label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={commScore}
-                onChange={(e) => setCommScore(e.target.value)}
-              />
-            </div>
-            
-            <div className={styles.feedbackInput}>
-              <label>Detailed Feedback</label>
-              <textarea
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Provide constructive feedback for the candidate..."
-              />
-            </div>
-            
-            <button 
-              className={`${styles.button} ${styles.primary}`}
-              onClick={() => {
-                // Save feedback
-                alert(`Feedback sent to ${candidate}`);
-                setSendFeedback(false);
-              }}
-            >
-              Send Feedback
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Add pagination component
-  const Pagination = ({ totalItems, currentPage, onPageChange }) => {
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
-    const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
-
-  return (
-      <div className={styles.pagination}>
-        <button
-          className={styles.pageButton}
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-        >
-          Previous
-        </button>
-        {pages.map(page => (
-          <button
-            key={page}
-            className={`${styles.pageButton} ${currentPage === page ? styles.active : ''}`}
-            onClick={() => onPageChange(page)}
-          >
-            {page}
-          </button>
-        ))}
-        <button
-          className={styles.pageButton}
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-        >
-          Next
-        </button>
-      </div>
-    );
-  };
-
-  // Enhanced loading state component
-  const LoadingState = () => (
-    <div className={styles.loadingContainer}>
-      <div className={styles.spinner}></div>
-      <p>{isRefreshing ? 'Refreshing data...' : 'Loading dashboard data...'}</p>
-      {isRefreshing && (
-        <div className={styles.progressBar}>
-          <div className={styles.progressFill}></div>
-        </div>
-      )}
-    </div>
-  );
-
-  // Enhanced error state component
-  const ErrorState = ({ message, onRetry }) => (
-    <div className={styles.errorContainer}>
-      <h3>Error</h3>
-      <p>{message}</p>
-      <div className={styles.errorActions}>
-        {onRetry && (
-          <button 
-            className={`${styles.button} ${styles.primary}`}
-            onClick={onRetry}
-          >
-            Try Again
-          </button>
-        )}
-        <button 
-          className={`${styles.button} ${styles.secondary}`}
-          onClick={() => window.location.reload()}
-        >
-          Refresh Page
-        </button>
-      </div>
-    </div>
-  );
-
-  // Add refresh button to header
-  const renderHeader = () => (
-      <div className={styles.dashboardHeader}>
-        <h1 className={styles.headerTitle}>
-          <FiBriefcase /> AJA Sales Team Dashboard
-        </h1>
-      <div className={styles.headerActions}>
-        <button 
-          className={`${styles.button} ${styles.secondary}`}
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-        >
-          <FiRefreshCw className={isRefreshing ? styles.spinning : ''} />
-          {isRefreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
-        <div className={styles.headerStats}>
-          <div className={styles.statBadge}>
-            <FiUsers /> <span>{candidates.length}</span> Candidates
-          </div>
-          <div className={styles.statBadge}>
-            <FiCheck /> <span>{deploymentStats.deployed}</span> Deployed
-          </div>
-          <div className={styles.statBadge}>
-            <FiDollarSign /> <span>$125K</span> Revenue
-          </div>
-        </div>
-      </div>
-      {/* Sales Team Profile */} 
-      <div className={styles.userProfile}> 
-        <div className={styles.userAvatar}> 
-          {profilePic ? ( 
-            <img src={profilePic} alt="Profile" /> 
-          ) : ( 
-            <FiUser size={18} /> 
-          )} 
-          <input 
-            type="file" 
-            id="salesProfilePicture" 
-            accept="image/jpeg,image/png" 
-            onChange={handleProfilePictureChange} 
-            style={{ display: 'none' }} 
-          /> 
-          <label htmlFor="salesProfilePicture" className={styles.avatarUpload}> 
-            <FiUpload size={14} /> 
-          </label> 
-        </div> 
-        <div className={styles.userInfo}> 
-          <span className={styles.userName}>{salesUserData.fullName}</span> 
-          <span className={styles.userRole}>Sales Manager ({salesUserData.email})</span> 
-          <span className={styles.userRole}>Sales Team</span> 
-        </div> 
-      </div> 
-    </div>
-  );
-
-  // Add client management tab
-  const ClientsTab = () => {
-    const filteredClients = clients.filter(client => 
-      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.contactEmail.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredDeployedEmployees = deployedEmployees.filter(employee =>
+      (employee.user?.fullName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (employee.technology?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (employee.empId?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -1728,70 +1698,62 @@ const SalesTeamDashboard = () => {
         <div className={styles.filterSection}>
           <div className={styles.searchBox}>
             <FiSearch className={styles.searchIcon} />
-            <input 
-              type="text" 
-              placeholder="Search clients..." 
+            <input
+              type="text"
+              placeholder="Search deployed employees..."
               value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className={styles.searchInput}
             />
           </div>
-          <button 
-            className={`${styles.button} ${styles.primary}`}
-            onClick={() => setShowClientModal(true)}
-          >
-            <FiUserPlus /> Add New Client
-          </button>
+          {/* Add more filters here if needed */}
         </div>
 
-        {filteredClients.length > 0 ? (
-          <div className={styles.cardGrid}>
-            {filteredClients.map(client => (
+        {filteredDeployedEmployees.length > 0 ? (
+          <div className={styles.cardGrid}> {/* Changed to cardGrid */}
+            {filteredDeployedEmployees.map((employee) => (
               <motion.div
-                key={client.id}
+                key={employee.id}
                 layout
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
-                className={styles.clientCard}
+                className={styles.profileCard} /* Reusing profileCard style or similar */
               >
-                <div className={styles.clientHeader}>
-                  <h3 className={styles.clientName}>{client.name}</h3>
-                  <span className={styles.clientEmail}>{client.contactEmail}</span>
+                <div className={styles.profileHeader}> {/* Reusing profileHeader style or similar */}
+                  <h3 className={styles.profileName}> {/* Reusing profileName style or similar */}
+                    {employee.user?.fullName || 'N/A'}
+                  </h3>
+                  <span className={`${styles.statusBadge} ${styles[employee.status?.toLowerCase()]}`}> {/* Status badge */}
+                    {employee.status || 'N/A'}
+                  </span>
                 </div>
 
-                <div className={styles.clientDetails}>
+                <div className={styles.profileDetails}> {/* Reusing profileDetails style or similar */}
+                  <p><strong>Employee ID:</strong> {employee.empId || 'N/A'}</p>
+                  <p><strong>Email:</strong> {employee.user?.email || 'N/A'}</p>
                   <p>
-                    <strong>Active Positions:</strong> {client.activePositions}
+                    <strong>Technology:</strong> 
+                    <span className={`${styles.techBadge} ${styles[employee.technology?.toLowerCase()]}`}>
+                      {employee.technology || 'N/A'}
+                    </span>
                   </p>
-                  <div className={styles.technologyTags}>
-                    {client.technologies.map(tech => (
-                      <span 
-                        key={tech} 
-                        className={`${styles.techBadge} ${styles[tech.toLowerCase()]}`}
-                      >
-                        {tech}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className={styles.clientActions}>
-                  <button className={`${styles.button} ${styles.secondary}`}>
-                    <FiMail /> Contact
-                  </button>
-                  <button className={`${styles.button} ${styles.primary}`}>
-                    <FiFileText /> View JDs
-                  </button>
+                  <p>
+                    <strong>Resource Type:</strong> 
+                    <span className={`${styles.resourceBadge} ${styles[employee.resourceType?.toLowerCase()]}`}>
+                      {employee.resourceType || 'N/A'}
+                    </span>
+                  </p>
+                  <p><strong>Level:</strong> {employee.level || 'N/A'}</p>
                 </div>
               </motion.div>
             ))}
           </div>
         ) : (
           <div className={styles.emptyState}>
-            <FiUsers size={48} />
-            <h4>No clients found</h4>
-            <p>Add new clients or adjust your search.</p>
+            <FiUserCheck size={48} />
+            <h4>No employees currently deployed</h4>
+            <p>Employees marked as deployed will appear here.</p>
           </div>
         )}
       </motion.div>
@@ -1805,11 +1767,11 @@ const SalesTeamDashboard = () => {
     }
 
     if (error) {
-      return <ErrorState message={error} onRetry={fetchData} />;
+      return <ErrorState error={error} />;
     }
 
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
 
     switch (activeTab) {
       case 'clients':
@@ -1868,7 +1830,16 @@ const SalesTeamDashboard = () => {
           </>
         );
       case 'deployments':
-        return <DeploymentsTab />;
+        return (
+          <>
+            <DeploymentsTab />
+            <Pagination
+              totalItems={deployedEmployees.length} // Use deployedEmployees for pagination
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        );
       default:
         return null;
     }
@@ -2050,44 +2021,88 @@ const SalesTeamDashboard = () => {
   };
 
   // Update handleScheduleInterview with better error handling
-  const handleScheduleInterview = async (candidateId) => {
-    const candidate = candidates.find(c => c.id === candidateId);
-    if (!candidate) {
-      setError('Candidate not found');
+  const handleScheduleInterview = async (candidateIds, interviewDetails) => {
+    if (!candidateIds || !Array.isArray(candidateIds) || candidateIds.length === 0) {
+      setError({ type: 'error', message: 'No candidates selected for interview' });
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await scheduleClientInterview(
-        candidateId,
-        selectedClient,
-        interviewDetails.date,
-        interviewDetails.time,
-        interviewDetails.level,
-        selectedJD?.title,
-        interviewDetails.link
-      );
+    if (!interviewDetails) {
+      setError({ type: 'error', message: 'Interview details are required' });
+      return;
+    }
 
-      if (response) {
-        // Update candidate status
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      // Validate required fields
+      if (!interviewDetails.client?.trim()) {
+        throw new Error('Client name is required');
+      }
+      if (!interviewDetails.date) {
+        throw new Error('Interview date is required');
+      }
+      if (!interviewDetails.time) {
+        throw new Error('Interview time is required');
+      }
+      if (!interviewDetails.level) {
+        throw new Error('Interview level is required');
+      }
+      if (!interviewDetails.jobDescriptionTitle?.trim()) {
+        throw new Error('Job description title is required');
+      }
+      if (interviewDetails.mode === 'virtual' && (!interviewDetails.link?.trim())) {
+        throw new Error('Meeting link is required for virtual interviews');
+      }
+      if (interviewDetails.mode === 'in-person' && (!interviewDetails.location?.trim())) {
+        throw new Error('Location is required for in-person interviews');
+      }
+
+      console.log('handleScheduleInterview: interviewDetails before API call:', interviewDetails);
+
+      const interviewPromises = candidateIds.map(id => {
+        const candidate = readyForDeploymentEmployees.find(emp => emp.id === id);
+
+        if (!candidate) {
+          throw new Error(`Employee not found for ID: ${id}`);
+        }
+        console.log('handleScheduleInterview: Candidate being processed:', candidate);
+
+        return scheduleClientInterview(
+          candidate.empId, // Use candidate.empId here
+          interviewDetails.client?.trim(), // client
+          interviewDetails.date, // date
+          interviewDetails.time, // time
+          parseInt(interviewDetails.level), // level
+          interviewDetails.jobDescriptionTitle?.trim(), // jobDescriptionTitle
+          interviewDetails.mode === 'virtual' ? interviewDetails.link?.trim() : interviewDetails.location?.trim(), // meetingLink or location
+          interviewDetails.deployedStatus // Pass the value from the checkbox
+        );
+      });
+
+      const results = await Promise.all(interviewPromises);
+      
+      // Filter out any potential null or undefined results from the API calls
+      const successfulResults = results.filter(result => result);
+
+      // Update the interviews state with the new interviews
+      setClientInterviews(prev => [...prev, ...successfulResults]);
+
+      // Update the status of scheduled candidates to 'interview_scheduled'
         setCandidates(prev => prev.map(c => 
-          c.id === candidateId 
+        candidateIds.includes(c.id) 
             ? { ...c, status: 'interview_scheduled' }
             : c
         ));
         
-        // Update interviews list
-        setClientInterviews(prev => [...prev, response]);
-        
         // Show success message
-        setError({ type: 'success', message: 'Interview scheduled successfully' });
+      setError({ type: 'success', message: `Successfully scheduled ${successfulResults.length} interview(s)!` });
         
-        // Close scheduler
+      // Close the scheduler
         setShowInterviewScheduler(false);
         setSelectedForInterview([]);
-        setInterviewDetails({
+      setInterviewDetails({ // Reset interview details on close
           level: 1,
           date: '',
           time: '',
@@ -2097,44 +2112,55 @@ const SalesTeamDashboard = () => {
           notes: '',
           client: '',
           jobDescriptionTitle: '',
-          interviewerName: ''
+          interviewerName: '',
+          deployedStatus: false // Reset deployedStatus
         });
-      }
+      setBulkSelectedCandidates([]); // Clear bulk selections
+
     } catch (error) {
-      console.error('Error scheduling interview:', error);
-      if (error.response?.status === 401) {
-        setError('Please log in to schedule interviews');
-      } else if (error.response?.status === 403) {
-        setError('Sales team can only schedule client interviews');
-      } else if (error.response?.status === 400) {
-        setError(error.response.data || 'Invalid interview data');
-      } else {
-        setError(error.message || 'Failed to schedule interview');
-      }
+      console.error('Error scheduling interviews:', error);
+      setError({ 
+        type: 'error', 
+        message: error.message || 'Failed to schedule interviews. Please try again.' 
+      });
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleUpdateFeedback = async (interviewId, feedback) => {
+  const handleUpdateFeedback = async (interviewId, result, feedback, technicalScore, communicationScore, deployedStatus) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await updateClientInterview(interviewId, {
+      const response = await updateClientInterview(
+        interviewId,
+        result,
         feedback,
-        result: feedback.toLowerCase().includes('selected') ? 'hired' : 'rejected',
-        overallStatus: 'completed'
-      });
+        technicalScore,
+        communicationScore,
+        deployedStatus // Pass deployedStatus to the API
+      );
 
       if (response) {
-        // Update interview status
+        // After updating, fetch the latest feedback details using the new API
+        const latestFeedbackDetails = await getClientInterviewFeedback(interviewId);
+
+        // Update interview status and feedback details with the data from the new API
         setClientInterviews(prev => prev.map(i => 
           i.id === interviewId 
-            ? { ...i, feedback, result: response.result, overallStatus: 'completed' }
+            ? { 
+                ...i, 
+                feedback: latestFeedbackDetails.feedback, 
+                result: latestFeedbackDetails.result, 
+                overallStatus: latestFeedbackDetails.overallStatus, 
+                technicalScore: latestFeedbackDetails.technicalScore, 
+                communicationScore: latestFeedbackDetails.communicationScore, 
+                deployedStatus: latestFeedbackDetails.deployedStatus // Update deployedStatus in state
+              }
             : i
         ));
-        // Refresh data
-        fetchData();
+        // Refresh data (if needed, but direct state update should suffice)
+        // fetchData(); 
         setError({ type: 'success', message: 'Feedback updated successfully' });
       }
     } catch (error) {
@@ -2207,6 +2233,53 @@ const SalesTeamDashboard = () => {
       toast.error(error.message || 'Failed to update deployment status');
     }
   };
+
+  // Add new state for interview feedback modal
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [selectedInterviewForFeedback, setSelectedInterviewForFeedback] = useState(null);
+
+  const renderHeader = () => (
+    <div className={styles.dashboardHeader}>
+      <div className={styles.headerTitleContainer}>
+        <h1 className={styles.headerTitle}>Sales Team Dashboard</h1>
+        <p className={styles.headerSubtitle}>Client Engagement & Resume Management</p>
+      </div>
+      <div className={styles.headerActions}>
+        <button 
+          className={`${styles.button} ${styles.secondary}`}
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+        >
+          <FiRefreshCw className={isRefreshing ? styles.spinning : ''} />
+          {isRefreshing ? 'Refreshing...' : 'Refresh'}
+        </button>
+        <div className={styles.userProfile}>
+          <div className={styles.userAvatar}>
+            {profilePic ? (
+              <img src={profilePic} alt="Profile" />
+            ) : (
+              <FiUser size={18} />
+            )}
+            <input
+              type="file"
+              id="salesProfilePicture"
+              accept="image/jpeg,image/png"
+              onChange={handleProfilePictureChange}
+              style={{ display: 'none' }}
+            />
+            <label htmlFor="salesProfilePicture" className={styles.avatarUpload}>
+              <FiUpload size={14} />
+            </label>
+          </div>
+          <div className={styles.userInfo}>
+            <span className={styles.userName}>{salesUserData.fullName}</span>
+            <span className={styles.userRole}>Sales Manager ({salesUserData.email})</span>
+            <span className={styles.userRole}>Sales Team</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className={styles.dashboardContainer}>
@@ -2400,6 +2473,146 @@ const SalesTeamDashboard = () => {
           </motion.div>
         </div>
       )}
+      {/* Feedback Modal */}
+      <AnimatePresence>
+        {console.log('Rendering FeedbackModal? showFeedbackModal:', showFeedbackModal, 'selectedInterviewForFeedback:', selectedInterviewForFeedback)}
+        {showFeedbackModal && selectedInterviewForFeedback && (
+          <FeedbackModal
+            show={showFeedbackModal}
+            onClose={() => {
+              setShowFeedbackModal(false);
+              setSelectedInterviewForFeedback(null);
+            }}
+            interview={selectedInterviewForFeedback}
+            onSubmit={handleUpdateFeedback}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const FeedbackModal = ({ show, onClose, interview, onSubmit }) => {
+  const [techScore, setTechScore] = useState(interview.technicalScore || 0);
+  const [commScore, setCommScore] = useState(interview.communicationScore || 0);
+  const [feedback, setFeedback] = useState(interview.feedback || '');
+  const [deployedStatus, setDeployedStatus] = useState(interview.deployedStatus || false); // Add state for deployedStatus
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (techScore < 0 || techScore > 10) {
+      setError('Technical score must be between 0 and 10.');
+      return;
+    }
+    if (commScore < 0 || commScore > 10) {
+      setError('Communication score must be between 0 and 10.');
+      return;
+    }
+    if (!feedback.trim()) {
+      setError('Feedback cannot be empty.');
+      return;
+    }
+
+    // Pass the relevant parameters to the onSubmit function (handleUpdateFeedback)
+    onSubmit(interview.id, 'completed', feedback, techScore, commScore, deployedStatus); // Pass deployedStatus here
+    onClose();
+  };
+
+  if (!show) return null;
+
+  return (
+    <div className={styles.modalOverlay}>
+      <motion.div
+        className={styles.modal}
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+      >
+        <form onSubmit={handleSubmit}>
+          <div className={styles.modalHeader}>
+            <h3>Update Feedback for {interview.candidateName}</h3>
+            <button
+              className={styles.closeButton}
+              type="button"
+              onClick={onClose}
+            >
+              <FiX />
+            </button>
+          </div>
+          <div className={styles.modalContent}>
+            {error && <div className={styles.errorMessage}>{error}</div>}
+            
+            <div className={styles.formGroup}>
+              <label>Technical Score (0-10) *</label>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                value={techScore}
+                onChange={(e) => setTechScore(parseInt(e.target.value) || 0)}
+                className={styles.input}
+                required
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Communication Score (0-10) *</label>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                value={commScore}
+                onChange={(e) => setCommScore(parseInt(e.target.value) || 0)}
+                className={styles.input}
+                required
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Detailed Feedback *</label>
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Enter detailed feedback here..."
+                className={styles.textarea}
+                rows="5"
+                required
+              />
+            </div>
+
+            {/* Deployed Status Checkbox in Feedback Modal */}
+            <div className={styles.formGroup}>
+                <label className={styles.checkboxLabel}>
+                    <input
+                        type="checkbox"
+                        checked={deployedStatus}
+                        onChange={(e) => setDeployedStatus(e.target.checked)}
+                    />
+                    <span>Mark as Deployed</span>
+                </label>
+            </div>
+
+            <div className={styles.modalFooter}>
+              <button
+                className={`${styles.button} ${styles.secondary}`}
+                type="button"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                className={`${styles.button} ${styles.primary}`}
+                type="submit"
+              >
+                Submit Feedback
+              </button>
+            </div>
+          </div>
+        </form>
+      </motion.div>
     </div>
   );
 };
