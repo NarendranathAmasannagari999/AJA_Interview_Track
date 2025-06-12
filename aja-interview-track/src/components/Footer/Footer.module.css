@@ -20,12 +20,12 @@
 }
 
 .footerContainer {
-  max-width: 1400px;
+  /* max-width: 1400px; */
   margin: 0 auto;
   padding: 0 3rem;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 4rem;
+  gap: 1rem;
   position: relative;
   z-index: 2;
 }
