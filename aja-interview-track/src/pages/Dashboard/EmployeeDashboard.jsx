@@ -20,6 +20,7 @@ import {
   addInterviewQuestion,
   getInterviewQuestions,
   updateEmployeeDetails,
+  getDeployedEmployees,
   updateProfilePicture,
   getProfilePicture
 } from '../../API/employee';
@@ -83,7 +84,8 @@ const EmployeeDashboard = () => {
     { id: 'jd', label: 'Job Descriptions', icon: <FiFileText /> },
     { id: 'resume', label: 'Resume Preparation', icon: <FiUpload /> },
     { id: 'interviews', label: 'Client Interviews', icon: <FiMessageSquare /> },
-    { id: 'performance', label: 'Performance', icon: <FiBarChart2 /> }
+    { id: 'performance', label: 'Performance', icon: <FiBarChart2 /> },
+    { id: 'profile', label: 'My Profile', icon: <FiUser /> }
   ];
 
   useEffect(() => {
@@ -156,7 +158,8 @@ const EmployeeDashboard = () => {
           fetchMockInterviews(empId),
           fetchClientInterviews(empId),
           fetchJobDescriptions(),
-          fetchInterviewQuestions()
+          fetchInterviewQuestions(),
+          fetchDeployedEmployees()
         ]);
       } catch (err) {
         if (err.message.includes('Unauthorized')) {
@@ -208,6 +211,19 @@ const EmployeeDashboard = () => {
       toast.error(err.message);
     }
   };
+
+  const fetchDeployedEmployees = async () => {
+    try {
+      setLoading(true);
+      const data = await getDeployedEmployees();
+      setDeployedEmployees(data);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const handleScheduleInterview = async (e) => {
     e.preventDefault();
@@ -378,7 +394,7 @@ const EmployeeDashboard = () => {
     try {
       setLoading(true);
       await updateProfilePicture(employeeId, file);
-      const picBlob = await getProfilePicture();
+      const picBlob = await getProfilePicture(employeeId);
       const picUrl = URL.createObjectURL(picBlob);
       setProfilePic(picUrl);
       toast.success('Profile picture updated successfully!');
@@ -403,8 +419,8 @@ const EmployeeDashboard = () => {
   );
 
   const filteredDeployedEmployees = () => deployedEmployees.filter(
-    e => technologyFilter === 'all' || e.technology.toLowerCase() === technologyFilter
-      && resourceTypeFilter === 'all' || e.resourceType.toLowerCase() === resourceTypeFilter
+    e => (technologyFilter === 'all' || (e.technology && e.technology.toLowerCase() === technologyFilter.toLowerCase())) 
+      && (resourceTypeFilter === 'all' || (e.resourceType && e.resourceType.toLowerCase() === resourceTypeFilter.toLowerCase()))
   );
 
   const renderPerformanceSection = () => {
@@ -847,7 +863,19 @@ const EmployeeDashboard = () => {
                 onClick={() => setOpenAccordionPanel(openAccordionPanel === 'deployed' ? null : 'deployed')}
               >
                 <h4><FiAward /> Deployed Colleagues</h4>
-                {openAccordionPanel === 'deployed' ? <FiChevronUp /> : <FiChevronDown />}
+                <div className={styles.accordionActions}>
+                  <button 
+                    className={styles.iconButton}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fetchDeployedEmployees();
+                      toast.info('Refreshing deployed colleagues list...');
+                    }}
+                  >
+                    <FiRefreshCw />
+                  </button>
+                  {openAccordionPanel === 'deployed' ? <FiChevronUp /> : <FiChevronDown />}
+                </div>
               </div>
               <AnimatePresence>
                 {openAccordionPanel === 'deployed' && (
@@ -859,7 +887,12 @@ const EmployeeDashboard = () => {
                     className={styles.accordionContent}
                   >
                     <div className={styles.deployedGrid}>
-                      {filteredDeployedEmployees().length > 0 ? (
+                      {loading ? (
+                        <motion.div className={styles.loadingContainer}>
+                          <div className={styles.loadingSpinner}></div>
+                          <p>Loading deployed colleagues...</p>
+                        </motion.div>
+                      ) : filteredDeployedEmployees().length > 0 ? (
                         filteredDeployedEmployees().map(employee => (
                           <motion.div 
                             key={employee.id} 
@@ -868,19 +901,20 @@ const EmployeeDashboard = () => {
                           >
                             <div className={styles.deployedHeader}>
                               <div className={styles.avatar}>
-                                {employee.name.charAt(0)}
+                                {employee.user?.fullName?.charAt(0) || 'E'}
                               </div>
                               <div>
-                                <h5>{employee.name}</h5>
+                                <h5>{employee.user?.fullName || 'Employee'}</h5>
                                 <div className={styles.deployedMeta}>
-                                  <span className={styles.techBadge}>{employee.technology}</span>
-                                  <span className={styles.resourceBadge}>{employee.resourceType}</span>
+                                  <span className={styles.techBadge}>{employee.technology || 'N/A'}</span>
+                                  <span className={styles.resourceBadge}>{employee.resourceType || 'N/A'}</span>
                                 </div>
                               </div>
                             </div>
                             <div className={styles.deployedDetails}>
-                              <p><strong>Client:</strong> {employee.client}</p>
-                              <p><strong>Deployed on:</strong> {formatDate(employee.date)}</p>
+                              <p><strong>Employee ID:</strong> {employee.empId || 'N/A'}</p>
+                              <p><strong>Level:</strong> {employee.level || 'N/A'}</p>
+                              <p><strong>Status:</strong> <span className={styles.statusBadge}>Deployed</span></p>
                             </div>
                           </motion.div>
                         ))
@@ -900,6 +934,95 @@ const EmployeeDashboard = () => {
 
       case 'performance':
         return renderPerformanceSection();
+        
+      case 'profile':
+        return (
+          <div className={styles.sectionContainer}>
+            <h3 className={styles.sectionTitle}>My Profile</h3>
+            <div className={styles.profileSection}>
+              <div className={styles.profileCard}>
+                <div className={styles.profileHeader}>
+                  <div className={styles.profilePictureContainer}>
+                    {loading ? (
+                      <div className={styles.loadingSpinner} />
+                    ) : profilePic ? (
+                      <img src={profilePic} alt="Profile" className={styles.profilePicture} />
+                    ) : (
+                      <div className={styles.noProfilePic}>
+                        <FiUser size={48} />
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      id="profilePictureUpload"
+                      accept="image/jpeg,image/png"
+                      onChange={handleProfilePictureChange}
+                      style={{ display: 'none' }}
+                    />
+                    <label htmlFor="profilePictureUpload" className={styles.profilePictureUpload}>
+                      <FiUpload size={18} /> Update Photo
+                    </label>
+                  </div>
+                  <div className={styles.profileInfo}>
+                    <h2>{employeeData.name}</h2>
+                    <p className={styles.profileRole}>{employeeData.technology} Developer</p>
+                    <p className={styles.profileEmail}>{employeeData.userEmail}</p>
+                    <p className={styles.profileId}>Employee ID: {employeeData.empId}</p>
+                  </div>
+                </div>
+                
+                <div className={styles.profileDetails}>
+                  <h4>Employee Details</h4>
+                  <form onSubmit={handleSubmitEmployeeDetails} className={styles.profileForm}>
+                    <div className={styles.formGroup}>
+                      <label htmlFor="empId">Employee ID</label>
+                      <input
+                        type="text"
+                        id="empId"
+                        name="empId"
+                        value={employeeData.empId}
+                        onChange={handleInputChange}
+                        className={styles.formControl}
+                      />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label htmlFor="technology">Technology</label>
+                      <input
+                        type="text"
+                        id="technology"
+                        name="technology"
+                        value={employeeData.technology}
+                        onChange={handleInputChange}
+                        className={styles.formControl}
+                      />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Resource Type</label>
+                      <p className={styles.staticField}>{employeeData.resourceType || 'Not specified'}</p>
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Level</label>
+                      <p className={styles.staticField}>{employeeData.level || 'Not specified'}</p>
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Status</label>
+                      <p className={styles.staticField}>{employeeData.status || 'Not specified'}</p>
+                    </div>
+                    <div className={styles.formActions}>
+                      <button 
+                        type="submit" 
+                        className={styles.primaryButton}
+                        disabled={loading}
+                      >
+                        {loading ? 'Updating...' : 'Update Profile'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
 
       default:
         return null;

@@ -301,3 +301,51 @@ export const getProfilePicture = async (employeeId) => {
     throw error.response?.data || error.message;
   }
 };
+
+/**
+ * Get employees ready for deployment with optional filters
+ * @param {string} technology - Optional technology filter
+ * @param {string} resourceType - Optional resource type filter
+ * @returns {Promise<Array>} List of employees ready for deployment
+ */
+export const getEmployeesReadyForDeployment = async (technology = null, resourceType = null) => {
+  try {
+    const params = new URLSearchParams();
+    if (technology) params.append('technology', technology);
+    if (resourceType) params.append('resourceType', resourceType);
+
+    const response = await axiosInstance.get(`${BASE_URL}/ready-for-deployment`, { params });
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('Access denied: You do not have permission to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid input parameters');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Get deployed employees
+ * @returns {Promise<Array>} List of deployed employees
+ */
+export const getDeployedEmployees = async () => {
+  try {
+    const response = await axiosInstance.get(`${BASE_URL}/deployed`);
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('Access denied: You do not have permission to access this resource');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
