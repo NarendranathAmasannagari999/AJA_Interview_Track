@@ -1,14 +1,14 @@
 import axiosInstance from './axiosConfig';
-
+ 
 // Base URL for sales-related endpoints
 const BASE_URL = '/api/sales';
-
+ 
 /**
  * Get candidates with optional filters
- * @param {string} technology - Optional technology filter
- * @param {string} status - Optional status filter
- * @param {string} resourceType - Optional resource type filter
- * @returns {Promise<Array>} List of candidates
+ * @param {string} technology - Optional technology filter (default: 'all')
+ * @param {string} status - Optional status filter (default: 'all')
+ * @param {string} resourceType - Optional resource type filter (default: 'all')
+ * @returns {Promise<Array<Employee>>} List of candidates
  */
 export const getCandidates = async (technology = 'all', status = 'all', resourceType = 'all') => {
   try {
@@ -17,31 +17,30 @@ export const getCandidates = async (technology = 'all', status = 'all', resource
     });
     return response.data;
   } catch (error) {
-    handleApiError(error);
-    return [];
+    throw handleApiError(error);
   }
 };
-
+ 
 /**
  * Schedule a client interview
  * @param {string} empId - Employee ID
  * @param {string} client - Client name
- * @param {string} date - Interview date (YYYY-MM-DD)
- * @param {string} time - Interview time (HH:mm:ss)
+ * @param {string} date - Interview date in ISO format (YYYY-MM-DD)
+ * @param {string} time - Interview time in HH:mm:ss format
  * @param {number} level - Interview level
  * @param {string} jobDescriptionTitle - Job description title
  * @param {string} meetingLink - Meeting link
  * @param {boolean} deployedStatus - Deployment status
- * @returns {Promise<Object>} Scheduled interview object
+ * @returns {Promise<ClientInterview>} Scheduled interview object
  */
-export const scheduleClientInterview = async (empId, client, date, time, level, jobDescriptionTitle, meetingLink, deployedStatus) => {
+export const scheduleClientInterview = async (empId, client, date, time, level, jobDescriptionTitle, meetingLink, deployedStatus = false) => {
   try {
     const response = await axiosInstance.post(`${BASE_URL}/interviews/schedule`, null, {
       params: {
         empId,
-        interviewType: 'client',
+        interviewType: 'client', // Required by backend
         date,
-        time: `${time}:00`,
+        time: time.includes(':') ? time : `${time}:00`, // Ensure proper time format
         client,
         level,
         jobDescriptionTitle,
@@ -51,40 +50,49 @@ export const scheduleClientInterview = async (empId, client, date, time, level, 
     });
     return response.data;
   } catch (error) {
-    handleApiError(error);
-    throw error;
+    throw handleApiError(error);
   }
 };
-
+ 
 /**
- * Update client interview feedback
- * @param {number} interviewId - Interview ID
- * @param {string} result - Interview result
- * @param {string} feedback - Interview feedback
- * @param {number} technicalScore - Technical score
- * @param {number} communicationScore - Communication score
- * @param {boolean} deployedStatus - Deployment status
- * @returns {Promise<Object>} Updated interview object
+ * Schedule multiple client interviews for an employee
+ * @param {string} empId - Employee ID
+ * @param {Array<ClientInterviewSchedule>} schedules - Array of interview schedules
+ * @returns {Promise<Array<ClientInterview>>} Array of scheduled interviews
  */
-export const updateClientInterview = async (interviewId, result, feedback, technicalScore, communicationScore, deployedStatus) => {
+export const scheduleMultipleClientInterviews = async (empId, schedules) => {
   try {
-    const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, {
-      result,
-      feedback,
-      technicalScore,
-      communicationScore,
-      deployedStatus
-    });
+    const response = await axiosInstance.post(`${BASE_URL}/employees/${empId}/interviews`, schedules);
     return response.data;
   } catch (error) {
     throw handleApiError(error);
   }
 };
-
+ 
+/**
+ * Update client interview feedback
+ * @param {number} interviewId - Interview ID
+ * @param {Object} feedbackData - Interview feedback data
+ * @param {string} feedbackData.result - Interview result
+ * @param {string} feedbackData.feedback - Interview feedback
+ * @param {number} feedbackData.technicalScore - Technical score
+ * @param {number} feedbackData.communicationScore - Communication score
+ * @param {boolean} feedbackData.deployedStatus - Deployment status
+ * @returns {Promise<Object>} Updated interview object
+ */
+export const updateClientInterview = async (interviewId, feedbackData) => {
+  try {
+    const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, feedbackData);
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+ 
 /**
  * Get client interviews with optional search
  * @param {string} search - Optional search term
- * @returns {Promise<Array>} List of client interviews
+ * @returns {Promise<Array<ClientInterview>>} List of client interviews
  */
 export const getClientInterviews = async (search = null) => {
   try {
@@ -96,35 +104,44 @@ export const getClientInterviews = async (search = null) => {
     throw handleApiError(error);
   }
 };
-
+ 
+/**
+ * Get total count of scheduled client interviews
+ * @returns {Promise<number>} Total count of interviews
+ */
+export const getClientInterviewCount = async () => {
+  try {
+    const response = await axiosInstance.get(`${BASE_URL}/get-all-scheduleclientinterview-count`);
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+ 
 /**
  * Add a new client
- * @param {string} name - Client name
- * @param {string} contactEmail - Contact email
- * @param {number} activePositions - Number of active positions
- * @param {Array<string>} technologies - List of technologies
- * @returns {Promise<Object>} Added client object
+ * @param {Object} clientData - Client data
+ * @param {string} clientData.name - Client name
+ * @param {string} clientData.contactEmail - Contact email
+ * @param {number} clientData.activePositions - Number of active positions
+ * @param {Array<string>} clientData.technologies - List of technologies
+ * @returns {Promise<Client>} Added client object
  */
-export const addClient = async (name, contactEmail, activePositions, technologies) => {
+export const addClient = async (clientData) => {
   try {
     const response = await axiosInstance.post(`${BASE_URL}/clients`, null, {
-      params: {
-        name,
-        contactEmail,
-        activePositions,
-        technologies
-      }
+      params: clientData
     });
     return response.data;
   } catch (error) {
     throw handleApiError(error);
   }
 };
-
+ 
 /**
  * Get clients with optional search
  * @param {string} search - Optional search term
- * @returns {Promise<Array>} List of clients
+ * @returns {Promise<Array<Client>>} List of clients
  */
 export const getClients = async (search = null) => {
   try {
@@ -136,31 +153,29 @@ export const getClients = async (search = null) => {
     throw handleApiError(error);
   }
 };
-
+ 
 /**
  * Add a new job description
- * @param {string} title - Job title
- * @param {string} client - Client name
- * @param {string} receivedDate - Received date (YYYY-MM-DD)
- * @param {string} deadline - Deadline date (YYYY-MM-DD)
- * @param {string} technology - Technology
- * @param {string} resourceType - Resource type
- * @param {string} description - Job description
- * @param {File} file - Job description file
- * @returns {Promise<Object>} Added job description object
+ * @param {Object} jdData - Job description data
+ * @param {string} jdData.title - Job title
+ * @param {string} jdData.client - Client name
+ * @param {string} jdData.receivedDate - Received date (YYYY-MM-DD)
+ * @param {string} jdData.deadline - Deadline date (YYYY-MM-DD)
+ * @param {string} jdData.technology - Technology
+ * @param {string} jdData.resourceType - Resource type
+ * @param {string} jdData.description - Job description
+ * @param {File} jdData.file - Job description file
+ * @returns {Promise<JobDescription>} Added job description object
  */
-export const addJobDescription = async (title, client, receivedDate, deadline, technology, resourceType, description, file) => {
+export const addJobDescription = async (jdData) => {
   try {
     const formData = new FormData();
-    formData.append('title', title);
-    formData.append('client', client);
-    formData.append('receivedDate', receivedDate);
-    formData.append('deadline', deadline);
-    formData.append('technology', technology);
-    formData.append('resourceType', resourceType);
-    formData.append('description', description);
-    if (file) formData.append('file', file);
-
+    Object.entries(jdData).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, value);
+      }
+    });
+ 
     const response = await axiosInstance.post(`${BASE_URL}/job-descriptions`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -171,10 +186,10 @@ export const addJobDescription = async (title, client, receivedDate, deadline, t
     throw handleApiError(error);
   }
 };
-
+ 
 /**
  * Get all job descriptions
- * @returns {Promise<Array>} List of all job descriptions
+ * @returns {Promise<Array<JobDescription>>} List of all job descriptions
  */
 export const getAllJobDescriptions = async () => {
   try {
@@ -184,7 +199,7 @@ export const getAllJobDescriptions = async () => {
     throw handleApiError(error);
   }
 };
-
+ 
 /**
  * Download job description file
  * @param {number} jdId - Job description ID
@@ -200,7 +215,7 @@ export const downloadJobDescription = async (jdId) => {
     throw handleApiError(error);
   }
 };
-
+ 
 /**
  * Delete job description
  * @param {number} jdId - Job description ID
@@ -213,7 +228,7 @@ export const deleteJobDescription = async (jdId) => {
     throw handleApiError(error);
   }
 };
-
+ 
 /**
  * Get client interview feedback
  * @param {number} interviewId - Interview ID
@@ -227,10 +242,10 @@ export const getClientInterviewFeedback = async (interviewId) => {
     throw handleApiError(error);
   }
 };
-
+ 
 /**
  * Get deployed employees
- * @returns {Promise<Array>} List of deployed employees
+ * @returns {Promise<Array<Employee>>} List of deployed employees
  */
 export const getDeployedEmployees = async () => {
   try {
@@ -240,19 +255,23 @@ export const getDeployedEmployees = async () => {
     throw handleApiError(error);
   }
 };
-
+ 
 /**
  * Update profile picture
  * @param {number} userId - User ID
- * @param {File} file - Profile picture file
- * @returns {Promise<Object>} Updated user object
+ * @param {File} file - Profile picture file (JPEG or PNG)
+ * @returns {Promise<User>} Updated user object
  */
 export const updateProfilePicture = async (userId, file) => {
   try {
+    if (!file || !['image/jpeg', 'image/png'].includes(file.type)) {
+      throw new Error('Profile picture must be a JPEG or PNG file');
+    }
+ 
     const formData = new FormData();
     formData.append('Id', userId);
     formData.append('file', file);
-
+ 
     const response = await axiosInstance.put(`${BASE_URL}/profile-picture`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -263,7 +282,7 @@ export const updateProfilePicture = async (userId, file) => {
     throw handleApiError(error);
   }
 };
-
+ 
 /**
  * Get profile picture
  * @param {number} employeeId - Employee ID
@@ -279,34 +298,115 @@ export const getProfilePicture = async (employeeId) => {
     throw handleApiError(error);
   }
 };
-
+ 
 /**
  * Helper function to handle API errors
  * @param {Error} error - The error object
  * @throws {Error} Formatted error message
  */
 const handleApiError = (error) => {
-  if (error.response?.status === 401) {
-    throw new Error('Unauthorized: Please login to access this resource');
+  if (error.response) {
+    switch (error.response.status) {
+      case 401:
+        throw new Error('Unauthorized: Please login to access this resource');
+      case 403:
+        throw new Error('Access denied: You do not have permission to perform this action');
+      case 400:
+        throw new Error(error.response.data || 'Invalid input data');
+      case 404:
+        throw new Error('Resource not found');
+      case 500:
+        throw new Error('Internal server error. Please try again later.');
+      default:
+        throw new Error(error.response.data || 'An error occurred while processing your request');
+    }
   }
-  if (error.response?.status === 403) {
-    throw new Error('Access denied: You do not have permission to perform this action');
-  }
-  if (error.response?.status === 400) {
-    throw new Error(error.response.data || 'Invalid input data');
-  }
-  if (error.response?.status === 404) {
-    throw new Error('Resource not found');
-  }
-  throw error.response?.data || error.message;
+  throw error;
 };
-
+ 
+// Type definitions for better IDE support
+/**
+ * @typedef {Object} Employee
+ * @property {number} id
+ * @property {User} user
+ * @property {string} empId
+ * @property {string} technology
+ * @property {string} resourceType
+ * @property {string} status
+ * @property {string} profilePicS3Key
+ * @property {boolean} readyForDeployment
+ * @property {boolean} deployed
+ * @property {boolean} sentToSales
+ */
+ 
+/**
+ * @typedef {Object} User
+ * @property {number} id
+ * @property {string} fullName
+ * @property {string} email
+ * @property {string} role
+ * @property {string} profilePicS3Key
+ */
+ 
+/**
+ * @typedef {Object} ClientInterview
+ * @property {number} id
+ * @property {Employee} employee
+ * @property {string} client
+ * @property {string} date
+ * @property {string} time
+ * @property {number} level
+ * @property {string} jobDescriptionTitle
+ * @property {string} meetingLink
+ * @property {string} status
+ * @property {string} result
+ * @property {string} feedback
+ * @property {number} technicalScore
+ * @property {number} communicationScore
+ * @property {boolean} deployedStatus
+ */
+ 
+/**
+ * @typedef {Object} ClientInterviewSchedule
+ * @property {string} client
+ * @property {string} date
+ * @property {string} time
+ * @property {number} level
+ * @property {string} jobDescriptionTitle
+ * @property {string} meetingLink
+ * @property {boolean} deployedStatus
+ */
+ 
+/**
+ * @typedef {Object} Client
+ * @property {number} id
+ * @property {string} name
+ * @property {string} contactEmail
+ * @property {number} activePositions
+ * @property {Array<string>} technologies
+ */
+ 
+/**
+ * @typedef {Object} JobDescription
+ * @property {number} id
+ * @property {string} title
+ * @property {string} client
+ * @property {string} receivedDate
+ * @property {string} deadline
+ * @property {string} technology
+ * @property {string} resourceType
+ * @property {string} description
+ * @property {string} s3Key
+ */
+ 
 // Export all functions as a single object
 export default {
   getCandidates,
   scheduleClientInterview,
+  scheduleMultipleClientInterviews,
   updateClientInterview,
   getClientInterviews,
+  getClientInterviewCount,
   addClient,
   getClients,
   addJobDescription,
@@ -318,3 +418,5 @@ export default {
   updateProfilePicture,
   getProfilePicture
 };
+ 
+ 

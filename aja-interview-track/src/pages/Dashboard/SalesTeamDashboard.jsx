@@ -739,40 +739,44 @@ const SalesTeamDashboard = () => {
   const fetchUserData = async () => {
     try {
       const token = localStorage.getItem("jwt_token");
-      if (token) {
-        const decoded = jwtDecode(token);
-        const email =
-          decoded.sub ||
-          decoded.email ||
-          localStorage.getItem("userEmail") ||
-          "N/A";
-        const role = decoded.role || localStorage.getItem("userRole") || "N/A";
-        const fullName = email !== "N/A" ? email.split("@")[0] : "N/A";
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
 
-        setSalesUserData({
-          fullName,
-          email,
-          role,
-          empId: decoded.empId || "",
-          id: decoded.id || "",
-          technology: decoded.technology || "",
-          resourceType: decoded.resourceType || "",
-          level: decoded.level || "",
-          status: decoded.status || "Active",
-        });
+      const decoded = jwtDecode(token);
+      const email = decoded.sub || decoded.email || localStorage.getItem("userEmail") || "N/A";
+      const role = decoded.role || localStorage.getItem("userRole") || "N/A";
+      const fullName = email !== "N/A" ? email.split("@")[0] : "N/A";
 
-        // Fetch profile picture if empId exists
-        if (decoded.empId) {
-          try {
-            const pictureBlob = await getProfilePicture(decoded.empId);
-            setProfilePic(URL.createObjectURL(pictureBlob));
-          } catch (pictureError) {
-            console.log("No profile picture found, using default");
+      setSalesUserData({
+        fullName,
+        email,
+        role,
+        empId: decoded.empId || "",
+        id: decoded.id || "",
+        technology: decoded.technology || "",
+        resourceType: decoded.resourceType || "",
+        level: decoded.level || "",
+        status: decoded.status || "Active",
+      });
+
+      // Fetch profile picture if empId exists
+      if (decoded.empId) {
+        try {
+          const pictureBlob = await getProfilePicture(decoded.empId);
+          if (pictureBlob) {
+            const imageUrl = URL.createObjectURL(pictureBlob);
+            setProfilePic(imageUrl);
           }
+        } catch (pictureError) {
+          console.error("Error fetching profile picture:", pictureError);
+          toast.error("Failed to load profile picture. Using default avatar.");
         }
       }
     } catch (err) {
-      console.error("Error decoding token:", err);
+      console.error("Error in fetchUserData:", err);
+      toast.error("Failed to load user data. Please refresh the page.");
+      setError("Failed to load user data");
     }
   };
 
@@ -780,28 +784,38 @@ const SalesTeamDashboard = () => {
     try {
       setIsLoading(true);
       setError(null);
+
+      const fetchPromises = [
+        getCandidates(filterTech, filterStatus, filterResourceType),
+        getClientInterviews(searchTerm),
+        getClients(searchTerm),
+        getAllJobDescriptions(),
+        getDeployedEmployees()
+      ];
+
       const [
         candidatesData,
         interviewsData,
         clientsData,
         jobDescriptionsData,
-        deployedEmployeesData,
-      ] = await Promise.all([
-        getCandidates(filterTech, filterStatus, filterResourceType),
-        getClientInterviews(searchTerm),
-        getClients(searchTerm),
-        getAllJobDescriptions(),
-        getDeployedEmployees(),
-      ]);
+        deployedEmployeesData
+      ] = await Promise.all(fetchPromises.map(p => p.catch(error => {
+        console.error("Error in fetchData:", error);
+        toast.error(`Failed to fetch some data: ${error.message}`);
+        return null;
+      })));
 
-      setCandidates(candidatesData);
-      setClientInterviews(interviewsData);
-      setClients(clientsData);
-      setJobDescriptions(jobDescriptionsData);
-      setDeployedEmployees(deployedEmployeesData);
+      // Only update state if data was successfully fetched
+      if (candidatesData) setCandidates(candidatesData);
+      if (interviewsData) setClientInterviews(interviewsData);
+      if (clientsData) setClients(clientsData);
+      if (jobDescriptionsData) setJobDescriptions(jobDescriptionsData);
+      if (deployedEmployeesData) setDeployedEmployees(deployedEmployeesData);
+
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error in fetchData:", error);
       toast.error("Failed to fetch data. Please try again later.");
+      setError("Failed to fetch data");
     } finally {
       setIsLoading(false);
       setIsInitialLoading(false);
@@ -844,9 +858,18 @@ const SalesTeamDashboard = () => {
 
     try {
       setIsSubmitting(true);
+      toast.info("Updating profile picture...");
+
+      // Update profile picture
       await updateProfilePicture(salesUserData.id, file);
-      setProfilePic(URL.createObjectURL(file));
-      toast.success("Profile picture updated successfully");
+      
+      // Fetch updated profile picture
+      const pictureBlob = await getProfilePicture(salesUserData.empId);
+      if (pictureBlob) {
+        const imageUrl = URL.createObjectURL(pictureBlob);
+        setProfilePic(imageUrl);
+        toast.success("Profile picture updated successfully");
+      }
     } catch (error) {
       console.error("Error updating profile picture:", error);
       toast.error(error.message || "Failed to update profile picture");
@@ -856,8 +879,31 @@ const SalesTeamDashboard = () => {
   };
 
   const handleScheduleInterview = async (empId, details) => {
+    if (!empId || !details) {
+      toast.error("Missing required interview details");
+      return;
+    }
+
+    // Validate required fields
+    const requiredFields = {
+      client: "Client name",
+      date: "Interview date",
+      time: "Interview time",
+      level: "Interview level",
+      jobDescriptionTitle: "Job description title",
+      meetingLink: "Meeting link"
+    };
+
+    for (const [field, label] of Object.entries(requiredFields)) {
+      if (!details[field]) {
+        toast.error(`${label} is required`);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setError(null);
+
     try {
       // Format time to HH:mm:ss
       const formattedTime = details.time.includes(':') 
@@ -865,6 +911,8 @@ const SalesTeamDashboard = () => {
           ? `${details.time}:00` 
           : details.time
         : details.time;
+
+      toast.info("Scheduling interview...");
 
       const response = await scheduleClientInterview(
         empId,
@@ -881,12 +929,14 @@ const SalesTeamDashboard = () => {
         setClientInterviews((prev) => [...prev, response]);
         setShowInterviewScheduler(false);
         setSelectedForInterview([]);
+        setInterviewDetails(initialInterviewDetails);
         toast.success("Interview scheduled successfully!");
         await fetchData();
       }
     } catch (error) {
       console.error("Error scheduling interview:", error);
       toast.error(error.message || "Failed to schedule interview");
+      setError(error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -900,10 +950,29 @@ const SalesTeamDashboard = () => {
     communicationScore,
     deployedStatus
   ) => {
+    if (!interviewId) {
+      toast.error("Interview ID is required");
+      return;
+    }
+
+    // Validate scores
+    if (technicalScore < 0 || technicalScore > 10 || communicationScore < 0 || communicationScore > 10) {
+      toast.error("Scores must be between 0 and 10");
+      return;
+    }
+
+    // Validate feedback
+    if (!feedback.trim()) {
+      toast.error("Feedback cannot be empty");
+      return;
+    }
+
     setIsFeedbackLoading(true);
     setError(null);
 
     try {
+      toast.info("Updating interview feedback...");
+
       const updatedInterview = await updateClientInterview(
         interviewId,
         result,
@@ -913,39 +982,48 @@ const SalesTeamDashboard = () => {
         deployedStatus
       );
 
-      setClientInterviews((prev) =>
-        prev.map((interview) =>
-          interview.id === interviewId ? updatedInterview : interview
-        )
-      );
+      if (updatedInterview) {
+        setClientInterviews((prev) =>
+          prev.map((interview) =>
+            interview.id === interviewId ? updatedInterview : interview
+          )
+        );
 
-      setShowFeedbackModal(false);
-      setSelectedInterviewForFeedback(null);
-      toast.success("Feedback updated successfully!");
-      await fetchData();
-
-      return updatedInterview;
+        setShowFeedbackModal(false);
+        setSelectedInterviewForFeedback(null);
+        toast.success("Feedback updated successfully!");
+        await fetchData();
+      }
     } catch (error) {
       console.error("Error updating feedback:", error);
       toast.error(error.message || "Failed to update feedback");
-      throw error;
+      setError(error.message);
     } finally {
       setIsFeedbackLoading(false);
     }
   };
 
   const handleDownloadJD = async (jdId) => {
+    if (!jdId) {
+      toast.error("Job description ID is required");
+      return;
+    }
+
     try {
+      toast.info("Downloading job description...");
       const blob = await downloadJobDescription(jdId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `job_description_${jdId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      toast.success("Job description downloaded successfully");
+      
+      if (blob) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `job_description_${jdId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success("Job description downloaded successfully");
+      }
     } catch (error) {
       console.error("Error downloading job description:", error);
       toast.error(error.message || "Failed to download job description");
@@ -953,7 +1031,17 @@ const SalesTeamDashboard = () => {
   };
 
   const handleDeleteJD = async (jdId) => {
+    if (!jdId) {
+      toast.error("Job description ID is required");
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to delete this job description?")) {
+      return;
+    }
+
     try {
+      toast.info("Deleting job description...");
       await deleteJobDescription(jdId);
       setJobDescriptions((prev) => prev.filter((jd) => jd.id !== jdId));
       toast.success("Job description deleted successfully");
@@ -968,6 +1056,7 @@ const SalesTeamDashboard = () => {
     setClientModalError("");
     setClientModalSuccess("");
 
+    // Validate required fields
     if (!clientModalFields.name.trim()) {
       setClientModalError("Client name is required");
       return;
@@ -987,26 +1076,35 @@ const SalesTeamDashboard = () => {
 
     setClientModalLoading(true);
     try {
+      toast.info("Adding new client...");
+
       const response = await addClient(
         clientModalFields.name,
         clientModalFields.contactEmail,
         clientModalFields.activePositions,
         clientModalFields.technologies
       );
-      setClients((prev) => [...prev, response]);
-      setClientModalSuccess("Client added successfully!");
-      setTimeout(() => {
-        setShowClientModal(false);
-        setClientModalFields({
-          name: "",
-          contactEmail: "",
-          activePositions: 0,
-          technologies: [],
-        });
-      }, 1500);
+
+      if (response) {
+        setClients((prev) => [...prev, response]);
+        setClientModalSuccess("Client added successfully!");
+        toast.success("Client added successfully!");
+        
+        // Reset form and close modal after success
+        setTimeout(() => {
+          setShowClientModal(false);
+          setClientModalFields({
+            name: "",
+            contactEmail: "",
+            activePositions: 0,
+            technologies: [],
+          });
+        }, 1500);
+      }
     } catch (error) {
       console.error("Error adding client:", error);
       setClientModalError(error.message || "Failed to add client");
+      toast.error(error.message || "Failed to add client");
     } finally {
       setClientModalLoading(false);
     }
@@ -1017,14 +1115,10 @@ const SalesTeamDashboard = () => {
     setJDModalError("");
     setJDModalSuccess("");
 
-    if (
-      !jdModalFields.title.trim() ||
-      !jdModalFields.client ||
-      !jdModalFields.technology ||
-      !jdModalFields.resourceType ||
-      !jdModalFile
-    ) {
-      setJDModalError("Please fill all required fields and select a file.");
+    // Validate required fields
+    if (!jdModalFields.title.trim() || !jdModalFields.client || 
+        !jdModalFields.technology || !jdModalFields.resourceType || !jdModalFile) {
+      setJDModalError("Please fill all required fields and select a file");
       return;
     }
 
@@ -1036,52 +1130,54 @@ const SalesTeamDashboard = () => {
     const maxSize = 5 * 1024 * 1024; // 5MB
 
     if (!allowedTypes.includes(jdModalFile.type)) {
-      setJDModalError(
-        "Invalid file type. Please upload a PDF or Word document."
-      );
+      setJDModalError("Invalid file type. Please upload a PDF or Word document");
       return;
     }
 
     if (jdModalFile.size > maxSize) {
-      setJDModalError("File size too large. Maximum size is 5MB.");
+      setJDModalError("File size too large. Maximum size is 5MB");
       return;
     }
 
     setJDModalLoading(true);
     try {
+      toast.info("Uploading job description...");
+
       const response = await addJobDescription(
         jdModalFields.title,
         jdModalFields.client,
         jdModalFields.receivedDate || new Date().toISOString().split("T")[0],
-        jdModalFields.deadline ||
-          new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split("T")[0],
+        jdModalFields.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
         jdModalFields.technology,
         jdModalFields.resourceType,
         jdModalFields.description,
         jdModalFile
       );
 
-      setJobDescriptions((prev) => [...prev, response]);
-      setJDModalSuccess("Job description uploaded successfully!");
+      if (response) {
+        setJobDescriptions((prev) => [...prev, response]);
+        setJDModalSuccess("Job description uploaded successfully!");
+        toast.success("Job description uploaded successfully!");
 
-      setTimeout(() => {
-        setSelectedJD(null);
-        setJDModalFields({
-          title: "",
-          client: "",
-          technology: "",
-          resourceType: "",
-          description: "",
-          receivedDate: "",
-          deadline: "",
-        });
-        setJDModalFile(null);
-      }, 1500);
+        // Reset form and close modal after success
+        setTimeout(() => {
+          setSelectedJD(null);
+          setJDModalFields({
+            title: "",
+            client: "",
+            technology: "",
+            resourceType: "",
+            description: "",
+            receivedDate: "",
+            deadline: "",
+          });
+          setJDModalFile(null);
+        }, 1500);
+      }
     } catch (error) {
       console.error("Error uploading job description:", error);
       setJDModalError(error.message || "Failed to upload job description");
+      toast.error(error.message || "Failed to upload job description");
     } finally {
       setJDModalLoading(false);
     }
@@ -1516,6 +1612,21 @@ const SalesTeamDashboard = () => {
       }
     };
 
+    const handleUpdateInterview = async (interviewId) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const interview = await getClientInterviewFeedback(interviewId);
+        setSelectedInterviewForFeedback(interview);
+        setShowFeedbackModal(true);
+      } catch (error) {
+        console.error("Error updating interview:", error);
+        toast.error(error.message || "Failed to update interview");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -1588,12 +1699,20 @@ const SalesTeamDashboard = () => {
                       </button>
                     )}
 
+                    <button
+                      className={`${styles.button} ${styles.secondary}`}
+                      onClick={() => handleUpdateInterview(interview.id)}
+                      title="Update Interview Details"
+                    >
+                      <FiEdit /> Update Interview
+                    </button>
+
                     {interview.overallStatus === "completed" && (
                       <button
                         className={`${styles.button} ${styles.secondary}`}
                         onClick={() => handleMarkAsCompleted(interview.id)}
                       >
-                        <FiMessageSquare /> Update Interview
+                        <FiMessageSquare /> Update Feedback
                       </button>
                     )}
                   </div>
