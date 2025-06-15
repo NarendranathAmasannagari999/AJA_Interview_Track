@@ -502,29 +502,41 @@ const ScheduleInterviewModal = ({
   );
 };
 
-const FeedbackModal = ({ show, onClose, interview, onSubmit }) => {
+const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) => {
   const [techScore, setTechScore] = useState(interview.technicalScore || 0);
   const [commScore, setCommScore] = useState(interview.communicationScore || 0);
   const [feedback, setFeedback] = useState(interview.feedback || "");
-  const [deployedStatus, setDeployedStatus] = useState(
-    interview.deployedStatus || false
-  );
+  const [deployedStatus, setDeployedStatus] = useState(interview.deployedStatus || false);
   const [error, setError] = useState("");
+
+  const hasUpdatePermission = () => {
+    const role = salesUserData?.role;
+    return role === "ROLE_SALES_TEAM" || role === "ROLE_ADMIN";
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    setError("");
-
-    if (techScore < 0 || techScore > 10) {
-      setError("Technical score must be between 0 and 10.");
+    if (!hasUpdatePermission()) {
+      toast.error("You don't have permission to update interviews");
       return;
     }
-    if (commScore < 0 || commScore > 10) {
-      setError("Communication score must be between 0 and 10.");
+
+    setError("");
+
+    // Validate scores
+    const techScoreNum = Number(techScore);
+    const commScoreNum = Number(commScore);
+
+    if (isNaN(techScoreNum) || techScoreNum < 0 || techScoreNum > 10) {
+      setError("Technical score must be a number between 0 and 10");
+      return;
+    }
+    if (isNaN(commScoreNum) || commScoreNum < 0 || commScoreNum > 10) {
+      setError("Communication score must be a number between 0 and 10");
       return;
     }
     if (!feedback.trim()) {
-      setError("Feedback cannot be empty.");
+      setError("Feedback cannot be empty");
       return;
     }
 
@@ -532,11 +544,10 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit }) => {
       interview.id,
       "completed",
       feedback,
-      techScore,
-      commScore,
+      techScoreNum, // Send as number
+      commScoreNum, // Send as number
       deployedStatus
     );
-    onClose();
   };
 
   if (!show) return null;
@@ -570,7 +581,7 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit }) => {
                 min="0"
                 max="10"
                 value={techScore}
-                onChange={(e) => setTechScore(parseInt(e.target.value) || 0)}
+                onChange={(e) => setTechScore(e.target.value)}
                 className={styles.input}
                 required
               />
@@ -583,7 +594,7 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit }) => {
                 min="0"
                 max="10"
                 value={commScore}
-                onChange={(e) => setCommScore(parseInt(e.target.value) || 0)}
+                onChange={(e) => setCommScore(e.target.value)}
                 className={styles.input}
                 required
               />
@@ -942,67 +953,6 @@ const SalesTeamDashboard = () => {
     }
   };
 
-  const handleUpdateFeedback = async (
-    interviewId,
-    result,
-    feedback,
-    technicalScore,
-    communicationScore,
-    deployedStatus
-  ) => {
-    if (!interviewId) {
-      toast.error("Interview ID is required");
-      return;
-    }
-
-    // Validate scores
-    if (technicalScore < 0 || technicalScore > 10 || communicationScore < 0 || communicationScore > 10) {
-      toast.error("Scores must be between 0 and 10");
-      return;
-    }
-
-    // Validate feedback
-    if (!feedback.trim()) {
-      toast.error("Feedback cannot be empty");
-      return;
-    }
-
-    setIsFeedbackLoading(true);
-    setError(null);
-
-    try {
-      toast.info("Updating interview feedback...");
-
-      const updatedInterview = await updateClientInterview(
-        interviewId,
-        result,
-        feedback,
-        technicalScore,
-        communicationScore,
-        deployedStatus
-      );
-
-      if (updatedInterview) {
-        setClientInterviews((prev) =>
-          prev.map((interview) =>
-            interview.id === interviewId ? updatedInterview : interview
-          )
-        );
-
-        setShowFeedbackModal(false);
-        setSelectedInterviewForFeedback(null);
-        toast.success("Feedback updated successfully!");
-        await fetchData();
-      }
-    } catch (error) {
-      console.error("Error updating feedback:", error);
-      toast.error(error.message || "Failed to update feedback");
-      setError(error.message);
-    } finally {
-      setIsFeedbackLoading(false);
-    }
-  };
-
   const handleDownloadJD = async (jdId) => {
     if (!jdId) {
       toast.error("Job description ID is required");
@@ -1245,6 +1195,70 @@ const SalesTeamDashboard = () => {
         interview.level === filterInterviewLevel;
       return matchesLevel;
     });
+  };
+
+  const handleUpdateFeedback = async (interviewId, status, feedback, techScore, commScore, deployedStatus) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Ensure scores are numbers
+      const techScoreNum = Number(techScore);
+      const commScoreNum = Number(commScore);
+
+      if (isNaN(techScoreNum) || techScoreNum < 0 || techScoreNum > 10) {
+        throw new Error('Technical score must be a number between 0 and 10');
+      }
+      if (isNaN(commScoreNum) || commScoreNum < 0 || commScoreNum > 10) {
+        throw new Error('Communication score must be a number between 0 and 10');
+      }
+
+      const feedbackData = {
+        result: status,
+        feedback,
+        technicalScore: techScoreNum, // Send as number
+        communicationScore: commScoreNum, // Send as number
+        deployedStatus
+      };
+
+      await updateClientInterview(interviewId, feedbackData);
+      toast.success('Interview feedback updated successfully');
+      
+      // Refresh the interviews list
+      const updatedInterviews = await getClientInterviews();
+      setClientInterviews(updatedInterviews);
+      
+      // Close the modal
+      setShowFeedbackModal(false);
+      setSelectedInterviewForFeedback(null);
+    } catch (error) {
+      console.error('Error updating feedback:', error);
+      
+      // Handle specific error messages
+      if (error.message.includes('additional permissions')) {
+        toast.error(error.message, {
+          duration: 5000,
+          action: {
+            label: 'Contact Admin',
+            onClick: () => {
+              window.location.href = 'mailto:admin@example.com?subject=Permission%20Request%20for%20Client%20Interview%20Updates';
+            }
+          }
+        });
+      } else if (error.message.includes('not authorized')) {
+        toast.error(error.message, {
+          duration: 5000,
+          icon: '🔒'
+        });
+      } else if (error.message.includes('Invalid data types')) {
+        toast.error('Invalid data format. Please ensure all fields are in the correct format.');
+      } else {
+        toast.error(error.message || 'Failed to update interview feedback');
+      }
+      
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const ClientsTab = () => {
@@ -1594,10 +1608,20 @@ const SalesTeamDashboard = () => {
     );
   };
 
-  const InterviewsTab = () => {
+  const InterviewsTab = ({ salesUserData }) => {
     const filteredInterviews = filterInterviews(clientInterviews);
 
+    const hasUpdatePermission = () => {
+      const role = salesUserData?.role;
+      return role === "ROLE_SALES_TEAM" || role === "ROLE_ADMIN";
+    };
+
     const handleMarkAsCompleted = async (interviewId) => {
+      if (!hasUpdatePermission()) {
+        toast.error("You don't have permission to update interviews");
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
       try {
@@ -1613,6 +1637,11 @@ const SalesTeamDashboard = () => {
     };
 
     const handleUpdateInterview = async (interviewId) => {
+      if (!hasUpdatePermission()) {
+        toast.error("You don't have permission to update interviews");
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
       try {
@@ -1689,31 +1718,35 @@ const SalesTeamDashboard = () => {
                     </span>
                   </div>
                   <div className={styles.interviewActions}>
-                    {(interview.overallStatus?.toLowerCase() === "scheduled" ||
-                      interview.overallStatus?.toLowerCase() === "pending") && (
-                      <button
-                        className={`${styles.button} ${styles.primary}`}
-                        onClick={() => handleMarkAsCompleted(interview.id)}
-                      >
-                        <FiMessageSquare /> Give Feedback
-                      </button>
-                    )}
+                    {hasUpdatePermission() && (
+                      <>
+                        {(interview.overallStatus?.toLowerCase() === "scheduled" ||
+                          interview.overallStatus?.toLowerCase() === "pending") && (
+                          <button
+                            className={`${styles.button} ${styles.primary}`}
+                            onClick={() => handleMarkAsCompleted(interview.id)}
+                          >
+                            <FiMessageSquare /> Give Feedback
+                          </button>
+                        )}
 
-                    <button
-                      className={`${styles.button} ${styles.secondary}`}
-                      onClick={() => handleUpdateInterview(interview.id)}
-                      title="Update Interview Details"
-                    >
-                      <FiEdit /> Update Interview
-                    </button>
+                        <button
+                          className={`${styles.button} ${styles.secondary}`}
+                          onClick={() => handleUpdateInterview(interview.id)}
+                          title="Update Interview Details"
+                        >
+                          <FiEdit /> Update Interview
+                        </button>
 
-                    {interview.overallStatus === "completed" && (
-                      <button
-                        className={`${styles.button} ${styles.secondary}`}
-                        onClick={() => handleMarkAsCompleted(interview.id)}
-                      >
-                        <FiMessageSquare /> Update Feedback
-                      </button>
+                        {interview.overallStatus === "completed" && (
+                          <button
+                            className={`${styles.button} ${styles.secondary}`}
+                            onClick={() => handleMarkAsCompleted(interview.id)}
+                          >
+                            <FiMessageSquare /> Update Feedback
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -2010,7 +2043,7 @@ const SalesTeamDashboard = () => {
       case "interviews":
         return (
           <>
-            <InterviewsTab />
+            <InterviewsTab salesUserData={salesUserData} />
             <Pagination
               totalItems={clientInterviews.length}
               currentPage={currentPage}
@@ -2363,6 +2396,7 @@ const SalesTeamDashboard = () => {
             }}
             interview={selectedInterviewForFeedback}
             onSubmit={handleUpdateFeedback}
+            salesUserData={salesUserData}
           />
         )}
       </AnimatePresence>

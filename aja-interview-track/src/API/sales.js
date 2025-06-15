@@ -1,8 +1,8 @@
 import axiosInstance from './axiosConfig';
- 
+
 // Base URL for sales-related endpoints
 const BASE_URL = '/api/sales';
- 
+
 /**
  * Get candidates with optional filters
  * @param {string} technology - Optional technology filter (default: 'all')
@@ -20,7 +20,7 @@ export const getCandidates = async (technology = 'all', status = 'all', resource
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Schedule a client interview
  * @param {string} empId - Employee ID
@@ -53,7 +53,7 @@ export const scheduleClientInterview = async (empId, client, date, time, level, 
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Schedule multiple client interviews for an employee
  * @param {string} empId - Employee ID
@@ -68,27 +68,63 @@ export const scheduleMultipleClientInterviews = async (empId, schedules) => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Update client interview feedback
  * @param {number} interviewId - Interview ID
  * @param {Object} feedbackData - Interview feedback data
  * @param {string} feedbackData.result - Interview result
  * @param {string} feedbackData.feedback - Interview feedback
- * @param {number} feedbackData.technicalScore - Technical score
- * @param {number} feedbackData.communicationScore - Communication score
+ * @param {string|number} feedbackData.technicalScore - Technical score
+ * @param {string|number} feedbackData.communicationScore - Communication score
  * @param {boolean} feedbackData.deployedStatus - Deployment status
  * @returns {Promise<Object>} Updated interview object
  */
 export const updateClientInterview = async (interviewId, feedbackData) => {
   try {
-    const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, feedbackData);
+    // Convert scores to numbers and validate
+    const techScore = Number(feedbackData.technicalScore);
+    const commScore = Number(feedbackData.communicationScore);
+    
+    if (isNaN(techScore) || techScore < 0 || techScore > 10) {
+      throw new Error('Technical score must be a number between 0 and 10');
+    }
+    if (isNaN(commScore) || commScore < 0 || commScore > 10) {
+      throw new Error('Communication score must be a number between 0 and 10');
+    }
+
+    // Format the data for the backend
+    const formattedData = {
+      result: String(feedbackData.result),
+      feedback: String(feedbackData.feedback),
+      technicalScore: techScore, // Send as number
+      communicationScore: commScore, // Send as number
+      deployedStatus: Boolean(feedbackData.deployedStatus)
+    };
+
+    const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, formattedData);
     return response.data;
   } catch (error) {
+    if (error.response?.status === 403) {
+      // Check if the error message contains specific permission information
+      const errorMessage = error.response.data?.message || error.response.data;
+      if (errorMessage.includes('Insufficient permissions')) {
+        throw new Error('You need additional permissions to update client interviews. Please contact your administrator.');
+      } else if (errorMessage.includes('not authorized')) {
+        throw new Error('You are not authorized to update this interview. Only the assigned sales team member can update it.');
+      }
+      throw new Error('Access denied: You do not have permission to perform this action');
+    } else if (error.response?.status === 400) {
+      const errorMessage = error.response.data?.message || error.response.data;
+      if (errorMessage.includes('Invalid data types')) {
+        throw new Error('Invalid data format. Please ensure all fields are in the correct format.');
+      }
+      throw new Error(errorMessage || 'Invalid request data');
+    }
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Get client interviews with optional search
  * @param {string} search - Optional search term
@@ -104,7 +140,7 @@ export const getClientInterviews = async (search = null) => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Get total count of scheduled client interviews
  * @returns {Promise<number>} Total count of interviews
@@ -117,7 +153,7 @@ export const getClientInterviewCount = async () => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Add a new client
  * @param {Object} clientData - Client data
@@ -137,7 +173,7 @@ export const addClient = async (clientData) => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Get clients with optional search
  * @param {string} search - Optional search term
@@ -153,7 +189,7 @@ export const getClients = async (search = null) => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Add a new job description
  * @param {Object} jdData - Job description data
@@ -175,7 +211,7 @@ export const addJobDescription = async (jdData) => {
         formData.append(key, value);
       }
     });
- 
+
     const response = await axiosInstance.post(`${BASE_URL}/job-descriptions`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -186,7 +222,7 @@ export const addJobDescription = async (jdData) => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Get all job descriptions
  * @returns {Promise<Array<JobDescription>>} List of all job descriptions
@@ -199,7 +235,7 @@ export const getAllJobDescriptions = async () => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Download job description file
  * @param {number} jdId - Job description ID
@@ -215,7 +251,7 @@ export const downloadJobDescription = async (jdId) => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Delete job description
  * @param {number} jdId - Job description ID
@@ -228,7 +264,7 @@ export const deleteJobDescription = async (jdId) => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Get client interview feedback
  * @param {number} interviewId - Interview ID
@@ -242,7 +278,7 @@ export const getClientInterviewFeedback = async (interviewId) => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Get deployed employees
  * @returns {Promise<Array<Employee>>} List of deployed employees
@@ -255,7 +291,7 @@ export const getDeployedEmployees = async () => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Update profile picture
  * @param {number} userId - User ID
@@ -267,11 +303,11 @@ export const updateProfilePicture = async (userId, file) => {
     if (!file || !['image/jpeg', 'image/png'].includes(file.type)) {
       throw new Error('Profile picture must be a JPEG or PNG file');
     }
- 
+
     const formData = new FormData();
     formData.append('Id', userId);
     formData.append('file', file);
- 
+
     const response = await axiosInstance.put(`${BASE_URL}/profile-picture`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -282,7 +318,7 @@ export const updateProfilePicture = async (userId, file) => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Get profile picture
  * @param {number} employeeId - Employee ID
@@ -298,7 +334,7 @@ export const getProfilePicture = async (employeeId) => {
     throw handleApiError(error);
   }
 };
- 
+
 /**
  * Helper function to handle API errors
  * @param {Error} error - The error object
@@ -323,7 +359,7 @@ const handleApiError = (error) => {
   }
   throw error;
 };
- 
+
 // Type definitions for better IDE support
 /**
  * @typedef {Object} Employee
@@ -338,7 +374,7 @@ const handleApiError = (error) => {
  * @property {boolean} deployed
  * @property {boolean} sentToSales
  */
- 
+
 /**
  * @typedef {Object} User
  * @property {number} id
@@ -347,7 +383,7 @@ const handleApiError = (error) => {
  * @property {string} role
  * @property {string} profilePicS3Key
  */
- 
+
 /**
  * @typedef {Object} ClientInterview
  * @property {number} id
@@ -365,7 +401,7 @@ const handleApiError = (error) => {
  * @property {number} communicationScore
  * @property {boolean} deployedStatus
  */
- 
+
 /**
  * @typedef {Object} ClientInterviewSchedule
  * @property {string} client
@@ -376,7 +412,7 @@ const handleApiError = (error) => {
  * @property {string} meetingLink
  * @property {boolean} deployedStatus
  */
- 
+
 /**
  * @typedef {Object} Client
  * @property {number} id
@@ -385,7 +421,7 @@ const handleApiError = (error) => {
  * @property {number} activePositions
  * @property {Array<string>} technologies
  */
- 
+
 /**
  * @typedef {Object} JobDescription
  * @property {number} id
@@ -398,7 +434,7 @@ const handleApiError = (error) => {
  * @property {string} description
  * @property {string} s3Key
  */
- 
+
 // Export all functions as a single object
 export default {
   getCandidates,
@@ -418,5 +454,3 @@ export default {
   updateProfilePicture,
   getProfilePicture
 };
- 
- 
