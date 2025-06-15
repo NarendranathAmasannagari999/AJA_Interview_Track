@@ -1,7 +1,10 @@
+// delivery.js
+// API service functions for interacting with the delivery backend APIs
+
 import axiosInstance from './axiosConfig';
 
+// Base URL for API endpoints
 const API_BASE_URL = '/api/delivery';
-const API_BASE_URL_EMP = '/api/employee';
 
 // Get employees with optional technology and resource type filters
 export const getEmployees = async (technology = 'all', resourceType = 'all') => {
@@ -11,9 +14,6 @@ export const getEmployees = async (technology = 'all', resourceType = 'all') => 
         });
         return response.data;
     } catch (error) {
-        if (error.response?.status === 401) {
-            throw new Error('Please log in to view employees');
-        }
         throw error.response?.data || error.message;
     }
 };
@@ -29,7 +29,7 @@ export const scheduleInterview = async ({
         const response = await axiosInstance.post(`${API_BASE_URL}/schedule`, null, {
             params: {
                 empId,
-                interviewType: 'mock', // Only mock interviews are allowed
+                interviewType: 'mock',
                 date,
                 time,
                 interviewerId
@@ -49,14 +49,8 @@ export const scheduleInterview = async ({
 };
 
 // Update mock interview feedback
-export const updateMockInterviewFeedback = async (interviewId, technicalFeedback,communicationFeedback, technicalScore, communicationScore,sentToSales) => {
+export const updateMockInterviewFeedback = async (interviewId, technicalFeedback, communicationFeedback, technicalScore, communicationScore, sentToSales) => {
     try {
-        // Check if user is logged in
-        const token = localStorage.getItem('jwt_token');
-        if (!token) {
-            throw new Error('Please log in to update feedback');
-        }
-
         const response = await axiosInstance.put(`${API_BASE_URL}/mock-interviews/${interviewId}/feedback`, null, {
             params: {
                 technicalFeedback,
@@ -69,16 +63,11 @@ export const updateMockInterviewFeedback = async (interviewId, technicalFeedback
         return response.data;
     } catch (error) {
         if (error.response?.status === 401) {
-            // Clear token and redirect to login
-            localStorage.removeItem('jwt_token');
-            window.location.href = '/login';
             throw new Error('Please log in to update feedback');
         } else if (error.response?.status === 403) {
-            throw new Error('You do not have permission to update feedback. Please ensure you are logged in as a Delivery Team member.');
-        } else if (error.response?.status === 404) {
-            throw new Error('Interview not found');
+            throw new Error('You do not have permission to update feedback');
         } else if (error.response?.status === 400) {
-            throw new Error(error.response.data || 'Invalid feedback data');
+            throw new Error(error.response.data || 'Invalid feedback data or interview not found');
         }
         throw error.response?.data || error.message;
     }
@@ -90,9 +79,6 @@ export const getUpcomingInterviews = async () => {
         const response = await axiosInstance.get(`${API_BASE_URL}/interviews/upcoming`);
         return response.data;
     } catch (error) {
-        if (error.response?.status === 401) {
-            throw new Error('Please log in to view upcoming interviews');
-        }
         throw error.response?.data || error.message;
     }
 };
@@ -103,33 +89,11 @@ export const getCompletedInterviews = async () => {
         const response = await axiosInstance.get(`${API_BASE_URL}/interviews/completed`);
         return response.data;
     } catch (error) {
-        if (error.response?.status === 401) {
-            throw new Error('Please log in to view completed interviews');
-        }
         throw error.response?.data || error.message;
     }
 };
 
-// Update employee's ready for deployment status
-export const updateReadyForDeployment = async (employeeId, readyForDeployment) => {
-    try {
-        const response = await axiosInstance.put(`${API_BASE_URL_EMP}/ready-for-deployment/${employeeId}`, null, {
-            params: { readyForDeployment }
-        });
-        return response.data;
-    } catch (error) {
-        if (error.response?.status === 401) {
-            throw new Error('Please log in to update deployment status');
-        } else if (error.response?.status === 403) {
-            throw new Error('You do not have permission to update deployment status');
-        } else if (error.response?.status === 404) {
-            throw new Error('Employee not found');
-        }
-        throw error.response?.data || error.message;
-    }
-};
-
-// Update interview status from scheduled to completed
+// Update interview status
 export const updateInterviewStatus = async (interviewId) => {
     try {
         const response = await axiosInstance.put(`${API_BASE_URL}/mock-interviews/${interviewId}/update-status`);
@@ -139,8 +103,6 @@ export const updateInterviewStatus = async (interviewId) => {
             throw new Error('Please log in to update interview status');
         } else if (error.response?.status === 403) {
             throw new Error('You do not have permission to update interview status');
-        } else if (error.response?.status === 404) {
-            throw new Error('Interview not found');
         } else if (error.response?.status === 400) {
             throw new Error(error.response.data || 'Invalid interview status update request');
         }
@@ -148,6 +110,63 @@ export const updateInterviewStatus = async (interviewId) => {
     }
 };
 
+// Update profile picture
+export const updateProfilePicture = async (userId, file) => {
+    try {
+        const formData = new FormData();
+        formData.append('Id', userId);
+        formData.append('file', file);
 
-    
-    
+        const response = await axiosInstance.put(`${API_BASE_URL}/profile-picture`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        return response.data;
+    } catch (error) {
+        if (error.response?.status === 401) {
+            throw new Error('Please log in to update profile picture');
+        } else if (error.response?.status === 400) {
+            throw new Error(error.response.data || 'Invalid file format. Please use JPEG or PNG');
+        }
+        throw error.response?.data || error.message;
+    }
+};
+
+// Get profile picture
+export const getProfilePicture = async (employeeId) => {
+    try {
+        const response = await axiosInstance.get(`${API_BASE_URL}/profile-picture/${employeeId}`, {
+            responseType: 'blob'
+        });
+        return URL.createObjectURL(response.data);
+    } catch (error) {
+        if (error.response?.status === 400) {
+            throw new Error('Profile picture not found');
+        }
+        throw error.response?.data || error.message;
+    }
+};
+
+// Get mock interview performance data
+export const getMockInterviewPerformance = async () => {
+    try {
+        const response = await axiosInstance.get(`${API_BASE_URL}/mock-interviews/performance`);
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || error.message;
+    }
+};
+
+// Export all functions as a single object
+export default {
+    getEmployees,
+    scheduleInterview,
+    updateMockInterviewFeedback,
+    getUpcomingInterviews,
+    getCompletedInterviews,
+    updateInterviewStatus,
+    updateProfilePicture,
+    getProfilePicture,
+    getMockInterviewPerformance
+};

@@ -83,7 +83,7 @@ const EmployeeDashboard = () => {
   const dashboardTabs = [
     { id: 'jd', label: 'Job Descriptions', icon: <FiFileText /> },
     { id: 'resume', label: 'Resume Preparation', icon: <FiUpload /> },
-    { id: 'interviews', label: 'Client Interviews', icon: <FiMessageSquare /> },
+    { id: 'interviews', label: 'Interviews', icon: <FiMessageSquare /> },
     { id: 'performance', label: 'Performance', icon: <FiBarChart2 /> },
     { id: 'profile', label: 'My Profile', icon: <FiUser /> }
   ];

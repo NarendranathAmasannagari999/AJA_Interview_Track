@@ -1,9 +1,7 @@
-import { Line } from 'recharts';
 import axiosInstance from './axiosConfig';
 
 // Base URL for sales-related endpoints
 const BASE_URL = '/api/sales';
-const API_BASE_URL_EMP = '/api/employee';
 
 /**
  * Get candidates with optional filters
@@ -19,13 +17,8 @@ export const getCandidates = async (technology = 'all', status = 'all', resource
     });
     return response.data;
   } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    if (error.response?.status === 400) {
-      throw new Error(error.response.data || 'Invalid input parameters');
-    }
-    throw error.response?.data || error.message;
+    handleApiError(error);
+    return [];
   }
 };
 
@@ -38,21 +31,17 @@ export const getCandidates = async (technology = 'all', status = 'all', resource
  * @param {number} level - Interview level
  * @param {string} jobDescriptionTitle - Job description title
  * @param {string} meetingLink - Meeting link
- * @param {boolean} deployedStatus - Deployment status (True or False)
+ * @param {boolean} deployedStatus - Deployment status
  * @returns {Promise<Object>} Scheduled interview object
  */
 export const scheduleClientInterview = async (empId, client, date, time, level, jobDescriptionTitle, meetingLink, deployedStatus) => {
   try {
-    if (!empId || !client || !date || !time || !level || !jobDescriptionTitle || !meetingLink) {
-      throw new Error('All fields are required for scheduling a client interview');
-    }
-
     const response = await axiosInstance.post(`${BASE_URL}/interviews/schedule`, null, {
       params: {
         empId,
         interviewType: 'client',
         date,
-        time,
+        time: `${time}:00`,
         client,
         level,
         jobDescriptionTitle,
@@ -62,16 +51,8 @@ export const scheduleClientInterview = async (empId, client, date, time, level, 
     });
     return response.data;
   } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    if (error.response?.status === 403) {
-      throw new Error('Sales team can only schedule client interviews');
-    }
-    if (error.response?.status === 400) {
-      throw new Error(error.response.data || 'Invalid input data');
-    }
-    throw error.response?.data || error.message;
+    handleApiError(error);
+    throw error;
   }
 };
 
@@ -82,15 +63,11 @@ export const scheduleClientInterview = async (empId, client, date, time, level, 
  * @param {string} feedback - Interview feedback
  * @param {number} technicalScore - Technical score
  * @param {number} communicationScore - Communication score
- * @param {boolean} deployedStatus - Optional: New deployment status
+ * @param {boolean} deployedStatus - Deployment status
  * @returns {Promise<Object>} Updated interview object
  */
 export const updateClientInterview = async (interviewId, result, feedback, technicalScore, communicationScore, deployedStatus) => {
   try {
-    if (!interviewId || !result || !feedback || technicalScore === undefined || communicationScore === undefined) {
-      throw new Error('All fields are required for updating interview feedback');
-    }
-
     const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, {
       result,
       feedback,
@@ -100,13 +77,7 @@ export const updateClientInterview = async (interviewId, result, feedback, techn
     });
     return response.data;
   } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    if (error.response?.status === 400) {
-      throw new Error(error.response.data || 'Invalid input data');
-    }
-    throw error.response?.data || error.message;
+    throw handleApiError(error);
   }
 };
 
@@ -122,10 +93,7 @@ export const getClientInterviews = async (search = null) => {
     });
     return response.data;
   } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    throw error.response?.data || error.message;
+    throw handleApiError(error);
   }
 };
 
@@ -139,10 +107,6 @@ export const getClientInterviews = async (search = null) => {
  */
 export const addClient = async (name, contactEmail, activePositions, technologies) => {
   try {
-    if (!name || !contactEmail || activePositions === undefined || !technologies?.length) {
-      throw new Error('All fields are required for adding a client');
-    }
-
     const response = await axiosInstance.post(`${BASE_URL}/clients`, null, {
       params: {
         name,
@@ -153,13 +117,7 @@ export const addClient = async (name, contactEmail, activePositions, technologie
     });
     return response.data;
   } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    if (error.response?.status === 400) {
-      throw new Error(error.response.data || 'Invalid input data');
-    }
-    throw error.response?.data || error.message;
+    throw handleApiError(error);
   }
 };
 
@@ -175,10 +133,7 @@ export const getClients = async (search = null) => {
     });
     return response.data;
   } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    throw error.response?.data || error.message;
+    throw handleApiError(error);
   }
 };
 
@@ -191,15 +146,11 @@ export const getClients = async (search = null) => {
  * @param {string} technology - Technology
  * @param {string} resourceType - Resource type
  * @param {string} description - Job description
- * @param {File} file - Optional job description file
+ * @param {File} file - Job description file
  * @returns {Promise<Object>} Added job description object
  */
-export const addJobDescription = async (title, client, receivedDate, deadline, technology, resourceType, description, file = null) => {
+export const addJobDescription = async (title, client, receivedDate, deadline, technology, resourceType, description, file) => {
   try {
-    if (!title || !client || !receivedDate || !deadline || !technology || !resourceType || !description) {
-      throw new Error('All fields except file are required for adding a job description');
-    }
-
     const formData = new FormData();
     formData.append('title', title);
     formData.append('client', client);
@@ -217,13 +168,7 @@ export const addJobDescription = async (title, client, receivedDate, deadline, t
     });
     return response.data;
   } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    if (error.response?.status === 400) {
-      throw new Error(error.response.data || 'Invalid input data');
-    }
-    throw error.response?.data || error.message;
+    throw handleApiError(error);
   }
 };
 
@@ -236,13 +181,7 @@ export const getAllJobDescriptions = async () => {
     const response = await axiosInstance.get(`${BASE_URL}/job-descriptions`);
     return response.data;
   } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    if (error.response?.status === 403) {
-      throw new Error('Access denied: Only sales team members can view all job descriptions');
-    }
-    throw error.response?.data || error.message;
+    throw handleApiError(error);
   }
 };
 
@@ -253,22 +192,12 @@ export const getAllJobDescriptions = async () => {
  */
 export const downloadJobDescription = async (jdId) => {
   try {
-    if (!jdId) {
-      throw new Error('Job description ID is required');
-    }
-
     const response = await axiosInstance.get(`${BASE_URL}/job-descriptions/${jdId}/download`, {
       responseType: 'blob',
     });
     return response.data;
   } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    if (error.response?.status === 400) {
-      throw new Error(error.response.data || 'Job description not found or invalid ID');
-    }
-    throw error.response?.data || error.message;
+    throw handleApiError(error);
   }
 };
 
@@ -279,117 +208,28 @@ export const downloadJobDescription = async (jdId) => {
  */
 export const deleteJobDescription = async (jdId) => {
   try {
-    if (!jdId) {
-      throw new Error('Job description ID is required');
-    }
-
     await axiosInstance.delete(`${BASE_URL}/job-descriptions/${jdId}`);
   } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    if (error.response?.status === 400) {
-      throw new Error(error.response.data || 'Job description not found or invalid ID');
-    }
-    throw error.response?.data || error.message;
+    throw handleApiError(error);
   }
 };
 
 /**
- * Get employees ready for deployment
- * @param {string} technology - Optional technology filter
- * @param {string} resourceType - Optional resource type filter
- * @returns {Promise<Array>} List of employees ready for deployment
- */
-export const getReadyForDeploymentEmployees = async () => {
-  try {
-    const response = await axiosInstance.get(`${API_BASE_URL_EMP}/ready-for-deployment`);
-    return response.data;
-  } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    throw error.response?.data || error.message;
-  }
-};
-
-/**
- * Update employee's ready for deployment status
- * @param {number} employeeId - Employee ID
- * @param {boolean} readyForDeployment - New deployment status
- * @returns {Promise<Object>} Updated employee object
- */
-export const updateReadyForDeployment = async (employeeId, readyForDeployment) => {
-  try {
-    const response = await axiosInstance.put(`${API_BASE_URL_EMP}/ready-for-deployment/${employeeId}`, null, {
-      params: { readyForDeployment }
-    });
-    return response.data;
-  } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    if (error.response?.status === 403) {
-      throw new Error('You do not have permission to update deployment status');
-    }
-    if (error.response?.status === 404) {
-      throw new Error('Employee not found');
-    }
-    throw error.response?.data || error.message;
-  }
-};
-
-/**
- * Get filtered resumes by technology and resource type
- * @param {string} technology - Optional technology filter (defaults to 'all')
- * @param {string} resourceType - Optional resource type filter (defaults to 'all')
- * @returns {Promise<Array>} List of filtered employee resumes
- */
-export const getFilteredResumes = async (technology = 'all', resourceType = 'all') => {
-  try {
-    const response = await axiosInstance.get(`${BASE_URL}/resumes/filter`, {
-      params: { technology, resourceType }
-    });
-    return response.data;
-  } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    if (error.response?.status === 400) {
-      throw new Error(error.response.data || 'Invalid filter parameters');
-    }
-    throw error.response?.data || error.message;
-  }
-};
-
-/**
- * Get client interview feedback by ID
- * @param {number} interviewId - The ID of the client interview
- * @returns {Promise<Object>} Object containing feedback details (feedback, technicalScore, communicationScore, result, overallStatus)
+ * Get client interview feedback
+ * @param {number} interviewId - Interview ID
+ * @returns {Promise<Object>} Interview feedback object
  */
 export const getClientInterviewFeedback = async (interviewId) => {
   try {
-    if (!interviewId) {
-      throw new Error('Interview ID is required to fetch feedback');
-    }
     const response = await axiosInstance.get(`${BASE_URL}/client-interviews/${interviewId}/feedback`);
     return response.data;
   } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    if (error.response?.status === 404) {
-      throw new Error('Interview feedback not found');
-    }
-    if (error.response?.status === 400) {
-      throw new Error(error.response.data || 'Invalid interview ID');
-    }
-    throw error.response?.data || error.message;
+    throw handleApiError(error);
   }
 };
 
 /**
- * Get a list of all deployed employees.
+ * Get deployed employees
  * @returns {Promise<Array>} List of deployed employees
  */
 export const getDeployedEmployees = async () => {
@@ -397,9 +237,84 @@ export const getDeployedEmployees = async () => {
     const response = await axiosInstance.get(`${BASE_URL}/employees/deployed`);
     return response.data;
   } catch (error) {
-    if (error.response?.status === 401) {
-      throw new Error('Unauthorized: Please login to access this resource');
-    }
-    throw error.response?.data || error.message;
+    throw handleApiError(error);
   }
+};
+
+/**
+ * Update profile picture
+ * @param {number} userId - User ID
+ * @param {File} file - Profile picture file
+ * @returns {Promise<Object>} Updated user object
+ */
+export const updateProfilePicture = async (userId, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('Id', userId);
+    formData.append('file', file);
+
+    const response = await axiosInstance.put(`${BASE_URL}/profile-picture`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+/**
+ * Get profile picture
+ * @param {number} employeeId - Employee ID
+ * @returns {Promise<Blob>} Profile picture blob
+ */
+export const getProfilePicture = async (employeeId) => {
+  try {
+    const response = await axiosInstance.get(`${BASE_URL}/profile-picture/${employeeId}`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+/**
+ * Helper function to handle API errors
+ * @param {Error} error - The error object
+ * @throws {Error} Formatted error message
+ */
+const handleApiError = (error) => {
+  if (error.response?.status === 401) {
+    throw new Error('Unauthorized: Please login to access this resource');
+  }
+  if (error.response?.status === 403) {
+    throw new Error('Access denied: You do not have permission to perform this action');
+  }
+  if (error.response?.status === 400) {
+    throw new Error(error.response.data || 'Invalid input data');
+  }
+  if (error.response?.status === 404) {
+    throw new Error('Resource not found');
+  }
+  throw error.response?.data || error.message;
+};
+
+// Export all functions as a single object
+export default {
+  getCandidates,
+  scheduleClientInterview,
+  updateClientInterview,
+  getClientInterviews,
+  addClient,
+  getClients,
+  addJobDescription,
+  getAllJobDescriptions,
+  downloadJobDescription,
+  deleteJobDescription,
+  getClientInterviewFeedback,
+  getDeployedEmployees,
+  updateProfilePicture,
+  getProfilePicture
 };

@@ -1,3 +1,212 @@
+/* Profile Styles */
+.profileContainer {
+  padding: 20px;
+}
+
+.profileHeader {
+  margin-bottom: 20px;
+}
+
+.profileCard {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.profileInfo {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.profileAvatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 20px;
+}
+
+.profileDetails h3 {
+  margin: 0 0 5px 0;
+  font-size: 1.5rem;
+}
+
+.profileTitle {
+  margin: 0 0 5px 0;
+  color: #555;
+}
+
+.profileEmail, .profileId {
+  margin: 5px 0;
+  color: #666;
+}
+
+.profileSection {
+  margin-bottom: 30px;
+}
+
+.profileSection h4 {
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+}
+
+.profileTable {
+  display: flex;
+  flex-direction: column;
+}
+
+.tableRow {
+  display: flex;
+  padding: 10px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.tableHeader {
+  flex: 1;
+  font-weight: 600;
+  color: #555;
+}
+
+.tableValue {
+  flex: 2;
+}
+
+.profileActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.profileImage {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.profileContainer {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+.profileCard {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 30px;
+  width: 100%;
+  max-width: 500px;
+  text-align: center;
+}
+
+.profileHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.profileAvatarLarge {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 15px;
+  transition: background 0.3s;
+}
+
+.profileAvatarLarge:hover {
+  background: #e0e0e0;
+}
+
+.profileImageLarge {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profileInfo h3 {
+  margin: 0;
+  font-size: 24px;
+  color: #333;
+}
+
+.profileRole {
+  font-size: 16px;
+  color: #666;
+  margin: 5px 0;
+}
+
+.profileEmail, .profileTeam {
+  font-size: 14px;
+  color: #555;
+  margin: 5px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.profileActions {
+  margin-top: 20px;
+}
+
+.successMessage {
+  color: #28a745;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.errorMessage {
+  color: #dc3545;
+  font-size: 14px;
+  margin-top: 10px;
+}
+.profileImageSmall {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.spinnerSmall {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.profileImage {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.profileImageSmall {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+}
 /* Dashboard Container */
 .dashboardContainer {
   padding: 3rem;
@@ -1525,4 +1734,162 @@
   padding: 1rem;
   background-color: #ffffff;
   border-top: 1px solid #e0e0e0;
+}
+
+/* Profile Section Styles */
+.profileSection {
+  margin-top: 2rem;
+}
+
+.profileCard {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 2.5rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #eff6ff;
+}
+
+.profileHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.5rem;
+  margin-bottom: 3rem;
+  align-items: center;
+}
+
+.profilePictureContainer {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(45deg, #4f46e5, #7c3aed);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+}
+
+.profilePicture {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.noProfilePic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: white;
+}
+
+.profilePictureUpload {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 0.75rem;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.4s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.profilePictureUpload:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.profileInfo {
+  flex-grow: 1;
+}
+
+.profileInfo h2 {
+  margin: 0 0 0.75rem;
+  color: #1e3a8a;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.profileRole {
+  color: #64748b;
+  font-size: 1.1rem;
+  margin: 0.5rem 0;
+}
+
+.profileEmail {
+  color: #64748b;
+  font-size: 1rem;
+  margin: 0.5rem 0;
+}
+
+.profileId {
+  color: #64748b;
+  font-size: 1rem;
+  margin: 0.5rem 0;
+  font-weight: 600;
+}
+
+.profileDetails {
+  margin-top: 2rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 2rem;
+}
+
+.profileDetails h4 {
+  margin: 0 0 1.5rem;
+  color: #1e3a8a;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.profileTable {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tableRow {
+  display: flex;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  transition: transform 0.3s ease;
+}
+
+.tableRow:hover {
+  transform: translateX(5px);
+}
+
+.tableHeader {
+  flex: 1;
+  font-weight: 600;
+  color: #475569;
+}
+
+.tableValue {
+  flex: 2;
+  color: #1e293b;
+}
+
+.loadingSpinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #4f46e5;
+  border-radius: 50%;
+  animation: spin 1.2s ease-in-out infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
