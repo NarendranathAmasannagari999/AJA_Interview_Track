@@ -796,27 +796,26 @@ const SalesTeamDashboard = () => {
       setIsLoading(true);
       setError(null);
 
-      const fetchPromises = [
-        getCandidates(filterTech, filterStatus, filterResourceType),
-        getClientInterviews(searchTerm),
-        getClients(searchTerm),
-        getAllJobDescriptions(),
-        getDeployedEmployees()
-      ];
-
+      // Fetch all data in parallel
       const [
         candidatesData,
         interviewsData,
         clientsData,
         jobDescriptionsData,
         deployedEmployeesData
-      ] = await Promise.all(fetchPromises.map(p => p.catch(error => {
+      ] = await Promise.all([
+        getCandidates(filterTech, filterStatus, filterResourceType),
+        getClientInterviews(searchTerm),
+        getClients(searchTerm),
+        getAllJobDescriptions(),
+        getDeployedEmployees()
+      ].map(p => p.catch(error => {
         console.error("Error in fetchData:", error);
         toast.error(`Failed to fetch some data: ${error.message}`);
         return null;
       })));
 
-      // Only update state if data was successfully fetched
+      // Update state only if data was successfully fetched
       if (candidatesData) setCandidates(candidatesData);
       if (interviewsData) setClientInterviews(interviewsData);
       if (clientsData) setClients(clientsData);
@@ -854,6 +853,7 @@ const SalesTeamDashboard = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Validate file type and size according to backend requirements
     const allowedTypes = ["image/jpeg", "image/png"];
     const maxSize = 2 * 1024 * 1024; // 2MB
 
@@ -871,15 +871,17 @@ const SalesTeamDashboard = () => {
       setIsSubmitting(true);
       toast.info("Updating profile picture...");
 
-      // Update profile picture
-      await updateProfilePicture(salesUserData.id, file);
+      // Update profile picture using the API
+      const response = await updateProfilePicture(salesUserData.id, file);
       
-      // Fetch updated profile picture
-      const pictureBlob = await getProfilePicture(salesUserData.empId);
-      if (pictureBlob) {
-        const imageUrl = URL.createObjectURL(pictureBlob);
-        setProfilePic(imageUrl);
-        toast.success("Profile picture updated successfully");
+      if (response) {
+        // Fetch updated profile picture
+        const pictureBlob = await getProfilePicture(salesUserData.empId);
+        if (pictureBlob) {
+          const imageUrl = URL.createObjectURL(pictureBlob);
+          setProfilePic(imageUrl);
+          toast.success("Profile picture updated successfully");
+        }
       }
     } catch (error) {
       console.error("Error updating profile picture:", error);
@@ -895,7 +897,7 @@ const SalesTeamDashboard = () => {
       return;
     }
 
-    // Validate required fields
+    // Validate required fields according to backend requirements
     const requiredFields = {
       client: "Client name",
       date: "Interview date",
@@ -916,7 +918,7 @@ const SalesTeamDashboard = () => {
     setError(null);
 
     try {
-      // Format time to HH:mm:ss
+      // Format time to HH:mm:ss as required by backend
       const formattedTime = details.time.includes(':') 
         ? details.time.split(':').length === 2 
           ? `${details.time}:00` 
@@ -933,11 +935,11 @@ const SalesTeamDashboard = () => {
         details.level,
         details.jobDescriptionTitle,
         details.meetingLink,
-        details.deployedStatus
+        details.deployedStatus || false
       );
 
       if (response) {
-        setClientInterviews((prev) => [...prev, response]);
+        setClientInterviews(prev => [...prev, response]);
         setShowInterviewScheduler(false);
         setSelectedForInterview([]);
         setInterviewDetails(initialInterviewDetails);
@@ -1006,7 +1008,7 @@ const SalesTeamDashboard = () => {
     setClientModalError("");
     setClientModalSuccess("");
 
-    // Validate required fields
+    // Validate required fields according to backend requirements
     if (!clientModalFields.name.trim()) {
       setClientModalError("Client name is required");
       return;
@@ -1028,15 +1030,15 @@ const SalesTeamDashboard = () => {
     try {
       toast.info("Adding new client...");
 
-      const response = await addClient(
-        clientModalFields.name,
-        clientModalFields.contactEmail,
-        clientModalFields.activePositions,
-        clientModalFields.technologies
-      );
+      const response = await addClient({
+        name: clientModalFields.name,
+        contactEmail: clientModalFields.contactEmail,
+        activePositions: clientModalFields.activePositions,
+        technologies: clientModalFields.technologies
+      });
 
       if (response) {
-        setClients((prev) => [...prev, response]);
+        setClients(prev => [...prev, response]);
         setClientModalSuccess("Client added successfully!");
         toast.success("Client added successfully!");
         
@@ -1201,7 +1203,7 @@ const SalesTeamDashboard = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Ensure scores are numbers
+      // Ensure scores are numbers as required by backend
       const techScoreNum = Number(techScore);
       const commScoreNum = Number(commScore);
 
@@ -1215,25 +1217,31 @@ const SalesTeamDashboard = () => {
       const feedbackData = {
         result: status,
         feedback,
-        technicalScore: techScoreNum, // Send as number
-        communicationScore: commScoreNum, // Send as number
-        deployedStatus
+        technicalScore: techScoreNum,
+        communicationScore: commScoreNum,
+        deployedStatus: Boolean(deployedStatus)
       };
 
-      await updateClientInterview(interviewId, feedbackData);
-      toast.success('Interview feedback updated successfully');
+      const response = await updateClientInterview(interviewId, feedbackData);
       
-      // Refresh the interviews list
-      const updatedInterviews = await getClientInterviews();
-      setClientInterviews(updatedInterviews);
-      
-      // Close the modal
-      setShowFeedbackModal(false);
-      setSelectedInterviewForFeedback(null);
+      if (response) {
+        // Update the interviews list with the new feedback
+        setClientInterviews(prev => 
+          prev.map(interview => 
+            interview.id === interviewId 
+              ? { ...interview, ...response }
+              : interview
+          )
+        );
+        
+        toast.success('Interview feedback updated successfully');
+        setShowFeedbackModal(false);
+        setSelectedInterviewForFeedback(null);
+      }
     } catch (error) {
       console.error('Error updating feedback:', error);
       
-      // Handle specific error messages
+      // Handle specific error messages from backend
       if (error.message.includes('additional permissions')) {
         toast.error(error.message, {
           duration: 5000,
@@ -1609,11 +1617,24 @@ const SalesTeamDashboard = () => {
   };
 
   const InterviewsTab = ({ salesUserData }) => {
+    const [expandedInterviews, setExpandedInterviews] = useState([]);
     const filteredInterviews = filterInterviews(clientInterviews);
 
     const hasUpdatePermission = () => {
       const role = salesUserData?.role;
       return role === "ROLE_SALES_TEAM" || role === "ROLE_ADMIN";
+    };
+
+    const toggleFeedback = (interviewId, e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setExpandedInterviews(prev => {
+        if (prev.includes(interviewId)) {
+          return prev.filter(id => id !== interviewId);
+        } else {
+          return [...prev, interviewId];
+        }
+      });
     };
 
     const handleMarkAsCompleted = async (interviewId) => {
@@ -1654,6 +1675,123 @@ const SalesTeamDashboard = () => {
       } finally {
         setIsLoading(false);
       }
+    };
+
+    const renderFeedbackSection = (interview) => {
+      const isExpanded = expandedInterviews.includes(interview.id);
+      const hasFeedback = interview.feedback || interview.technicalScore || interview.communicationScore;
+
+      return (
+        <div className={styles.feedbackSection}>
+          <button 
+            type="button"
+            className={styles.feedbackToggle}
+            onClick={(e) => toggleFeedback(interview.id, e)}
+            aria-expanded={isExpanded}
+          >
+            <div className={styles.feedbackToggleContent}>
+              <FiMessageSquare />
+              <span>Interview Feedback</span>
+            </div>
+            {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
+          </button>
+          
+          <AnimatePresence>
+            {isExpanded && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className={styles.feedbackContent}
+              >
+                {hasFeedback ? (
+                  <div className={styles.feedbackCard}>
+                    <div className={styles.feedbackCardHeader}>
+                      <h4>Interview Results</h4>
+                      <span className={`${styles.statusBadge} ${styles[interview.result?.toLowerCase()]}`}>
+                        {interview.result?.replace("_", " ")}
+                      </span>
+                    </div>
+
+                    <div className={styles.feedbackCardBody}>
+                      <div className={styles.feedbackScores}>
+                        <div className={styles.scoreCard}>
+                          <div className={styles.scoreHeader}>
+                            <FiBarChart2 />
+                            <h5>Technical Score</h5>
+                          </div>
+                          <div className={styles.scoreValue}>
+                            <div className={styles.scoreCircle}>
+                              <span>{interview.technicalScore}</span>
+                              <small>/10</small>
+                            </div>
+                            <div className={styles.scoreBar}>
+                              <div 
+                                className={styles.scoreFill} 
+                                style={{ width: `${(interview.technicalScore / 10) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className={styles.scoreCard}>
+                          <div className={styles.scoreHeader}>
+                            <FiMessageSquare />
+                            <h5>Communication Score</h5>
+                          </div>
+                          <div className={styles.scoreValue}>
+                            <div className={styles.scoreCircle}>
+                              <span>{interview.communicationScore}</span>
+                              <small>/10</small>
+                            </div>
+                            <div className={styles.scoreBar}>
+                              <div 
+                                className={styles.scoreFill} 
+                                style={{ width: `${(interview.communicationScore / 10) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={styles.feedbackDetails}>
+                        <div className={styles.feedbackStatus}>
+                          <div className={styles.statusItem}>
+                            <label>Deployment Status</label>
+                            <span className={`${styles.statusBadge} ${interview.deployedStatus ? styles.deployed : styles.notDeployed}`}>
+                              {interview.deployedStatus ? "Deployed" : "Not Deployed"}
+                            </span>
+                          </div>
+                          <div className={styles.statusItem}>
+                            <label>Interview Date</label>
+                            <span>{new Date(interview.date).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+
+                        <div className={styles.feedbackText}>
+                          <div className={styles.feedbackHeader}>
+                            <FiMessageSquare />
+                            <h5>Detailed Feedback</h5>
+                          </div>
+                          <div className={styles.feedbackContent}>
+                            <p>{interview.feedback}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.noFeedback}>
+                    <FiMessageSquare size={24} />
+                    <p>No feedback provided yet</p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      );
     };
 
     return (
@@ -1750,89 +1888,31 @@ const SalesTeamDashboard = () => {
                     )}
                   </div>
                 </div>
+
                 <div className={styles.interviewDetails}>
                   <div className={styles.detailItem}>
-                    <span className={styles.label}>Date:</span>
+                    <label>Candidate:</label>
+                    <span>{interview.employee?.user?.fullName}</span>
+                  </div>
+                  <div className={styles.detailItem}>
+                    <label>Date:</label>
                     <span>{new Date(interview.date).toLocaleDateString()}</span>
                   </div>
                   <div className={styles.detailItem}>
-                    <span className={styles.label}>Time:</span>
+                    <label>Time:</label>
                     <span>{interview.time}</span>
                   </div>
                   <div className={styles.detailItem}>
-                    <span className={styles.label}>Level:</span>
-                    <span>{interview.level}</span>
+                    <label>Level:</label>
+                    <span>Level {interview.level}</span>
                   </div>
-                  {interview.meetingLink && (
-                    <div className={styles.detailItem}>
-                      <span className={styles.label}>Meeting Link:</span>
-                      <a
-                        href={interview.meetingLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Join Meeting
-                      </a>
-                    </div>
-                  )}
-                  {interview.employee && (
-                    <div className={styles.employeeDetailsSection}>
-                      <strong>Employee Details:</strong>
-                      <div className={styles.detailItem}>
-                        <span className={styles.label}>Full Name:</span>
-                        <span>
-                          {interview.employee.user?.fullName || "N/A"}
-                        </span>
-                      </div>
-                      <div className={styles.detailItem}>
-                        <span className={styles.label}>Email:</span>
-                        <span>{interview.employee.user?.email || "N/A"}</span>
-                      </div>
-                      <div className={styles.detailItem}>
-                        <span className={styles.label}>Employee ID:</span>
-                        <span>{interview.employee.empId || "N/A"}</span>
-                      </div>
-                      <div className={styles.detailItem}>
-                        <span className={styles.label}>Technology:</span>
-                        <span>{interview.employee.technology || "N/A"}</span>
-                      </div>
-                      <div className={styles.detailItem}>
-                        <span className={styles.label}>Resource Type:</span>
-                        <span>{interview.employee.resourceType || "N/A"}</span>
-                      </div>
-                    </div>
-                  )}
-                  {interview.overallStatus?.toLowerCase() === "completed" &&
-                    interview.feedback && (
-                      <div className={styles.feedbackDetailsSection}>
-                        <strong>Feedback:</strong>
-                        <div className={styles.detailItem}>
-                          <span className={styles.label}>Technical:</span>
-                          <span>
-                            {interview.technicalScore !== undefined
-                              ? `${interview.technicalScore}/10`
-                              : "N/A"}
-                          </span>
-                        </div>
-                        <div className={styles.detailItem}>
-                          <span className={styles.label}>Communication:</span>
-                          <span>
-                            {interview.communicationScore !== undefined
-                              ? `${interview.communicationScore}/10`
-                              : "N/A"}
-                          </span>
-                        </div>
-                        <p>
-                          <strong>Technical Feedback</strong>
-                        </p>
-                        <p>{interview.feedback}</p>
-                        <p>
-                          <strong>Communication Feedback</strong>
-                        </p>
-                        <p>{interview.feedback}</p>
-                      </div>
-                    )}
+                  <div className={styles.detailItem}>
+                    <label>Job Description:</label>
+                    <span>{interview.jobDescriptionTitle}</span>
+                  </div>
                 </div>
+
+                {renderFeedbackSection(interview)}
               </motion.div>
             ))}
           </div>
@@ -1862,6 +1942,22 @@ const SalesTeamDashboard = () => {
         (employee.empId?.toLowerCase() || "").includes(searchTerm.toLowerCase())
     );
 
+    // Find the latest interview for each employee
+    const getEmployeeLevel = (employeeId) => {
+      const employeeInterviews = clientInterviews.filter(
+        interview => interview.employee?.id === employeeId
+      );
+      
+      if (employeeInterviews.length > 0) {
+        // Sort interviews by date in descending order to get the latest
+        const sortedInterviews = [...employeeInterviews].sort((a, b) => 
+          new Date(b.date) - new Date(a.date)
+        );
+        return sortedInterviews[0].level;
+      }
+      return null;
+    };
+
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -1884,61 +1980,71 @@ const SalesTeamDashboard = () => {
 
         {filteredDeployedEmployees.length > 0 ? (
           <div className={styles.cardGrid}>
-            {filteredDeployedEmployees.map((employee) => (
-              <motion.div
-                key={employee.id}
-                layout
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
-                className={styles.profileCard}
-              >
-                <div className={styles.profileHeader}>
-                  <h3 className={styles.profileName}>
-                    {employee.user?.fullName || "N/A"}
-                  </h3>
-                  <span
-                    className={`${styles.statusBadge} ${
-                      styles[employee.status?.toLowerCase()]
-                    }`}
-                  >
-                    {employee.status || "N/A"}
-                  </span>
-                </div>
+            {filteredDeployedEmployees.map((employee) => {
+              const employeeLevel = getEmployeeLevel(employee.id);
+              return (
+                <motion.div
+                  key={employee.id}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                  className={styles.profileCard}
+                >
+                  <div className={styles.profileHeader}>
+                    <h3 className={styles.profileName}>
+                      {employee.user?.fullName || "N/A"}
+                    </h3>
+                    <span
+                      className={`${styles.statusBadge} ${
+                        styles[employee.status?.toLowerCase()]
+                      }`}
+                    >
+                      {employee.status || "N/A"}
+                    </span>
+                  </div>
 
-                <div className={styles.profileDetails}>
-                  <p>
-                    <strong>Employee ID:</strong> {employee.empId || "N/A"}
-                  </p>
-                  <p>
-                    <strong>Email:</strong> {employee.user?.email || "N/A"}
-                  </p>
-                  <p>
-                    <strong>Technology:</strong>
-                    <span
-                      className={`${styles.techBadge} ${
-                        styles[employee.technology?.toLowerCase()]
-                      }`}
-                    >
-                      {employee.technology || "N/A"}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Resource Type:</strong>
-                    <span
-                      className={`${styles.resourceBadge} ${
-                        styles[employee.resourceType?.toLowerCase()]
-                      }`}
-                    >
-                      {employee.resourceType || "N/A"}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Level:</strong> {employee.level || "N/A"}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
+                  <div className={styles.profileDetails}>
+                    <p>
+                      <strong>Employee ID:</strong> {employee.empId || "N/A"}
+                    </p>
+                    <p>
+                      <strong>Email:</strong> {employee.user?.email || "N/A"}
+                    </p>
+                    <p>
+                      <strong>Technology:</strong>
+                      <span
+                        className={`${styles.techBadge} ${
+                          styles[employee.technology?.toLowerCase()]
+                        }`}
+                      >
+                        {employee.technology || "N/A"}
+                      </span>
+                    </p>
+                    <p>
+                      <strong>Resource Type:</strong>
+                      <span
+                        className={`${styles.resourceBadge} ${
+                          styles[employee.resourceType?.toLowerCase()]
+                        }`}
+                      >
+                        {employee.resourceType || "N/A"}
+                      </span>
+                    </p>
+                    <p>
+                      <strong>Level:</strong>{" "}
+                      {employeeLevel ? (
+                        <span className={styles.levelBadge}>
+                          Level {employeeLevel}
+                        </span>
+                      ) : (
+                        "N/A"
+                      )}
+                    </p>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         ) : (
           <div className={styles.emptyState}>

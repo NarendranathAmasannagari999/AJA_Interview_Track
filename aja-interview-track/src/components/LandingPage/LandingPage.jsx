@@ -1,5 +1,5 @@
 // AJA_Interview_Track\aja-interview-track\src\components\LandingPage\LandingPage.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -14,10 +14,136 @@ import {
   FaServer,
   FaSalesforce,
   FaPalette,
-  FaVial
+  FaVial,
+  FaTrophy,
+  FaMedal,
+  FaStar
 } from 'react-icons/fa';
 import { FiArrowRight } from 'react-icons/fi';
+import { getMockInterviewPerformance, formatPerformanceData, filterByTechnology, filterByResourceType } from '../../API/leaderboardAPI';
 import styles from './LandingPage.module.css';
+
+const LeaderboardCard = () => {
+  const [leaderboardData, setLeaderboardData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [techFilter, setTechFilter] = useState('all');
+  const [resourceFilter, setResourceFilter] = useState('all');
+
+  useEffect(() => {
+    const fetchLeaderboardData = async () => {
+      try {
+        const data = await getMockInterviewPerformance();
+        const formattedData = formatPerformanceData(data);
+        setLeaderboardData(formattedData);
+        setFilteredData(formattedData);
+      } catch (err) {
+        setError('Failed to load leaderboard data');
+        console.error('Leaderboard error:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchLeaderboardData();
+  }, []);
+
+  useEffect(() => {
+    let data = leaderboardData;
+    if (techFilter !== 'all') data = filterByTechnology(data, techFilter);
+    if (resourceFilter !== 'all') data = filterByResourceType(data, resourceFilter);
+    setFilteredData(data);
+  }, [techFilter, resourceFilter, leaderboardData]);
+
+  const uniqueTechs = ['all', ...Array.from(new Set(leaderboardData.map(d => d.technology).filter(Boolean)))];
+  const uniqueResources = ['all', ...Array.from(new Set(leaderboardData.map(d => d.resourceType).filter(Boolean)))];
+
+  const getRankIcon = (rank) => {
+    switch (rank) {
+      case 1: return <FaTrophy className={styles.goldIcon} />;
+      case 2: return <FaMedal className={styles.silverIcon} />;
+      case 3: return <FaStar className={styles.bronzeIcon} />;
+      default: return <span className={styles.rankNumber}>{rank}</span>;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className={styles.leaderboardCard}>
+        <div className={styles.leaderboardHeader}>
+          <FaTrophy className={styles.leaderboardIcon} />
+          <h3>Top Performers</h3>
+        </div>
+        <div className={styles.leaderboardLoading}>Loading leaderboard data...</div>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className={styles.leaderboardCard}>
+        <div className={styles.leaderboardHeader}>
+          <FaTrophy className={styles.leaderboardIcon} />
+          <h3>Top Performers</h3>
+        </div>
+        <div className={styles.leaderboardError}>{error}</div>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div 
+      className={styles.leaderboardCard}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+    >
+      <div className={styles.leaderboardHeader}>
+        <FaTrophy className={styles.leaderboardIcon} />
+        <h3>Top Performers</h3>
+      </div>
+      <div className={styles.leaderboardFilters}>
+        <select value={techFilter} onChange={e => setTechFilter(e.target.value)} className={styles.leaderboardSelect}>
+          {uniqueTechs.map(tech => <option key={tech} value={tech}>{tech}</option>)}
+        </select>
+        <select value={resourceFilter} onChange={e => setResourceFilter(e.target.value)} className={styles.leaderboardSelect}>
+          {uniqueResources.map(res => <option key={res} value={res}>{res}</option>)}
+        </select>
+      </div>
+      <div className={styles.leaderboardContent}>
+        <div className={styles.leaderboardList}>
+          {filteredData.length === 0 && (
+            <div className={styles.leaderboardEmpty}>No results found.</div>
+          )}
+          {filteredData.slice(0, 10).map((performer, idx) => (
+            <motion.div
+              key={performer.employeeId + performer.rank}
+              className={`${styles.leaderboardItem} ${performer.rank <= 3 ? styles.leaderboardTop : ''}`}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              whileHover={{ scale: 1.02 }}
+            >
+              <div className={styles.rankContainer}>{getRankIcon(performer.rank)}</div>
+              <div className={styles.performerInfo}>
+                <h4 className={styles.leaderboardName}>{performer.employeeName}</h4>
+                <p className={styles.technology}>{performer.technology} <span className={styles.resourceType}>{performer.resourceType}</span></p>
+              </div>
+              <div className={styles.scoreContainer}>
+                <div className={styles.scoreBar}>
+                  <div 
+                    className={styles.scoreFill}
+                    style={{ width: `${performer.scorePercentage}%` }}
+                  />
+                </div>
+                <span className={styles.scoreBadge}>{performer.totalRating}/20</span>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -214,6 +340,19 @@ const LandingPage = () => {
             <h3>3.5</h3>
             <p>Avg. Months to Placement</p>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Leaderboard Section */}
+      <section className={styles.leaderboardSection}>
+        <div className={styles.sectionInner}>
+          <motion.div className={styles.sectionHeader} variants={fadeIn}>
+            <p className={styles.sectionSubtitle}>Performance Highlights</p>
+            <motion.h2 className={styles.sectionTitle}>
+              Our <span className={styles.highlight}>Top Performers</span>
+            </motion.h2>
+          </motion.div>
+          <LeaderboardCard />
         </div>
       </section>
 
