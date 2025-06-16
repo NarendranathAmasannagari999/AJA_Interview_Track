@@ -336,16 +336,20 @@ export const getEmployeesReadyForDeployment = async (technology = null, resource
  */
 export const getDeployedEmployees = async () => {
   try {
-    const response = await axiosInstance.get(`${BASE_URL}/deployed`);
+    const response = await axiosInstance.get('/api/sales/employees/deployed');
     return response.data;
   } catch (error) {
+    console.error('Error fetching deployed employees:', error);
     if (error.response?.status === 401) {
       throw new Error('Unauthorized: Please login to access this resource');
     }
     if (error.response?.status === 403) {
       throw new Error('Access denied: You do not have permission to access this resource');
     }
-    throw error.response?.data || error.message;
+    if (error.response?.status === 404) {
+      throw new Error('No deployed employees found');
+    }
+    throw new Error(error.response?.data || 'Failed to fetch deployed employees');
   }
 };
 

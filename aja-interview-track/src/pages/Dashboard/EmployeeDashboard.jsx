@@ -216,9 +216,17 @@ const EmployeeDashboard = () => {
     try {
       setLoading(true);
       const data = await getDeployedEmployees();
-      setDeployedEmployees(data);
+      if (Array.isArray(data)) {
+        setDeployedEmployees(data);
+      } else {
+        console.error('Invalid deployed employees data received:', data);
+        setDeployedEmployees([]);
+        toast.error('Failed to load deployed employees data');
+      }
     } catch (err) {
-      toast.error(err.message);
+      console.error('Error fetching deployed employees:', err);
+      toast.error(err.message || 'Failed to fetch deployed employees');
+      setDeployedEmployees([]);
     } finally {
       setLoading(false);
     }
@@ -892,8 +900,8 @@ const EmployeeDashboard = () => {
                           <div className={styles.loadingSpinner}></div>
                           <p>Loading deployed colleagues...</p>
                         </motion.div>
-                      ) : filteredDeployedEmployees().length > 0 ? (
-                        filteredDeployedEmployees().map(employee => (
+                      ) : deployedEmployees.length > 0 ? (
+                        deployedEmployees.map(employee => (
                           <motion.div 
                             key={employee.id} 
                             className={styles.deployedCard}
