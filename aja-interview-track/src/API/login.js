@@ -1,23 +1,24 @@
-import axiosInstance from './axiosConfig';
+import axios from 'axios';
+
+const baseURL = 'http://localhost:8080';
 
 export const loginUser = async (email, password) => {
     try {
-        // Ensure email and password are properly encoded in the URL
-        const params = new URLSearchParams();
-        params.append('email', email);
-        params.append('password', password);
-
-        const response = await axiosInstance.post('/api/auth/login', null, { 
-            params,
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
+        // Create a clean axios instance without JWT token for login
+        const response = await axios.post(`${baseURL}/api/auth/login`, null, {
+            params: {
+                email: email,
+                password: password
             }
         });
         
+        // Handle the AuthResponse from backend
         const { token, role } = response.data;
         
         // Store the token in localStorage
-        localStorage.setItem('jwt_token', token);
+        if (token) {
+            localStorage.setItem('jwt_token', token);
+        }
         
         return { token, role };
     } catch (error) {

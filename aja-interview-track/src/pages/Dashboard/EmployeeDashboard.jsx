@@ -20,16 +20,19 @@ import {
   addInterviewQuestion,
   getInterviewQuestions,
   updateEmployeeDetails,
+  getEmployeeDetails,
   getDeployedEmployees,
   updateProfilePicture,
   getProfilePicture
 } from '../../API/employee';
+import { useAuth } from '../../context/AuthContext';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 const EmployeeDashboard = () => {
   const navigate = useNavigate();
-  const [employeeId, setEmployeeId] = useState(null);
+  const { user, employee, loading: authLoading, logout } = useAuth();
+  const [employeeId, setEmployeeIdState] = useState(null);
   const [employeeData, setEmployeeData] = useState({
     empId: '',
     technology: '',
@@ -76,7 +79,7 @@ const EmployeeDashboard = () => {
   const [showInterviewModal, setShowInterviewModal] = useState(false);
   const [deployedEmployees, setDeployedEmployees] = useState([]);
   const [resumeStatus, setResumeStatus] = useState('pending');
-  const [openAccordionPanel, setOpenAccordionPanel] = useState('mock');
+  const [openAccordionPanel, setOpenAccordionPanel] = useState('client');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedInterviewDetails, setSelectedInterviewDetails] = useState(null);
 
@@ -85,8 +88,45 @@ const EmployeeDashboard = () => {
     { id: 'resume', label: 'Resume Preparation', icon: <FiUpload /> },
     { id: 'interviews', label: 'Interviews', icon: <FiMessageSquare /> },
     { id: 'performance', label: 'Performance', icon: <FiBarChart2 /> },
+    { id: 'deployed', label: 'Deployed Colleagues', icon: <FiAward /> },
     { id: 'profile', label: 'My Profile', icon: <FiUser /> }
   ];
+
+  // Check authentication and set employee data
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!user) {
+      toast.error('Please login to access the dashboard');
+      navigate('/login');
+      return;
+    }
+
+    // If we have employee data from auth context, use it
+    if (employee) {
+      setEmployeeIdState(employee.id);
+      setEmployeeData({
+        empId: employee.empId,
+        technology: employee.technology || '',
+        resourceType: employee.resourceType || '',
+        level: employee.level || '',
+        status: employee.status || '',
+        name: employee.user?.fullName || 'Employee',
+        userEmail: employee.user?.email || 'n.amasannagari@ajacs.in'
+      });
+    } else if (user.role === 'ROLE_EMPLOYEE') {
+      // If we don't have employee data but user is an employee, try to get it from localStorage
+      const storedEmployeeId = localStorage.getItem('employeeId');
+      if (storedEmployeeId) {
+        setEmployeeIdState(storedEmployeeId);
+      } else {
+        // If no employee ID found, redirect to login
+        toast.error('Employee data not found. Please login again.');
+        logout();
+        navigate('/login');
+      }
+    }
+  }, [user, employee, authLoading, navigate, logout]);
 
   useEffect(() => {
     if (employeeData.technology && employeeData.name) {
@@ -123,92 +163,149 @@ const EmployeeDashboard = () => {
     const fetchInitialData = async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem('jwt_token');
-        if (!token) {
-          throw new Error('No authentication token found');
+        
+        // Check authentication
+        if (!user) {
+          toast.error('Please login to access the dashboard');
+          navigate('/login');
+          return;
         }
 
-        // Get employee ID from auth context or local storage
-        const empId = localStorage.getItem('employeeId') || 1; // Fallback to 1 for testing
-        setEmployeeId(empId);
-
-        // Fetch employee data
-        const employeeResponse = await updateEmployeeDetails(empId);
-        setEmployeeData({
-          empId: employeeResponse.empId,
-          technology: employeeResponse.technology || '',
-          resourceType: employeeResponse.resourceType || '',
-          level: employeeResponse.level || '',
-          status: employeeResponse.status || '',
-          name: employeeResponse.user?.fullName || 'Employee',
-          userEmail: employeeResponse.user?.email || 'n.amasannagari@ajacs.in'
-        });
+        // If we don't have employee data, fetch it
+        if (!employee && employeeId) {
+          try {
+            const employeeResponse = await getEmployeeDetails(employeeId);
+            setEmployeeData({
+              empId: employeeResponse.empId,
+              technology: employeeResponse.technology || '',
+              resourceType: employeeResponse.resourceType || '',
+              level: employeeResponse.level || '',
+              status: employeeResponse.status || '',
+              name: employeeResponse.user?.fullName || 'Employee',
+              userEmail: employeeResponse.user?.email || 'n.amasannagari@ajacs.in'
+            });
+          } catch (error) {
+            console.error('Error fetching employee details:', error);
+            toast.error('Failed to load employee details');
+          }
+        }
 
         // Fetch profile picture
-        try {
-          const picBlob = await getProfilePicture(empId);
-          const picUrl = URL.createObjectURL(picBlob);
-          setProfilePic(picUrl);
-        } catch (picError) {
-          console.warn('Could not load profile picture:', picError.message);
+        if (employeeId) {
+          try {
+            const picBlob = await getProfilePicture(employeeId);
+            const picUrl = URL.createObjectURL(picBlob);
+            setProfilePic(picUrl);
+          } catch (picError) {
+            console.warn('Could not load profile picture:', picError.message);
+          }
         }
 
         // Fetch other data
-        await Promise.all([
-          fetchMockInterviews(empId),
-          fetchClientInterviews(empId),
-          fetchJobDescriptions(),
-          fetchInterviewQuestions(),
-          fetchDeployedEmployees()
-        ]);
-      } catch (err) {
-        if (err.message.includes('Unauthorized')) {
-          localStorage.removeItem('jwt_token');
-          navigate('/login');
+        if (employeeId) {
+          await Promise.all([
+            fetchMockInterviews(employeeId),
+            fetchClientInterviews(employeeId),
+            fetchJobDescriptions(),
+            fetchInterviewQuestions(),
+            fetchDeployedEmployees()
+          ]);
         }
-        toast.error(err.message);
+      } catch (err) {
+        if (err.message?.includes('Unauthorized') || err.status === 401) {
+          toast.error('Session expired. Please login again.');
+          logout();
+        } else {
+          toast.error(err.message || 'Failed to load dashboard data');
+        }
       } finally {
         setLoading(false);
         setIsDataLoading(false);
       }
     };
 
-    fetchInitialData();
-  }, [navigate]);
+    if (employeeId && !authLoading) {
+      fetchInitialData();
+    }
+  }, [user, employee, employeeId, authLoading, navigate, logout]);
 
   const fetchMockInterviews = async (empId) => {
     try {
+      setLoading(true);
       const data = await getMockInterviews(empId, technologyFilter, resourceTypeFilter);
-      setMockInterviews(data);
+      if (Array.isArray(data)) {
+        setMockInterviews(data);
+      } else {
+        console.error('Invalid mock interviews data received:', data);
+        setMockInterviews([]);
+        toast.error('Failed to load mock interviews data');
+      }
     } catch (err) {
-      toast.error(err.message);
+      console.error('Error fetching mock interviews:', err);
+      toast.error(err.message || 'Failed to fetch mock interviews');
+      setMockInterviews([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchClientInterviews = async (empId) => {
     try {
+      setLoading(true);
       const data = await getClientInterviews(empId, technologyFilter, resourceTypeFilter);
-      setClientInterviews(data);
+      if (Array.isArray(data)) {
+        setClientInterviews(data);
+      } else {
+        console.error('Invalid client interviews data received:', data);
+        setClientInterviews([]);
+        toast.error('Failed to load client interviews data');
+      }
     } catch (err) {
-      toast.error(err.message);
+      console.error('Error fetching client interviews:', err);
+      toast.error(err.message || 'Failed to fetch client interviews');
+      setClientInterviews([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchJobDescriptions = async () => {
     try {
+      setLoading(true);
       const data = await getJobDescriptions(searchTerm, technologyFilter, resourceTypeFilter);
-      setJobDescriptions(data);
+      if (Array.isArray(data)) {
+        setJobDescriptions(data);
+      } else {
+        console.error('Invalid job descriptions data received:', data);
+        setJobDescriptions([]);
+        toast.error('Failed to load job descriptions');
+      }
     } catch (err) {
-      toast.error(err.message);
+      console.error('Error fetching job descriptions:', err);
+      toast.error(err.message || 'Failed to fetch job descriptions');
+      setJobDescriptions([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchInterviewQuestions = async () => {
     try {
+      setLoading(true);
       const data = await getInterviewQuestions(technologyFilter);
-      setInterviewQuestions(data);
+      if (Array.isArray(data)) {
+        setInterviewQuestions(data);
+      } else {
+        console.error('Invalid interview questions data received:', data);
+        setInterviewQuestions([]);
+        toast.error('Failed to load interview questions');
+      }
     } catch (err) {
-      toast.error(err.message);
+      console.error('Error fetching interview questions:', err);
+      toast.error(err.message || 'Failed to fetch interview questions');
+      setInterviewQuestions([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -232,6 +329,13 @@ const EmployeeDashboard = () => {
     }
   };
 
+  // Add new useEffect to fetch interviews when tab is active
+  useEffect(() => {
+    if (activeTab === 'interviews' && employeeId) {
+      fetchMockInterviews(employeeId);
+      fetchClientInterviews(employeeId);
+    }
+  }, [activeTab, employeeId, technologyFilter, resourceTypeFilter]);
 
   const handleScheduleInterview = async (e) => {
     e.preventDefault();
@@ -305,18 +409,21 @@ const EmployeeDashboard = () => {
         employeeData.technology,
         employeeData.empId
       );
-      setEmployeeData({
-        empId: updatedEmployee.empId,
-        technology: updatedEmployee.technology,
-        resourceType: updatedEmployee.resourceType,
-        level: updatedEmployee.level,
-        status: updatedEmployee.status,
-        name: updatedEmployee.user?.fullName,
-        userEmail: updatedEmployee.user?.email
-      });
-      toast.success('Employee details updated successfully!');
+      if (updatedEmployee) {
+        setEmployeeData({
+          empId: updatedEmployee.empId,
+          technology: updatedEmployee.technology,
+          resourceType: updatedEmployee.resourceType,
+          level: updatedEmployee.level,
+          status: updatedEmployee.status,
+          name: updatedEmployee.user?.fullName,
+          userEmail: updatedEmployee.user?.email
+        });
+        toast.success('Employee details updated successfully!');
+      }
     } catch (err) {
-      toast.error(err.message);
+      console.error('Error updating employee details:', err);
+      toast.error(err.message || 'Failed to update employee details');
     } finally {
       setLoading(false);
     }
@@ -331,12 +438,20 @@ const EmployeeDashboard = () => {
     try {
       setLoading(true);
       const resume = await uploadResume(employeeId, selectedJd, selectedFile);
-      setResumeStatus('pending');
-      toast.success('Resume uploaded successfully!');
-      setSelectedFile(null);
-      setSelectedJd('');
+      if (resume) {
+        setResumeStatus('pending');
+        toast.success('Resume uploaded successfully!');
+        setSelectedFile(null);
+        setSelectedJd('');
+        // Refresh interviews to show updated resume
+        await Promise.all([
+          fetchMockInterviews(employeeId),
+          fetchClientInterviews(employeeId)
+        ]);
+      }
     } catch (err) {
-      toast.error(err.message);
+      console.error('Error uploading resume:', err);
+      toast.error(err.message || 'Failed to upload resume');
     } finally {
       setLoading(false);
     }
@@ -346,17 +461,20 @@ const EmployeeDashboard = () => {
     try {
       setLoading(true);
       const blob = await downloadResume(resumeId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `resume_${resumeId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      toast.success('Resume downloaded successfully!');
+      if (blob) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `resume_${resumeId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success('Resume downloaded successfully!');
+      }
     } catch (err) {
-      toast.error(err.message);
+      console.error('Error downloading resume:', err);
+      toast.error(err.message || 'Failed to download resume');
     } finally {
       setLoading(false);
     }
@@ -367,10 +485,14 @@ const EmployeeDashboard = () => {
       setLoading(true);
       await deleteResume(resumeId);
       toast.success('Resume deleted successfully!');
-      fetchMockInterviews(employeeId);
-      fetchClientInterviews(employeeId);
+      // Refresh interviews to show updated resume status
+      await Promise.all([
+        fetchMockInterviews(employeeId),
+        fetchClientInterviews(employeeId)
+      ]);
     } catch (err) {
-      toast.error(err.message);
+      console.error('Error deleting resume:', err);
+      toast.error(err.message || 'Failed to delete resume');
     } finally {
       setLoading(false);
     }
@@ -385,12 +507,15 @@ const EmployeeDashboard = () => {
         newQuestion.question,
         newQuestion.user
       );
-      setInterviewQuestions([...interviewQuestions, question]);
-      setNewQuestion({ technology: '', question: '', user: '' });
-      setShowQuestionModal(false);
-      toast.success('Interview question added successfully!');
+      if (question) {
+        setInterviewQuestions(prev => [...prev, question]);
+        setNewQuestion({ technology: '', question: '', user: '' });
+        setShowQuestionModal(false);
+        toast.success('Interview question added successfully!');
+      }
     } catch (err) {
-      toast.error(err.message);
+      console.error('Error adding interview question:', err);
+      toast.error(err.message || 'Failed to add interview question');
     } finally {
       setLoading(false);
     }
@@ -401,14 +526,19 @@ const EmployeeDashboard = () => {
     if (!file) return;
     try {
       setLoading(true);
-      await updateProfilePicture(employeeId, file);
-      const picBlob = await getProfilePicture(employeeId);
-      const picUrl = URL.createObjectURL(picBlob);
-      setProfilePic(picUrl);
-      toast.success('Profile picture updated successfully!');
-      setSelectedFile(null);
+      const updatedEmployee = await updateProfilePicture(employeeId, file);
+      if (updatedEmployee) {
+        const picBlob = await getProfilePicture(employeeId);
+        if (picBlob) {
+          const picUrl = URL.createObjectURL(picBlob);
+          setProfilePic(picUrl);
+          toast.success('Profile picture updated successfully!');
+          setSelectedFile(null);
+        }
+      }
     } catch (err) {
-      toast.error(err.message);
+      console.error('Error updating profile picture:', err);
+      toast.error(err.message || 'Failed to update profile picture');
     } finally {
       setLoading(false);
     }
@@ -430,6 +560,10 @@ const EmployeeDashboard = () => {
     e => (technologyFilter === 'all' || (e.technology && e.technology.toLowerCase() === technologyFilter.toLowerCase())) 
       && (resourceTypeFilter === 'all' || (e.resourceType && e.resourceType.toLowerCase() === resourceTypeFilter.toLowerCase()))
   );
+
+  const handleLogout = () => {
+    logout();
+  };
 
   const renderPerformanceSection = () => {
     if (!mockInterviews?.length && !clientInterviews?.length) {
@@ -696,77 +830,20 @@ const EmployeeDashboard = () => {
                     <option value="OM">OM</option>
                   </select>
                 </div>
+                <button 
+                  className={styles.iconButton}
+                  onClick={() => {
+                    fetchMockInterviews(employeeId);
+                    fetchClientInterviews(employeeId);
+                    toast.info('Refreshing interviews...');
+                  }}
+                >
+                  <FiRefreshCw /> Refresh
+                </button>
               </div>
             </div>
 
-            {/* Mock Interviews Accordion Panel */}
-            <div className={styles.accordionPanel}>
-              <div 
-                className={styles.accordionHeader}
-                onClick={() => setOpenAccordionPanel(openAccordionPanel === 'mock' ? null : 'mock')}
-              >
-                <h4><FiMessageSquare /> Mock Interviews</h4>
-                {openAccordionPanel === 'mock' ? <FiChevronUp /> : <FiChevronDown />}
-              </div>
-              <AnimatePresence>
-                {openAccordionPanel === 'mock' && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className={styles.accordionContent}
-                  >
-                    {mockInterviews.length > 0 ? (
-                      mockInterviews.map(interview => (
-                        <motion.div 
-                          key={interview.id} 
-                          className={styles.interviewCard}
-                          whileHover={{ scale: 1.01 }}
-                        >
-                          <div className={styles.interviewHeader}>
-                            <div>
-                              <h4>Interview with {interview.interviewer?.name || 'TBD'}</h4>
-                              <div className={styles.interviewMeta}>
-                                <span className={styles.techBadge}>{interview.employee?.technology}</span>
-                                <span className={styles.resourceBadge}>{interview.employee?.resourceType}</span>
-                                <span><FiCalendar /> {formatDate(interview.date)}</span>
-                              </div>
-                            </div>
-                            <span className={`${styles.status} ${styles[interview.status]}`}>
-                              {interview.status}
-                            </span>
-                          </div>
-                          {interview.resume && (
-                            <div className={styles.interviewActions}>
-                              <button 
-                                onClick={() => handleDownloadResume(interview.resume.id)}
-                                className={styles.primaryButton}
-                              >
-                                <FiDownload /> Resume
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteResume(interview.resume.id)}
-                                className={styles.secondaryButton}
-                              >
-                                Delete Resume
-                              </button>
-                            </div>
-                          )}
-                        </motion.div>
-                      ))
-                    ) : (
-                      <motion.div className={styles.emptyState}>
-                        <FiHelpCircle size={48} />
-                        <p>No Mock Interviews Found</p>
-                      </motion.div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Client Interviews Accordion Panel */}
+            {/* Client Interviews Accordion Panel - Moved to top */}
             <div className={styles.accordionPanel}>
               <div 
                 className={styles.accordionHeader}
@@ -784,7 +861,12 @@ const EmployeeDashboard = () => {
                     transition={{ duration: 0.3 }}
                     className={styles.accordionContent}
                   >
-                    {clientInterviews.length > 0 ? (
+                    {loading ? (
+                      <motion.div className={styles.loadingContainer}>
+                        <div className={styles.loadingSpinner}></div>
+                        <p>Loading client interviews...</p>
+                      </motion.div>
+                    ) : clientInterviews.length > 0 ? (
                       clientInterviews.map(interview => (
                         <motion.div 
                           key={interview.id} 
@@ -798,6 +880,7 @@ const EmployeeDashboard = () => {
                                 <span className={styles.techBadge}>{interview.employee?.technology}</span>
                                 <span className={styles.resourceBadge}>{interview.employee?.resourceType}</span>
                                 <span><FiCalendar /> {formatDate(interview.date)}</span>
+                                <span><FiClock /> {interview.time}</span>
                                 <span>For JD: {interview.jobDescriptionTitle}</span>
                               </div>
                             </div>
@@ -805,12 +888,24 @@ const EmployeeDashboard = () => {
                               {interview.status}
                             </span>
                           </div>
-                            <div className={styles.interviewActions}>
+                          <div className={styles.interviewDetails}>
+                            <p><strong>Interview Type:</strong> Client Interview</p>
+                            <p><strong>Client:</strong> {interview.client}</p>
+                            <p><strong>Level:</strong> {interview.level}</p>
+                            {interview.meetingLink && (
+                              <p><strong>Meeting Link:</strong> <a href={interview.meetingLink} target="_blank" rel="noopener noreferrer">Join Meeting</a></p>
+                            )}
+                            {interview.result && (
+                              <p><strong>Result:</strong> {interview.result}</p>
+                            )}
+                            {interview.feedback && (
+                              <p><strong>Feedback:</strong> {interview.feedback}</p>
+                            )}
+                          </div>
+                          <div className={styles.interviewActions}>
                             <button 
-                                className={styles.primaryButton}
+                              className={styles.primaryButton}
                               onClick={() => {
-                                console.log('Technology from employeeData:', employeeData.technology);
-                                console.log('User name from employeeData:', employeeData.name);
                                 setNewQuestion(prev => ({
                                   ...prev,
                                   technology: interview.employee?.technology || employeeData.technology,
@@ -821,9 +916,7 @@ const EmployeeDashboard = () => {
                             >
                               <FiShare2 /> Share a Question
                             </button>
-                          </div>
-                          {(interview.status === 'scheduled' || interview.result) && (
-                            <div className={styles.interviewActions}>
+                            {(interview.status === 'scheduled' || interview.result) && (
                               <button 
                                 onClick={() => {
                                   setSelectedInterviewDetails(interview);
@@ -833,8 +926,8 @@ const EmployeeDashboard = () => {
                               >
                                 Details
                               </button>
-                            </div>
-                          )}
+                            )}
+                          </div>
                           {interview.resume && (
                             <div className={styles.interviewActions}>
                               <button 
@@ -864,29 +957,17 @@ const EmployeeDashboard = () => {
               </AnimatePresence>
             </div>
 
-            {/* Deployed Colleagues Accordion Panel */}
+            {/* Mock Interviews Accordion Panel */}
             <div className={styles.accordionPanel}>
               <div 
                 className={styles.accordionHeader}
-                onClick={() => setOpenAccordionPanel(openAccordionPanel === 'deployed' ? null : 'deployed')}
+                onClick={() => setOpenAccordionPanel(openAccordionPanel === 'mock' ? null : 'mock')}
               >
-                <h4><FiAward /> Deployed Colleagues</h4>
-                <div className={styles.accordionActions}>
-                  <button 
-                    className={styles.iconButton}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      fetchDeployedEmployees();
-                      toast.info('Refreshing deployed colleagues list...');
-                    }}
-                  >
-                    <FiRefreshCw />
-                  </button>
-                  {openAccordionPanel === 'deployed' ? <FiChevronUp /> : <FiChevronDown />}
-                </div>
+                <h4><FiMessageSquare /> Mock Interviews</h4>
+                {openAccordionPanel === 'mock' ? <FiChevronUp /> : <FiChevronDown />}
               </div>
               <AnimatePresence>
-                {openAccordionPanel === 'deployed' && (
+                {openAccordionPanel === 'mock' && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -894,45 +975,69 @@ const EmployeeDashboard = () => {
                     transition={{ duration: 0.3 }}
                     className={styles.accordionContent}
                   >
-                    <div className={styles.deployedGrid}>
-                      {loading ? (
-                        <motion.div className={styles.loadingContainer}>
-                          <div className={styles.loadingSpinner}></div>
-                          <p>Loading deployed colleagues...</p>
-                        </motion.div>
-                      ) : deployedEmployees.length > 0 ? (
-                        deployedEmployees.map(employee => (
-                          <motion.div 
-                            key={employee.id} 
-                            className={styles.deployedCard}
-                            whileHover={{ scale: 1.02 }}
-                          >
-                            <div className={styles.deployedHeader}>
-                              <div className={styles.avatar}>
-                                {employee.user?.fullName?.charAt(0) || 'E'}
-                              </div>
-                              <div>
-                                <h5>{employee.user?.fullName || 'Employee'}</h5>
-                                <div className={styles.deployedMeta}>
-                                  <span className={styles.techBadge}>{employee.technology || 'N/A'}</span>
-                                  <span className={styles.resourceBadge}>{employee.resourceType || 'N/A'}</span>
-                                </div>
+                    {loading ? (
+                      <motion.div className={styles.loadingContainer}>
+                        <div className={styles.loadingSpinner}></div>
+                        <p>Loading mock interviews...</p>
+                      </motion.div>
+                    ) : mockInterviews.length > 0 ? (
+                      mockInterviews.map(interview => (
+                        <motion.div 
+                          key={interview.id} 
+                          className={styles.interviewCard}
+                          whileHover={{ scale: 1.01 }}
+                        >
+                          <div className={styles.interviewHeader}>
+                            <div>
+                              <h4>Interview with {interview.interviewer?.name || 'TBD'}</h4>
+                              <div className={styles.interviewMeta}>
+                                <span className={styles.techBadge}>{interview.employee?.technology}</span>
+                                <span className={styles.resourceBadge}>{interview.employee?.resourceType}</span>
+                                <span><FiCalendar /> {formatDate(interview.date)}</span>
+                                <span><FiClock /> {interview.time}</span>
                               </div>
                             </div>
-                            <div className={styles.deployedDetails}>
-                              <p><strong>Employee ID:</strong> {employee.empId || 'N/A'}</p>
-                              <p><strong>Level:</strong> {employee.level || 'N/A'}</p>
-                              <p><strong>Status:</strong> <span className={styles.statusBadge}>Deployed</span></p>
+                            <span className={`${styles.status} ${styles[interview.status]}`}>
+                              {interview.status}
+                            </span>
+                          </div>
+                          <div className={styles.interviewDetails}>
+                            <p><strong>Interview Type:</strong> Mock Interview</p>
+                            <p><strong>Level:</strong> {interview.level || 'Not specified'}</p>
+                            {interview.ratings && (
+                              <>
+                                <p><strong>Technical Score:</strong> {interview.ratings.technical || 'Not rated'}</p>
+                                <p><strong>Communication Score:</strong> {interview.ratings.communication || 'Not rated'}</p>
+                              </>
+                            )}
+                            {interview.feedback && (
+                              <p><strong>Feedback:</strong> {interview.feedback}</p>
+                            )}
+                          </div>
+                          {interview.resume && (
+                            <div className={styles.interviewActions}>
+                              <button 
+                                onClick={() => handleDownloadResume(interview.resume.id)}
+                                className={styles.primaryButton}
+                              >
+                                <FiDownload /> Resume
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteResume(interview.resume.id)}
+                                className={styles.secondaryButton}
+                              >
+                                Delete Resume
+                              </button>
                             </div>
-                          </motion.div>
-                        ))
-                      ) : (
-                        <motion.div className={styles.emptyState}>
-                          <FiHelpCircle size={48} />
-                          <p>No Deployed Colleagues Found</p>
+                          )}
                         </motion.div>
-                      )}
-                    </div>
+                      ))
+                    ) : (
+                      <motion.div className={styles.emptyState}>
+                        <FiHelpCircle size={48} />
+                        <p>No Mock Interviews Found</p>
+                      </motion.div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -942,6 +1047,96 @@ const EmployeeDashboard = () => {
 
       case 'performance':
         return renderPerformanceSection();
+
+      case 'deployed':
+        return (
+          <div className={styles.sectionContainer}>
+            <div className={styles.filterSection}>
+              <div className={styles.filterControls}>
+                <div className={styles.filterGroup}>
+                  <label htmlFor="deployed-tech-filter"><FiFilter /> Technology:</label>
+                  <select 
+                    id="deployed-tech-filter" 
+                    value={technologyFilter}
+                    onChange={handleFilterChange}
+                    name="technology"
+                  >
+                    <option value="all">All Technologies</option>
+                    <option value="Java">Java</option>
+                    <option value="Python">Python</option>
+                    <option value=".NET">.NET</option>
+                    <option value="DevOps">DevOps</option>
+                    <option value="SalesForce">SalesForce</option>
+                    <option value="UI">UI</option>
+                    <option value="Testing">Testing</option>
+                  </select>
+                </div>
+                <div className={styles.filterGroup}>
+                  <label htmlFor="deployed-resource-filter"><FiUsers /> Resource Type:</label>
+                  <select 
+                    id="deployed-resource-filter" 
+                    value={resourceTypeFilter}
+                    onChange={handleFilterChange}
+                    name="resourceType"
+                  >
+                    <option value="all">All Types</option>
+                    <option value="TCT1">TCT1</option>
+                    <option value="OM">OM</option>
+                  </select>
+                </div>
+                <button 
+                  className={styles.iconButton}
+                  onClick={() => {
+                    fetchDeployedEmployees();
+                    toast.info('Refreshing deployed colleagues list...');
+                  }}
+                >
+                  <FiRefreshCw /> Refresh
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.deployedGrid}>
+              {loading ? (
+                <motion.div className={styles.loadingContainer}>
+                  <div className={styles.loadingSpinner}></div>
+                  <p>Loading deployed colleagues...</p>
+                </motion.div>
+              ) : deployedEmployees.length > 0 ? (
+                deployedEmployees.map(employee => (
+                  <motion.div 
+                    key={employee.id} 
+                    className={styles.deployedCard}
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    <div className={styles.deployedHeader}>
+                      <div className={styles.avatar}>
+                        {employee.user?.fullName?.charAt(0) || 'E'}
+                      </div>
+                      <div>
+                        <h5>{employee.user?.fullName || 'Employee'}</h5>
+                        <div className={styles.deployedMeta}>
+                          <span className={styles.techBadge}>{employee.technology || 'N/A'}</span>
+                          <span className={styles.resourceBadge}>{employee.resourceType || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className={styles.deployedDetails}>
+                      <p><strong>Employee ID:</strong> {employee.empId || 'N/A'}</p>
+                      <p><strong>Level:</strong> {employee.level || 'N/A'}</p>
+                      <p><strong>Status:</strong> <span className={styles.statusBadge}>Deployed</span></p>
+                    </div>
+                  </motion.div>
+                ))
+              ) : (
+                <motion.div className={styles.emptyState}>
+                  <FiHelpCircle size={48} />
+                  <p>No Deployed Colleagues Found</p>
+                </motion.div>
+              )}
+            </div>
+          </div>
+        );
         
       case 'profile':
         return (
@@ -972,37 +1167,33 @@ const EmployeeDashboard = () => {
                     </label>
                   </div>
                   <div className={styles.profileInfo}>
-                    <h2>{employeeData.name}</h2>
-                    <p className={styles.profileRole}>{employeeData.technology} Developer</p>
-                    <p className={styles.profileEmail}>{employeeData.userEmail}</p>
-                    <p className={styles.profileId}>Employee ID: {employeeData.empId}</p>
+                    <h2>{employeeData.name || 'Loading...'}</h2>
+                    <p className={styles.profileRole}>
+                      {employeeData.technology ? `${employeeData.technology} Developer` : 'Loading...'}
+                    </p>
+                    <p className={styles.profileEmail}>{employeeData.userEmail || 'Loading...'}</p>
+                    <p className={styles.profileId}>Employee ID: {employeeData.empId || 'Loading...'}</p>
                   </div>
                 </div>
                 
                 <div className={styles.profileDetails}>
                   <h4>Employee Details</h4>
-                  <form onSubmit={handleSubmitEmployeeDetails} className={styles.profileForm}>
+                  <div className={styles.profileForm}>
                     <div className={styles.formGroup}>
-                      <label htmlFor="empId">Employee ID</label>
-                      <input
-                        type="text"
-                        id="empId"
-                        name="empId"
-                        value={employeeData.empId}
-                        onChange={handleInputChange}
-                        className={styles.formControl}
-                      />
+                      <label>Employee ID</label>
+                      <p className={styles.staticField}>{employeeData.empId || 'Not specified'}</p>
                     </div>
                     <div className={styles.formGroup}>
-                      <label htmlFor="technology">Technology</label>
-                      <input
-                        type="text"
-                        id="technology"
-                        name="technology"
-                        value={employeeData.technology}
-                        onChange={handleInputChange}
-                        className={styles.formControl}
-                      />
+                      <label>Name</label>
+                      <p className={styles.staticField}>{employeeData.name || 'Not specified'}</p>
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Email</label>
+                      <p className={styles.staticField}>{employeeData.userEmail || 'Not specified'}</p>
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>Technology</label>
+                      <p className={styles.staticField}>{employeeData.technology || 'Not specified'}</p>
                     </div>
                     <div className={styles.formGroup}>
                       <label>Resource Type</label>
@@ -1016,16 +1207,16 @@ const EmployeeDashboard = () => {
                       <label>Status</label>
                       <p className={styles.staticField}>{employeeData.status || 'Not specified'}</p>
                     </div>
-                    <div className={styles.formActions}>
-                      <button 
-                        type="submit" 
-                        className={styles.primaryButton}
-                        disabled={loading}
-                      >
-                        {loading ? 'Updating...' : 'Update Profile'}
-                      </button>
-                    </div>
-                  </form>
+                  </div>
+                </div>
+
+                <div className={styles.profileActions}>
+                  <button 
+                    onClick={handleLogout}
+                    className={styles.logoutButton}
+                  >
+                    <FiUser /> Logout
+                  </button>
                 </div>
               </div>
             </div>
@@ -1342,5 +1533,6 @@ const EmployeeDashboard = () => {
     </div>
   );
 };
+
 
 export default EmployeeDashboard;

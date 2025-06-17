@@ -101,6 +101,36 @@ export const updateEmployeeDetails = async (employeeId, technology = null, empId
 };
 
 /**
+ * Get employee details by ID
+ * @param {number} employeeId - Employee ID to fetch
+ * @returns {Promise<Object>} Employee object
+ */
+export const getEmployeeDetails = async (employeeId) => {
+  try {
+    if (!employeeId) {
+      throw new Error('Employee ID is required');
+    }
+
+    const response = await axiosInstance.get(`${BASE_URL}/${employeeId}`);
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('Access denied: You do not have permission to access this resource');
+    }
+    if (error.response?.status === 404) {
+      throw new Error('Employee not found');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid input parameters');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
  * Get job descriptions with optional filters
  * @param {string} search - Optional search term
  * @param {string} technology - Optional technology filter

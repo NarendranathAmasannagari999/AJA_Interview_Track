@@ -14,6 +14,7 @@ import DeliveryTeamDashboard from "./pages/Dashboard/DeliveryTeamDashboard";
 import SalesTeamDashboard from "./pages/Dashboard/SalesTeamDashboard";
 import AdminDashboard from "./pages/Dashboard/AdminDashboard";
 import InterviewQuestions from './pages/InterviewQuestions/InterviewQuestions';
+import { AuthProvider } from "./context/AuthContext"; 
 import "./assets/styles/global.css";
 
 function AppContent() {
@@ -21,7 +22,6 @@ function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
-  // Only show sidebar for dashboard pages
   const sidebarVisible = !['/', '/login', '/register', '/about'].includes(location.pathname);
 
   const toggleDarkMode = () => {
@@ -78,9 +78,11 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <AuthProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
   );
 }
 

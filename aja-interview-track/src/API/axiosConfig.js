@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 
 // Create axios instance with default config
@@ -16,16 +15,10 @@ axiosInstance.interceptors.request.use(
     const token = localStorage.getItem('jwt_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      // Add debug logging
-      console.log('Request URL:', config.url);
-      console.log('Request Headers:', config.headers);
-    } else {
-      console.warn('No JWT token found in localStorage');
     }
     return config;
   },
   (error) => {
-    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
@@ -37,27 +30,76 @@ axiosInstance.interceptors.response.use(
     if (error.response) {
       switch (error.response.status) {
         case 401:
-          console.warn('Authentication failed: Token expired or invalid');
+          // Token expired or invalid
           localStorage.removeItem('jwt_token');
           window.location.href = '/login';
           break;
         case 403:
+          // Insufficient permissions
           console.error('Authorization failed: Insufficient permissions');
-          console.error('Request URL:', error.config?.url);
-          console.error('Request Headers:', error.config?.headers);
-          // Don't redirect, let the component handle the error
           break;
         default:
           console.error('API Error:', error.response.data);
       }
-    } else if (error.request) {
-      console.error('No response received:', error.request);
-    } else {
-      console.error('Error setting up request:', error.message);
     }
     return Promise.reject(error);
   }
 );
+
+// Auth API endpoints
+export const authAPI = {
+  login: async (email, password) => {
+    try {
+      const response = await axiosInstance.post('/api/auth/login', null, {
+        params: { email, password }
+      });
+      const { token, role } = response.data;
+      if (token) {
+        localStorage.setItem('jwt_token', token);
+      }
+      return { token, role };
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  register: async (userData) => {
+    try {
+      const response = await axiosInstance.post('/api/auth/register', null, {
+        params: {
+          fullName: userData.fullName,
+          empId: userData.empId,
+          email: userData.email,
+          password: userData.password,
+          role: userData.role,
+          technology: userData.technology || '',
+          resourceType: userData.resourceType || ''
+        }
+      });
+      const { token, role } = response.data;
+      if (token) {
+        localStorage.setItem('jwt_token', token);
+      }
+      return { token, role, user: response.data };
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  logout: () => {
+    localStorage.removeItem('jwt_token');
+    window.location.href = '/login';
+  },
+
+  getCurrentUser: async () => {
+    try {
+      const response = await axiosInstance.get('/api/auth/current-user');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+};
 
 export default axiosInstance; 
 

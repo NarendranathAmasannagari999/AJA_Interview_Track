@@ -13,11 +13,12 @@ import {
 } from 'react-icons/fa';
 import { FiMail, FiKey } from 'react-icons/fi';
 import styles from './Login.module.css';
-import { loginUser } from '../API/login';
-import { jwtDecode } from 'jwt-decode';
+import { loginUser } from '../API/auth';
+import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -63,28 +64,14 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      const { token, role } = await loginUser(formData.email.trim(), formData.password);
+      // Use the updated loginUser function that returns complete user data
+      const userData = await loginUser(formData.email.trim(), formData.password);
       
-      // Decode the JWT token to get user information
-      const decodedToken = jwtDecode(token);
-      
-      // Store authentication data
-      localStorage.setItem('jwt_token', token);
-      localStorage.setItem('userRole', role);
-      
-      // Store additional user information from the token
-      if (decodedToken) {
-        localStorage.setItem('userEmail', decodedToken.sub); // 'sub' is typically the email in JWT
-        if (decodedToken.exp) {
-          localStorage.setItem('tokenExpiration', decodedToken.exp);
-        }
-        if (decodedToken.employeeId) {
-          localStorage.setItem('employeeId', decodedToken.employeeId);
-        }
-      }
+      // Use the AuthContext login function to properly set the user and employee data
+      await login(userData);
       
       // Normalize role for routing (remove 'ROLE_' prefix and convert to lowercase)
-      const normalizedRole = role.replace('ROLE_', '').toLowerCase();
+      const normalizedRole = userData.role.replace('ROLE_', '').toLowerCase();
       
       // Redirect based on role
       switch(normalizedRole) {
