@@ -1034,7 +1034,7 @@ const SalesTeamDashboard = () => {
         name: clientModalFields.name,
         contactEmail: clientModalFields.contactEmail,
         activePositions: clientModalFields.activePositions,
-        technologies: clientModalFields.technologies
+        technologies: clientModalFields.technologies.join(",")
       });
 
       if (response) {
@@ -1095,15 +1095,16 @@ const SalesTeamDashboard = () => {
     try {
       toast.info("Uploading job description...");
 
-      const response = await addJobDescription(
-        jdModalFields.title,
-        jdModalFields.client,
-        jdModalFields.receivedDate || new Date().toISOString().split("T")[0],
-        jdModalFields.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        jdModalFields.technology,
-        jdModalFields.resourceType,
-        jdModalFields.description,
+      const response = await addJobDescription({
+        title:jdModalFields.title,
+        client:jdModalFields.client,
+        receivedDate:jdModalFields.receivedDate || new Date().toISOString().split("T")[0],
+        deadline:jdModalFields.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        technology:jdModalFields.technology,
+        resourceType:jdModalFields.resourceType,
+        description:jdModalFields.description,
         jdModalFile
+        }
       );
 
       if (response) {
