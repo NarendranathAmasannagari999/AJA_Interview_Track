@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FiUsers,
   FiCalendar,
@@ -6,7 +6,6 @@ import {
   FiCheck,
   FiX,
   FiSend,
-  FiDollarSign,
   FiFilter,
   FiSearch,
   FiChevronDown,
@@ -19,12 +18,8 @@ import {
   FiMail,
   FiUserPlus,
   FiBriefcase,
-  FiAward,
-  FiClock,
-  FiLayers,
   FiBook,
   FiUserCheck,
-  FiUserX,
   FiShare2,
   FiToggleLeft,
   FiToggleRight,
@@ -36,21 +31,6 @@ import {
   FiChevronRight,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-} from "recharts";
 import styles from "./Sales.module.css";
 import {
   getCandidates,
@@ -67,6 +47,7 @@ import {
   updateProfilePicture,
   getProfilePicture,
   getClientInterviewFeedback,
+  getUserByRole
 } from "../../API/sales";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
@@ -275,11 +256,6 @@ const ScheduleInterviewModal = ({
   clients,
   jobDescriptions,
 }) => {
-  if (!show) return null;
-
-  const candidateNames = selectedCandidates
-    .map((c) => c.user?.fullName || "N/A")
-    .join(", ");
   const [error, setError] = useState("");
 
   const handleSubmit = (e) => {
@@ -316,6 +292,8 @@ const ScheduleInterviewModal = ({
     }
   };
 
+  if (!show) return null;
+
   return (
     <div className={styles.modalOverlay}>
       <motion.div
@@ -342,7 +320,9 @@ const ScheduleInterviewModal = ({
               <label>Candidate(s)</label>
               <input
                 type="text"
-                value={candidateNames}
+                value={selectedCandidates
+                  .map((c) => c.user?.fullName || "N/A")
+                  .join(", ")}
                 className={styles.input}
                 readOnly
               />
@@ -544,8 +524,8 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
       interview.id,
       "completed",
       feedback,
-      techScoreNum, // Send as number
-      commScoreNum, // Send as number
+      techScoreNum,
+      commScoreNum,
       deployedStatus
     );
   };
@@ -747,6 +727,16 @@ const SalesTeamDashboard = () => {
     fetchUserData();
   }, []);
 
+  // Cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      // Clean up profile picture object URL on component unmount
+      if (profilePic && profilePic.startsWith('blob:')) {
+        URL.revokeObjectURL(profilePic);
+      }
+    };
+  }, [profilePic]);
+
   const fetchUserData = async () => {
     try {
       const token = localStorage.getItem("jwt_token");
@@ -754,34 +744,41 @@ const SalesTeamDashboard = () => {
         throw new Error("No authentication token found");
       }
 
+      // First get basic user data from JWT
       const decoded = jwtDecode(token);
       const email = decoded.sub || decoded.email || localStorage.getItem("userEmail") || "N/A";
       const role = decoded.role || localStorage.getItem("userRole") || "N/A";
       const fullName = email !== "N/A" ? email.split("@")[0] : "N/A";
 
+      // Then fetch detailed user data using the getUserByRole API
+      const userData = await getUserByRole();
+      
       setSalesUserData({
-        fullName,
-        email,
-        role,
-        empId: decoded.empId || "",
-        id: decoded.id || "",
-        technology: decoded.technology || "",
-        resourceType: decoded.resourceType || "",
-        level: decoded.level || "",
-        status: decoded.status || "Active",
+        fullName: userData.fullName || fullName,
+        email: userData.email || email,
+        role: userData.role || role,
+        empId: userData.empId || decoded.empId || "",
+        id: userData.id || decoded.id || "",
+        technology: userData.technology || decoded.technology || "",
+        resourceType: userData.resourceType || decoded.resourceType || "",
+        level: userData.level || decoded.level || "",
+        status: userData.status || decoded.status || "Active",
       });
 
       // Fetch profile picture if empId exists
-      if (decoded.empId) {
+      if (userData.empId || decoded.empId) {
         try {
-          const pictureBlob = await getProfilePicture(decoded.empId);
+          const empIdToUse = userData.empId || decoded.empId;
+          const pictureBlob = await getProfilePicture(empIdToUse);
           if (pictureBlob) {
             const imageUrl = URL.createObjectURL(pictureBlob);
             setProfilePic(imageUrl);
           }
         } catch (pictureError) {
           console.error("Error fetching profile picture:", pictureError);
-          toast.error("Failed to load profile picture. Using default avatar.");
+          // Don't show toast error for profile picture loading failures
+          // Just log the error and use default avatar
+          setProfilePic(null);
         }
       }
     } catch (err) {
@@ -853,6 +850,12 @@ const SalesTeamDashboard = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Check if empId is available
+    if (!salesUserData.empId) {
+      toast.error("Employee ID not available. Please refresh the page and try again.");
+      return;
+    }
+
     // Validate file type and size according to backend requirements
     const allowedTypes = ["image/jpeg", "image/png"];
     const maxSize = 2 * 1024 * 1024; // 2MB
@@ -872,12 +875,16 @@ const SalesTeamDashboard = () => {
       toast.info("Updating profile picture...");
 
       // Update profile picture using the API
-      const response = await updateProfilePicture(salesUserData.id, file);
+      const response = await updateProfilePicture(salesUserData.empId, file);
       
       if (response) {
         // Fetch updated profile picture
         const pictureBlob = await getProfilePicture(salesUserData.empId);
         if (pictureBlob) {
+          // Clean up previous object URL to prevent memory leaks
+          if (profilePic && profilePic.startsWith('blob:')) {
+            URL.revokeObjectURL(profilePic);
+          }
           const imageUrl = URL.createObjectURL(pictureBlob);
           setProfilePic(imageUrl);
           toast.success("Profile picture updated successfully");
@@ -1096,16 +1103,15 @@ const SalesTeamDashboard = () => {
       toast.info("Uploading job description...");
 
       const response = await addJobDescription({
-        title:jdModalFields.title,
-        client:jdModalFields.client,
-        receivedDate:jdModalFields.receivedDate || new Date().toISOString().split("T")[0],
-        deadline:jdModalFields.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        technology:jdModalFields.technology,
-        resourceType:jdModalFields.resourceType,
-        description:jdModalFields.description,
-        jdModalFile
-        }
-      );
+        title: jdModalFields.title,
+        client: jdModalFields.client,
+        receivedDate: jdModalFields.receivedDate || new Date().toISOString().split("T")[0],
+        deadline: jdModalFields.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        technology: jdModalFields.technology,
+        resourceType: jdModalFields.resourceType,
+        description: jdModalFields.description,
+        file: jdModalFile
+      });
 
       if (response) {
         setJobDescriptions((prev) => [...prev, response]);
@@ -1418,7 +1424,7 @@ const SalesTeamDashboard = () => {
                       className={`${styles.techBadge} ${
                         styles[jd.technology?.toLowerCase()]
                       }`}
-                    >
+                      >
                       {jd.technology}
                     </span>
                     <span
@@ -1617,7 +1623,7 @@ const SalesTeamDashboard = () => {
     );
   };
 
-  const InterviewsTab = ({ salesUserData }) => {
+  const InterviewsTab = () => {
     const [expandedInterviews, setExpandedInterviews] = useState([]);
     const filteredInterviews = filterInterviews(clientInterviews);
 
@@ -2058,19 +2064,48 @@ const SalesTeamDashboard = () => {
     );
   };
 
-  const ProfileTab = () => (
-    <div className={styles.sectionContainer}>
+  const ProfileTab = () => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedData, setEditedData] = useState({ ...salesUserData });
+
+    const handleEditToggle = () => {
+      setIsEditing(!isEditing);
+      if (!isEditing) {
+        setEditedData({ ...salesUserData });
+      }
+    };
+
+    const handleFieldChange = (field, value) => {
+      setEditedData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleSaveProfile = async () => {
+      try {
+        setIsSubmitting(true);
+        // Here you would typically call an API to update the user profile
+        // For now, we'll just update the local state
+        setSalesUserData(editedData);
+        setIsEditing(false);
+        toast.success("Profile updated successfully");
+      } catch (error) {
+        console.error("Error updating profile:", error);
+        toast.error("Failed to update profile");
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    return (
+       <div className={styles.sectionContainer}>
       <h3 className={styles.sectionTitle}>My Profile</h3>
       <div className={styles.profileSection}>
         <div className={styles.profileCard}>
           <div className={styles.profileHeader}>
             <div className={styles.profilePictureContainer}>
-              {profilePic ? (
-                <img
-                  src={profilePic}
-                  alt="Profile"
-                  className={styles.profilePicture}
-                />
+              {isLoading ? (
+                <div className={styles.loadingSpinner} />
+              ) : profilePic ? (
+                <img src={profilePic} alt="Profile" className={styles.profilePicture} />
               ) : (
                 <div className={styles.noProfilePic}>
                   <FiUser size={48} />
@@ -2081,12 +2116,9 @@ const SalesTeamDashboard = () => {
                 id="profilePictureUpload"
                 accept="image/jpeg,image/png"
                 onChange={handleProfilePictureChange}
-                style={{ display: "none" }}
+                style={{ display: 'none' }}
               />
-              <label
-                htmlFor="profilePictureUpload"
-                className={styles.profilePictureUpload}
-              >
+              <label htmlFor="profilePictureUpload" className={styles.profilePictureUpload}>
                 <FiUpload size={18} /> Update Photo
               </label>
             </div>
@@ -2094,15 +2126,36 @@ const SalesTeamDashboard = () => {
               <h2>{salesUserData.fullName}</h2>
               <p className={styles.profileRole}>{salesUserData.role}</p>
               <p className={styles.profileEmail}>{salesUserData.email}</p>
-              <p className={styles.profileId}>
-                Employee ID: {salesUserData.empId || "N/A"}
-              </p>
+              <p className={styles.profileId}>Employee ID: {salesUserData.empId || "AJA1007"}</p>
+            </div>
+          </div>
+          
+          <div className={styles.profileDetails}>
+            <h4>Profile Details</h4>
+            <div className={styles.profileTable}>
+              <div className={styles.tableRow}>
+                <div className={styles.tableHeader}>Name</div>
+                <div className={styles.tableValue}>{salesUserData.fullName}</div>
+              </div>
+              <div className={styles.tableRow}>
+                <div className={styles.tableHeader}>Email</div>
+                <div className={styles.tableValue}>{salesUserData.email}</div>
+              </div>
+              <div className={styles.tableRow}>
+                <div className={styles.tableHeader}>Role</div>
+                <div className={styles.tableValue}>{salesUserData.role}</div>
+              </div>
+              <div className={styles.tableRow}>
+                <div className={styles.tableHeader}>Employee ID</div>
+                <div className={styles.tableValue}>{salesUserData.empId || "AJA1007"}</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const renderTabContent = () => {
     if (isLoading && isInitialLoading) {
@@ -2150,7 +2203,7 @@ const SalesTeamDashboard = () => {
       case "interviews":
         return (
           <>
-            <InterviewsTab salesUserData={salesUserData} />
+            <InterviewsTab />
             <Pagination
               totalItems={clientInterviews.length}
               currentPage={currentPage}

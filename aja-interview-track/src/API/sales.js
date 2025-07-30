@@ -4,6 +4,19 @@ import axiosInstance from './axiosConfig';
 const BASE_URL = '/api/sales';
 
 /**
+ * Get user by role (ROLE_SALES_TEAM)
+ * @returns {Promise<User>} User object with ROLE_SALES_TEAM
+ */
+export const getUserByRole = async () => {
+  try {
+    const response = await axiosInstance.get(`${BASE_URL}/user`);
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+/**
  * Get candidates with optional filters
  * @param {string} technology - Optional technology filter (default: 'all')
  * @param {string} status - Optional status filter (default: 'all')
@@ -13,7 +26,7 @@ const BASE_URL = '/api/sales';
 export const getCandidates = async (technology = 'all', status = 'all', resourceType = 'all') => {
   try {
     const response = await axiosInstance.get(`${BASE_URL}/candidates`, {
-      params: { technology, status, resourceType }
+      params: { technology, status, resourceType },
     });
     return response.data;
   } catch (error) {
@@ -33,20 +46,29 @@ export const getCandidates = async (technology = 'all', status = 'all', resource
  * @param {boolean} deployedStatus - Deployment status
  * @returns {Promise<ClientInterview>} Scheduled interview object
  */
-export const scheduleClientInterview = async (empId, client, date, time, level, jobDescriptionTitle, meetingLink, deployedStatus = false) => {
+export const scheduleClientInterview = async (
+  empId,
+  client,
+  date,
+  time,
+  level,
+  jobDescriptionTitle,
+  meetingLink,
+  deployedStatus = false
+) => {
   try {
     const response = await axiosInstance.post(`${BASE_URL}/interviews/schedule`, null, {
       params: {
         empId,
-        interviewType: 'client', // Required by backend
+        interviewType: 'client',
         date,
-        time: time.includes(':') ? time : `${time}:00`, // Ensure proper time format
+        time: time.includes(':') ? time : `${time}:00`,
         client,
         level,
         jobDescriptionTitle,
         meetingLink,
-        deployedStatus
-      }
+        deployedStatus,
+      },
     });
     return response.data;
   } catch (error) {
@@ -82,10 +104,9 @@ export const scheduleMultipleClientInterviews = async (empId, schedules) => {
  */
 export const updateClientInterview = async (interviewId, feedbackData) => {
   try {
-    // Convert scores to numbers and validate
     const techScore = Number(feedbackData.technicalScore);
     const commScore = Number(feedbackData.communicationScore);
-    
+
     if (isNaN(techScore) || techScore < 0 || techScore > 10) {
       throw new Error('Technical score must be a number between 0 and 10');
     }
@@ -93,34 +114,17 @@ export const updateClientInterview = async (interviewId, feedbackData) => {
       throw new Error('Communication score must be a number between 0 and 10');
     }
 
-    // Format the data for the backend
     const formattedData = {
       result: String(feedbackData.result),
       feedback: String(feedbackData.feedback),
-      technicalScore: techScore, // Send as number
-      communicationScore: commScore, // Send as number
-      deployedStatus: Boolean(feedbackData.deployedStatus)
+      technicalScore: techScore,
+      communicationScore: commScore,
+      deployedStatus: Boolean(feedbackData.deployedStatus),
     };
 
     const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, formattedData);
     return response.data;
   } catch (error) {
-    if (error.response?.status === 403) {
-      // Check if the error message contains specific permission information
-      const errorMessage = error.response.data?.message || error.response.data;
-      if (errorMessage.includes('Insufficient permissions')) {
-        throw new Error('You need additional permissions to update client interviews. Please contact your administrator.');
-      } else if (errorMessage.includes('not authorized')) {
-        throw new Error('You are not authorized to update this interview. Only the assigned sales team member can update it.');
-      }
-      throw new Error('Access denied: You do not have permission to perform this action');
-    } else if (error.response?.status === 400) {
-      const errorMessage = error.response.data?.message || error.response.data;
-      if (errorMessage.includes('Invalid data types')) {
-        throw new Error('Invalid data format. Please ensure all fields are in the correct format.');
-      }
-      throw new Error(errorMessage || 'Invalid request data');
-    }
     throw handleApiError(error);
   }
 };
@@ -133,7 +137,7 @@ export const updateClientInterview = async (interviewId, feedbackData) => {
 export const getClientInterviews = async (search = null) => {
   try {
     const response = await axiosInstance.get(`${BASE_URL}/client-interviews`, {
-      params: { search }
+      params: { search },
     });
     return response.data;
   } catch (error) {
@@ -166,7 +170,7 @@ export const getClientInterviewCount = async () => {
 export const addClient = async (clientData) => {
   try {
     const response = await axiosInstance.post(`${BASE_URL}/clients`, null, {
-      params: clientData
+      params: clientData,
     });
     return response.data;
   } catch (error) {
@@ -182,7 +186,7 @@ export const addClient = async (clientData) => {
 export const getClients = async (search = null) => {
   try {
     const response = await axiosInstance.get(`${BASE_URL}/clients`, {
-      params: { search }
+      params: { search },
     });
     return response.data;
   } catch (error) {
@@ -294,18 +298,18 @@ export const getDeployedEmployees = async () => {
 
 /**
  * Update profile picture
- * @param {number} userId - User ID
+ * @param {number} employeeId - Employee ID
  * @param {File} file - Profile picture file (JPEG or PNG)
  * @returns {Promise<User>} Updated user object
  */
-export const updateProfilePicture = async (userId, file) => {
+export const updateProfilePicture = async (employeeId, file) => {
   try {
     if (!file || !['image/jpeg', 'image/png'].includes(file.type)) {
       throw new Error('Profile picture must be a JPEG or PNG file');
     }
 
     const formData = new FormData();
-    formData.append('Id', userId);
+    formData.append('Id', employeeId); // Backend expects 'Id' parameter
     formData.append('file', file);
 
     const response = await axiosInstance.put(`${BASE_URL}/profile-picture`, formData, {
@@ -342,101 +346,28 @@ export const getProfilePicture = async (employeeId) => {
  */
 const handleApiError = (error) => {
   if (error.response) {
+    const errorMessage = error.response.data?.message || error.response.data || 'An error occurred';
     switch (error.response.status) {
-      case 401:
-        throw new Error('Unauthorized: Please login to access this resource');
-      case 403:
-        throw new Error('Access denied: You do not have permission to perform this action');
       case 400:
-        throw new Error(error.response.data || 'Invalid input data');
+        return new Error(errorMessage || 'Invalid request data');
+      case 401:
+        return new Error('Unauthorized: Please login to access this resource');
+      case 403:
+        return new Error(errorMessage || 'Access denied: You do not have permission to perform this action');
       case 404:
-        throw new Error('Resource not found');
+        return new Error(errorMessage || 'Resource not found');
       case 500:
-        throw new Error('Internal server error. Please try again later.');
+        return new Error('Internal server error. Please try again later.');
       default:
-        throw new Error(error.response.data || 'An error occurred while processing your request');
+        return new Error(errorMessage);
     }
   }
-  throw error;
+  return new Error(error.message || 'An error occurred while processing your request');
 };
-
-// Type definitions for better IDE support
-/**
- * @typedef {Object} Employee
- * @property {number} id
- * @property {User} user
- * @property {string} empId
- * @property {string} technology
- * @property {string} resourceType
- * @property {string} status
- * @property {string} profilePicS3Key
- * @property {boolean} readyForDeployment
- * @property {boolean} deployed
- * @property {boolean} sentToSales
- */
-
-/**
- * @typedef {Object} User
- * @property {number} id
- * @property {string} fullName
- * @property {string} email
- * @property {string} role
- * @property {string} profilePicS3Key
- */
-
-/**
- * @typedef {Object} ClientInterview
- * @property {number} id
- * @property {Employee} employee
- * @property {string} client
- * @property {string} date
- * @property {string} time
- * @property {number} level
- * @property {string} jobDescriptionTitle
- * @property {string} meetingLink
- * @property {string} status
- * @property {string} result
- * @property {string} feedback
- * @property {number} technicalScore
- * @property {number} communicationScore
- * @property {boolean} deployedStatus
- */
-
-/**
- * @typedef {Object} ClientInterviewSchedule
- * @property {string} client
- * @property {string} date
- * @property {string} time
- * @property {number} level
- * @property {string} jobDescriptionTitle
- * @property {string} meetingLink
- * @property {boolean} deployedStatus
- */
-
-/**
- * @typedef {Object} Client
- * @property {number} id
- * @property {string} name
- * @property {string} contactEmail
- * @property {number} activePositions
- * @property {Array<string>} technologies
- */
-
-/**
- * @typedef {Object} JobDescription
- * @property {number} id
- * @property {string} title
- * @property {string} client
- * @property {string} receivedDate
- * @property {string} deadline
- * @property {string} technology
- * @property {string} resourceType
- * @property {string} description
- * @property {string} s3Key
- */
 
 // Export all functions as a single object
 export default {
+  getUserByRole,
   getCandidates,
   scheduleClientInterview,
   scheduleMultipleClientInterviews,
@@ -452,5 +383,5 @@ export default {
   getClientInterviewFeedback,
   getDeployedEmployees,
   updateProfilePicture,
-  getProfilePicture
+  getProfilePicture,
 };

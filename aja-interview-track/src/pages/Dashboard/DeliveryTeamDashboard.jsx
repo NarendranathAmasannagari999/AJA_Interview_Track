@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FiUsers, FiCalendar, FiCheckCircle, FiClock, FiFileText, 
   FiSend, FiEdit, FiPlus, FiFilter, FiSearch, FiBarChart2,
@@ -7,8 +7,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
-  ResponsiveContainer, PieChart, Pie, Cell, RadarChart, 
-  PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, LineChart, Line
+  ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import styles from './DeliveryTeamDashboard.module.css';
 import { 
@@ -20,13 +19,12 @@ import {
   updateInterviewStatus,
   updateProfilePicture,
   getProfilePicture,
-  getMockInterviewPerformance
+  getMockInterviewPerformance,
+  getUserByRole 
 } from '../../API/delivery';
 import ScheduleInterviewModal from './ScheduleInterviewModal';
 import EvaluationModal from '../../components/EvaluationModal';
-import axiosInstance from '../../API/axiosConfig';
 import { toast } from 'react-hot-toast';
-import { jwtDecode } from 'jwt-decode';
 
 const DeliveryTeamDashboard = () => {
   const [activeTab, setActiveTab] = useState('employees');
@@ -120,7 +118,6 @@ const DeliveryTeamDashboard = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch employees with filters
       const employeesData = await getEmployees(technologyFilter, resourceTypeFilter);
       if (Array.isArray(employeesData)) {
         setEmployees(employeesData);
@@ -129,7 +126,6 @@ const DeliveryTeamDashboard = () => {
         setEmployees([]);
       }
 
-      // Fetch upcoming interviews
       let upcomingData = [];
       try {
         upcomingData = await getUpcomingInterviews();
@@ -142,7 +138,6 @@ const DeliveryTeamDashboard = () => {
         setError(error.message || 'Failed to load upcoming interviews');
       }
 
-      // Fetch completed interviews
       let completedData = [];
       try {
         completedData = await getCompletedInterviews();
@@ -155,7 +150,6 @@ const DeliveryTeamDashboard = () => {
         setError(error.message || 'Failed to load completed interviews');
       }
 
-      // Combine and set all interviews
       const allInterviews = [
         ...upcomingData,
         ...completedData,
@@ -168,7 +162,6 @@ const DeliveryTeamDashboard = () => {
       });
       setMockInterviews(allInterviews);
 
-      // Update profiles sent to sales and deployed employees
       const sentToSales = completedData
         .filter(i => i && i.sentToSales)
         .map(i => i.employeeId);
@@ -191,12 +184,9 @@ const DeliveryTeamDashboard = () => {
         console.error('Error fetching performance data:', error);
         toast.error('Could not load performance data.');
       }
-
     } catch (error) {
       console.error('Error fetching data:', error);
       setError(error.message || 'Failed to load dashboard data');
-      
-      // Set empty arrays for all data
       setEmployees([]);
       setMockInterviews([]);
       setProfilesSentToSales([]);
@@ -214,32 +204,26 @@ const DeliveryTeamDashboard = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const token = localStorage.getItem('jwt_token');
-        if (token) {
-          const decodedToken = jwtDecode(token);
-          setUserData({
-            name: decodedToken.name || 'N/A',
-            email: decodedToken.email || 'N/A',
-            role: decodedToken.role || 'N/A',
-            id: decodedToken.id || 'N/A',
-            empId: decodedToken.empId || 'N/A'
-          });
+        const user = await getUserByRole();
+        setUserData({
+          name: user.fullName || 'N/A',
+          email: user.email || 'N/A',
+          role: user.role || 'ROLE_DELIVERY_TEAM',
+          empId: user.empId || 'N/A',
+          id: user.id || 'N/A'
+        });
 
-          // Fetch profile picture using delivery.js API
-          try {
-            const response = await getProfilePicture(decodedToken.id);
-            setProfilePic(response);
-          } catch (error) {
-            console.error('Error fetching profile picture:', error);
-            // Don't show error toast for missing profile picture
-          }
+        try {
+          const response = await getProfilePicture(user.id);
+          setProfilePic(response);
+        } catch (error) {
+          console.error('Error fetching profile picture:', error);
         }
       } catch (error) {
-        console.error('Error decoding token:', error);
-        toast.error('Failed to load user data');
+        console.error('Error fetching user data:', error);
+        toast.error(error.message || 'Failed to load user data');
       }
     };
-
     fetchUserData();
   }, []);
 
@@ -250,11 +234,11 @@ const DeliveryTeamDashboard = () => {
         setSelectedFile(file);
         await updateProfilePicture(userData.id, file);
         const response = await getProfilePicture(userData.id);
-        const imageUrl = URL.createObjectURL(response);
-        setProfilePic(imageUrl);
+        setProfilePic(response);
+        toast.success('Profile picture updated successfully!');
       } catch (error) {
         console.error('Error updating profile picture:', error);
-        toast.error('Failed to update profile picture');
+        toast.error(error.message || 'Failed to update profile picture');
       }
     }
   };
@@ -262,11 +246,9 @@ const DeliveryTeamDashboard = () => {
   const filteredEmployees = Array.isArray(employees) ?
     employees.filter(employee => {
       if (!employee || !employee.user) return false;
-
       const matchesSearch = employee.user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false;
       const matchesTechnology = technologyFilter === 'all' || (employee.technology?.toLowerCase() === technologyFilter.toLowerCase());
       const matchesResourceType = resourceTypeFilter === 'all' || (employee.resourceType?.toLowerCase() === resourceTypeFilter.toLowerCase());
-
       return matchesSearch && matchesTechnology && matchesResourceType;
     })
     : [];
@@ -279,21 +261,17 @@ const DeliveryTeamDashboard = () => {
     ? mockInterviews.filter(i => i && i.status === 'completed')
     : [];
 
-  // Calculate average ratings by technology
   const techPerformanceData = technologies.map(tech => {
     const techInterviews = completedInterviews.filter(i => {
       const emp = (employees || []).find(e => e && e.id === i.employeeId);
       return emp && emp.technology === tech;
     });
-    
     const avgTechnical = techInterviews.length > 0 
       ? techInterviews.reduce((sum, i) => sum + (i.ratings?.technical || 0), 0) / techInterviews.length
       : 0;
-      
     const avgCommunication = techInterviews.length > 0 
       ? techInterviews.reduce((sum, i) => sum + (i.ratings?.communication || 0), 0) / techInterviews.length
       : 0;
-      
     return { 
       name: tech, 
       technical: parseFloat(avgTechnical.toFixed(1)), 
@@ -302,21 +280,17 @@ const DeliveryTeamDashboard = () => {
     };
   });
 
-  // Calculate average ratings by resource type
   const resourcePerformanceData = resourceTypes.map(type => {
     const typeInterviews = completedInterviews.filter(i => {
       const emp = (employees || []).find(e => e && e.id === i.employeeId);
       return emp && emp.resourceType === type;
     });
-    
     const avgTechnical = typeInterviews.length > 0 
       ? typeInterviews.reduce((sum, i) => sum + (i.ratings?.technical || 0), 0) / typeInterviews.length
       : 0;
-      
     const avgCommunication = typeInterviews.length > 0 
       ? typeInterviews.reduce((sum, i) => sum + (i.ratings?.communication || 0), 0) / typeInterviews.length
       : 0;
-      
     return { 
       name: type, 
       technical: parseFloat(avgTechnical.toFixed(1)), 
@@ -325,10 +299,8 @@ const DeliveryTeamDashboard = () => {
     };
   });
 
-  // Top performers (total rating >= 16, which is avg >= 8)
   const topPerformers = performanceData.filter(p => p.totalRating >= 16);
 
-  // Conversion metrics
   const totalCompleted = completedInterviews.length;
   const totalSentToSales = completedInterviews.filter(i => i.sentToSales).length;
   const totalDeployed = completedInterviews.filter(i => i.deployed).length;
@@ -339,15 +311,7 @@ const DeliveryTeamDashboard = () => {
     { name: 'Deployed', value: totalDeployed }
   ];
 
-  const employeeRadarData = selectedEmployee ? [
-    { subject: 'Technical', A: 85, fullMark: 100 },
-    { subject: 'Communication', A: 75, fullMark: 100 },
-    { subject: 'Problem Solving', A: 90, fullMark: 100 },
-    { subject: 'System Design', A: 70, fullMark: 100 },
-    { subject: 'Client Fit', A: 80, fullMark: 100 }
-  ] : [];
-
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28'];
 
   const handleScheduleInterviewSubmit = async (interviewData) => {
     setIsLoading(true);
@@ -360,7 +324,6 @@ const DeliveryTeamDashboard = () => {
         time: interviewData.time,
         interviewerId: interviewData.interviewerId
       });
-      
       if (response) {
         setMockInterviews(prev => {
           const newInterview = {
@@ -369,15 +332,14 @@ const DeliveryTeamDashboard = () => {
           };
           return [...prev, newInterview];
         });
-        
         setShowInterviewScheduler(false);
         setSelectedEmployeeForScheduling(null);
-        setError('Interview scheduled successfully!');
+        toast.success('Interview scheduled successfully!');
         await fetchData();
       }
     } catch (error) {
       console.error('Error scheduling interview:', error);
-      setError(error.message || 'Failed to schedule interview. Please try again.');
+      toast.error(error.message || 'Failed to schedule interview. Please try again.');
     } finally {
       setIsLoading(false);
       setIsInterviewsLoading(false);
@@ -387,7 +349,6 @@ const DeliveryTeamDashboard = () => {
   const handleUpdateFeedback = async (data) => {
     setIsFeedbackLoading(true);
     setError(null);
-
     try {
       const updatedInterview = await updateMockInterviewFeedback(
         data.interviewId,
@@ -397,7 +358,6 @@ const DeliveryTeamDashboard = () => {
         data.communicationRating,
         data.sentToSales || false
       );
-
       const updatedInterviews = mockInterviews.map(interview => {
         if (interview.id === data.interviewId) {
           return {
@@ -408,11 +368,9 @@ const DeliveryTeamDashboard = () => {
         }
         return interview;
       });
-
       setMockInterviews(updatedInterviews);
       setSelectedInterviewId(null);
-      setError('Feedback updated successfully!');
-
+      toast.success('Feedback updated successfully!');
       const completedData = await getCompletedInterviews();
       if (Array.isArray(completedData)) {
         const allInterviews = [
@@ -427,11 +385,10 @@ const DeliveryTeamDashboard = () => {
         });
         setMockInterviews(allInterviews);
       }
-
       return updatedInterview;
     } catch (error) {
       console.error('Error updating feedback:', error);
-      setError(error.message || 'Failed to update feedback. Please try again.');
+      toast.error(error.message || 'Failed to update feedback. Please try again.');
       throw error;
     } finally {
       setIsFeedbackLoading(false);
@@ -447,20 +404,19 @@ const DeliveryTeamDashboard = () => {
     setIsSubmitting(true);
     setError(null);
     try {
-      // Update the interview feedback with sentToSales flag
       await updateMockInterviewFeedback(
         interview.id,
         interview.technicalFeedback,
         interview.communicationFeedback,
         interview.technicalRating,
         interview.communicationRating,
-        true // Set sentToSales to true
+        true
       );
-      setError('Profile sent to sales successfully!');
-      await fetchData(); // Refresh data after update
+      toast.success('Profile sent to sales successfully!');
+      await fetchData();
     } catch (error) {
       console.error('Error sending to sales:', error);
-      setError(error.message || 'Failed to send profile to sales. Please try again.');
+      toast.error(error.message || 'Failed to send profile to sales. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -470,11 +426,11 @@ const DeliveryTeamDashboard = () => {
     try {
       setIsLoading(true);
       await updateInterviewStatus(interviewId);
-      setError('Interview status updated successfully!');
+      toast.success('Interview status updated successfully!');
       await fetchData();
     } catch (error) {
       console.error('Error updating interview status:', error);
-      setError(error.message || 'Failed to update interview status. Please try again.');
+      toast.error(error.message || 'Failed to update interview status. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -487,12 +443,18 @@ const DeliveryTeamDashboard = () => {
     }));
   };
 
+  const getScoreColor = useCallback((score) => {
+    if (score >= 8) return '#28a745';
+    if (score >= 5) return '#ffc107';
+    return '#dc3545';
+  }, []);
+
   const renderTabContent = () => {
-    if (isLoading) {
+    if (isLoading && !isInitialLoading) {
       return <LoadingSpinner />;
     }
 
-    if (error) {
+    if (error && !isInitialLoading) {
       return <ErrorMessage message={error} onRetry={fetchData} />;
     }
 
@@ -569,7 +531,21 @@ const DeliveryTeamDashboard = () => {
                 >
                   <div className={styles.cardHeader}>
                     <div className={styles.userAvatar}>
-                      <FiUser />
+                      {isLoading ? (
+                        <div className={styles.loadingSpinner} />
+                      ) : employee.profilePic ? (
+                        <img
+                          src={employee.profilePic}
+                          alt={`${employee.user?.fullName || 'Employee'}'s profile`}
+                          className={styles.profilePicture}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            console.error('Employee profile picture failed to load');
+                          }}
+                        />
+                      ) : (
+                        <FiUser />
+                      )}
                     </div>
                     <div>
                       <h3>{employee.user?.fullName || 'Unknown Employee'}</h3>
@@ -584,7 +560,6 @@ const DeliveryTeamDashboard = () => {
                     </div>
                   </div>
                   <div className={styles.cardDetails}>
-                    <p><strong>Employee ID:</strong> {employee.empId || 'N/A'}</p>
                     <p><strong>Status:</strong> {employee.status || 'N/A'}</p>
                   </div>
                   <div className={styles.cardFooter}>
@@ -695,7 +670,7 @@ const DeliveryTeamDashboard = () => {
                     >
                       <div className={styles.interviewHeader}>
                         <div className={styles.interviewHeaderLeft}>
-                          <h4>{interview.employee?.user?.fullName || 'Unknown Employee'}</h4>
+                          <h4>{interview.employeeName || 'Unknown Employee'}</h4>
                           <div className={styles.interviewMeta}>
                             <span className={`${styles.techBadge} ${styles[interview.employee?.technology?.replace(' ', '')]}`}>
                               {interview.employee?.technology || 'Unknown'}
@@ -712,7 +687,6 @@ const DeliveryTeamDashboard = () => {
                       
                       <div className={styles.interviewDetails}>
                         <div className={styles.detailRow}>
-                          <p><strong>Employee ID:</strong> {interview.employee?.empId || 'N/A'}</p>
                           <p><strong>Status:</strong> {interview.status || 'N/A'}</p>
                         </div>
                         <div className={styles.detailRow}>
@@ -778,7 +752,7 @@ const DeliveryTeamDashboard = () => {
                     >
                       <div className={styles.interviewHeader}>
                         <div>
-                          <h4>{interview.employee?.user?.fullName || 'Unknown Employee'}</h4>
+                          <h4>{interview.employeeName || 'Unknown Employee'}</h4>
                           <div className={styles.interviewMeta}>
                             <span className={`${styles.techBadge} ${styles[interview.employee?.technology?.replace(' ', '')]}`}>
                               {interview.employee?.technology || 'Unknown'}
@@ -802,7 +776,7 @@ const DeliveryTeamDashboard = () => {
                       </div>
                       
                       <div className={styles.interviewDetails}>
-                        <p><strong>Employee ID:</strong> {interview.employee?.empId || 'N/A'}</p>
+                        <p><strong>Employee ID:</strong> {interview.employee?.empId || 'AJA4444'}</p>
                         <p><strong>Interviewer:</strong> {interview.interviewer?.fullName || 'N/A'}</p>
                       </div>
                       
@@ -981,8 +955,7 @@ const DeliveryTeamDashboard = () => {
             <div className={styles.chartRow}>
               <div className={styles.chartCard}>
                 <h4>Interview Conversion</h4>
-                <ResponsiveContainer width="100%" height={300}>ls
-                  
+                <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
                       data={conversionData}
@@ -1012,7 +985,21 @@ const DeliveryTeamDashboard = () => {
                       <div key={index} className={styles.performerCard}>
                         <div className={styles.performerInfo}>
                           <div className={styles.userAvatarSmall}>
-                            <FiUser />
+                            {isLoading ? (
+                              <div className={styles.loadingSpinner} />
+                            ) : performer.profilePic ? (
+                              <img
+                                src={performer.profilePic}
+                                alt={`${performer.employeeName || 'Performer'}'s profile`}
+                                className={styles.profilePictureSmall}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  console.error('Top performer profile picture failed to load');
+                                }}
+                              />
+                            ) : (
+                              <FiUser />
+                            )}
                           </div>
                           <div>
                             <h5>{performer.employeeName}</h5>
@@ -1053,7 +1040,15 @@ const DeliveryTeamDashboard = () => {
                     {isLoading ? (
                       <div className={styles.loadingSpinner} />
                     ) : profilePic ? (
-                      <img src={profilePic} alt="Profile" className={styles.profilePicture} />
+                      <img
+                        src={profilePic}
+                        alt={`${userData.name || 'User'}'s profile`}
+                        className={styles.profilePicture}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          console.error('Profile picture failed to load');
+                        }}
+                      />
                     ) : (
                       <div className={styles.noProfilePic}>
                         <FiUser size={48} />
@@ -1074,7 +1069,6 @@ const DeliveryTeamDashboard = () => {
                     <h2>{userData.name}</h2>
                     <p className={styles.profileRole}>{userData.role}</p>
                     <p className={styles.profileEmail}>{userData.email}</p>
-                    <p className={styles.profileId}>Employee ID: {userData.empId}</p>
                   </div>
                 </div>
                 
@@ -1093,10 +1087,6 @@ const DeliveryTeamDashboard = () => {
                       <div className={styles.tableHeader}>Role</div>
                       <div className={styles.tableValue}>{userData.role}</div>
                     </div>
-                    <div className={styles.tableRow}>
-                      <div className={styles.tableHeader}>Employee ID</div>
-                      <div className={styles.tableValue}>{userData.empId}</div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1107,12 +1097,6 @@ const DeliveryTeamDashboard = () => {
         return null;
     }
   };
-
-  const getScoreColor = useCallback((score) => {
-    if (score >= 8) return '#28a745'; // Green
-    if (score >= 5) return '#ffc107'; // Yellow
-    return '#dc3545'; // Red
-  }, []);
 
   const renderModalActions = useCallback(() => (
     <div className={styles.modalActions}>
@@ -1133,13 +1117,10 @@ const DeliveryTeamDashboard = () => {
         {isSubmitting ? 'Updating...' : 'Update Feedback'}
       </button>
     </div>
-  ), [isSubmitting, isFeedbackLoading, handleCloseFeedbackModal, handleUpdateFeedback]);
+  ), [isSubmitting, isFeedbackLoading]);
 
-  // Add error boundary component
   const ErrorBoundary = ({ children }) => {
     const [hasError, setHasError] = useState(false);
-    const [errorInfo, setErrorInfo] = useState(null);
-
     if (hasError) {
       return (
         <div className={styles.errorContainer}>
@@ -1154,11 +1135,9 @@ const DeliveryTeamDashboard = () => {
         </div>
       );
     }
-
     return children;
   };
 
-  // Add loading component
   const LoadingState = () => (
     <div className={styles.loadingContainer}>
       <div className={styles.spinner}></div>
@@ -1166,120 +1145,133 @@ const DeliveryTeamDashboard = () => {
     </div>
   );
 
-  // Derive the full selected interview object from the ID
   const currentSelectedInterview = mockInterviews.find(interview => interview.id === selectedInterviewId) || null;
 
-  // Wrap the main content with error boundary
   return (
     <ErrorBoundary>
-    <div className={styles.dashboardContainer}>
+      <div className={styles.dashboardContainer}>
         {isInitialLoading ? (
           <LoadingState />
         ) : error ? (
           <ErrorMessage message={error} onRetry={fetchData} />
         ) : (
           <>
-      <div className={styles.dashboardHeader}>
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <h2>Delivery Team Dashboard</h2>
-          <p className={styles.dashboardSubtitle}>Mock Interview Management & Employee Evaluation</p>
-        </motion.div>
-        <div className={styles.userProfile}>
-          <div className={styles.userAvatar}>
-            <FiUser />
-          </div>
-          <div className={styles.userInfo}>
-            <span className={styles.userName}>{userData.name}</span>
-            <span className={styles.userName}>{userData.role}{userData.email ? ` (${userData.email})` : ''}</span>
-            {/* Optionally, show only role or split role/email as needed */}
-          </div>
-        </div>
-      </div>
-      
-      <div className={styles.tabs}>
-        <motion.button
-          className={`${styles.tab} ${activeTab === 'employees' ? styles.active : ''}`}
-          onClick={() => setActiveTab('employees')}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <FiUsers /> Employees
-        </motion.button>
-        <motion.button
-          className={`${styles.tab} ${activeTab === 'interviews' ? styles.active : ''}`}
-          onClick={() => setActiveTab('interviews')}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <FiCalendar /> Upcoming Interviews
-        </motion.button>
-        <motion.button
-          className={`${styles.tab} ${activeTab === 'completed' ? styles.active : ''}`}
-          onClick={() => setActiveTab('completed')}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <FiCheckCircle /> Completed Interviews
-        </motion.button>
-        <motion.button
-          className={`${styles.tab} ${activeTab === 'analytics' ? styles.active : ''}`}
-          onClick={() => setActiveTab('analytics')}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <FiBarChart2 /> Analytics
-        </motion.button>
-        <motion.button
-          className={`${styles.tab} ${activeTab === 'profile' ? styles.active : ''}`}
-          onClick={() => setActiveTab('profile')}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <FiUser /> My Profile
-        </motion.button>
-      </div>
-      
-      <motion.div
-        className={styles.tabContent}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        {isLoading ? <LoadingState /> : renderTabContent()}
-      </motion.div>
-      
-      <AnimatePresence>
-        {selectedInterviewId && (
-          <EvaluationModal
-            selectedInterview={currentSelectedInterview}
-            setSelectedInterview={setSelectedInterviewId}
-            mockInterviews={mockInterviews}
-            onUpdate={handleUpdateFeedback}
-          />
-        )}
-      </AnimatePresence>
-      
-      <AnimatePresence>
-        {showInterviewScheduler && (
-          <ScheduleInterviewModal
-            show={showInterviewScheduler}
-            onClose={() => {
-              setShowInterviewScheduler(false);
-              setSelectedEmployeeForScheduling(null);
-            }}
-            onSubmit={handleScheduleInterviewSubmit}
-            employees={employees}
-            selectedEmployee={selectedEmployeeForScheduling}
-          />
-        )}
-      </AnimatePresence>
+            <div className={styles.dashboardHeader}>
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <h2>Delivery Team Dashboard</h2>
+                <p className={styles.dashboardSubtitle}>Mock Interview Management & Employee Evaluation</p>
+              </motion.div>
+              <div className={styles.userProfile}>
+                <div className={styles.userAvatar}>
+                  {isLoading ? (
+                    <div className={styles.loadingSpinner} />
+                  ) : profilePic ? (
+                    <img
+                      src={profilePic}
+                      alt={`${userData.name || 'User'}'s profile`}
+                      className={styles.profilePicture}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        console.error('Profile picture failed to load');
+                      }}
+                    />
+                  ) : (
+                    <FiUser />
+                  )}
+                </div>
+                <div className={styles.userInfo}>
+                  <span className={styles.userName}>{userData.name}</span>
+                  <span className={styles.userName}>
+                    {userData.role} {userData.email ? `(${userData.email})` : ''}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div className={styles.tabs}>
+              <motion.button
+                className={`${styles.tab} ${activeTab === 'employees' ? styles.active : ''}`}
+                onClick={() => setActiveTab('employees')}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <FiUsers /> Employees
+              </motion.button>
+              <motion.button
+                className={`${styles.tab} ${activeTab === 'interviews' ? styles.active : ''}`}
+                onClick={() => setActiveTab('interviews')}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <FiCalendar /> Upcoming Interviews
+              </motion.button>
+              <motion.button
+                className={`${styles.tab} ${activeTab === 'completed' ? styles.active : ''}`}
+                onClick={() => setActiveTab('completed')}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <FiCheckCircle /> Completed Interviews
+              </motion.button>
+              <motion.button
+                className={`${styles.tab} ${activeTab === 'analytics' ? styles.active : ''}`}
+                onClick={() => setActiveTab('analytics')}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <FiBarChart2 /> Analytics
+              </motion.button>
+              <motion.button
+                className={`${styles.tab} ${activeTab === 'profile' ? styles.active : ''}`}
+                onClick={() => setActiveTab('profile')}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <FiUser /> My Profile
+              </motion.button>
+            </div>
+            
+            <motion.div
+              className={styles.tabContent}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              {renderTabContent()}
+            </motion.div>
+            
+            <AnimatePresence>
+              {selectedInterviewId && (
+                <EvaluationModal
+                  selectedInterview={currentSelectedInterview}
+                  setSelectedInterview={setSelectedInterviewId}
+                  mockInterviews={mockInterviews}
+                  onUpdate={handleUpdateFeedback}
+                />
+              )}
+            </AnimatePresence>
+            
+            <AnimatePresence>
+              {showInterviewScheduler && (
+                <ScheduleInterviewModal
+                  show={showInterviewScheduler}
+                  onClose={() => {
+                    setShowInterviewScheduler(false);
+                    setSelectedEmployeeForScheduling(null);
+                  }}
+                  onSubmit={handleScheduleInterviewSubmit}
+                  employees={employees}
+                  selectedEmployee={selectedEmployeeForScheduling}
+                />
+              )}
+            </AnimatePresence>
           </>
         )}
-    </div>
+      </div>
     </ErrorBoundary>
   );
 };

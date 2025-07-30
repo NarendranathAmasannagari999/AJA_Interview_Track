@@ -37,7 +37,7 @@ const Sidebar = ({ darkMode, toggleDarkMode, onToggle }) => {
       { path: "/dashboard/employee/questions", icon: <FiBook size={20} />, activeIcon: <FaBook size={20} />, label: "Interview Questions" },
     ] : []),
     // { path: "/about", icon: <FiInfo size={20} />, activeIcon: <FaInfoCircle size={20} />, label: "About" },
-    { path: "/dashboard/admin", icon: <FiBarChart2 size={20} />, activeIcon: <FaChartLine size={20} />, label: "Admin" }
+    // { path: "/dashboard/admin", icon: <FiBarChart2 size={20} />, activeIcon: <FaChartLine size={20} />, label: "Admin" }
   ];
 
   const authItems = [
