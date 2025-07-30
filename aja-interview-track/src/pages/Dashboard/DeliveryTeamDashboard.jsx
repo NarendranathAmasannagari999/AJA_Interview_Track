@@ -1193,9 +1193,9 @@ const DeliveryTeamDashboard = () => {
             <FiUser />
           </div>
           <div className={styles.userInfo}>
-            <span className={styles.userName}>Indhraneel Shetty</span>
-            <span className={styles.userName}>Delivery Manager ({'i.shetty@ajacs.in'})</span>
-            <span className={styles.userRole}>Delivery Team</span>
+            <span className={styles.userName}>{userData.name}</span>
+            <span className={styles.userName}>{userData.role}{userData.email ? ` (${userData.email})` : ''}</span>
+            {/* Optionally, show only role or split role/email as needed */}
           </div>
         </div>
       </div>

@@ -1,3 +1,16 @@
+/* Add CSS variables for color consistency at the top */
+:root {
+  --primary-color: #3b82f6;
+  --primary-color-dark: #1e293b;
+  --primary-color-light: #93c5fd;
+  --border-color: #1e293b;
+  --hover-color: rgba(59, 130, 246, 0.08);
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --background-light: #1e293b;
+  --error-color: #ef4444;
+}
+
 /* Global Container */
 .container {
   width: 100%;
@@ -749,69 +762,119 @@
     padding: 8rem 6% 6rem;
     min-height: auto;
   }
-  
   .heroContent {
     margin-bottom: 5rem;
-  }
-  
-  .heroTitle {
-    font-size: 3rem;
-  }
-  
-  .heroSubtitle {
-    font-size: 1.3rem;
-  }
-  
-  .ctaButtons {
+    align-items: center;
     justify-content: center;
-  }
-  
-  .statsContainer {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .section, .sectionDark {
-    padding: 8rem 6%;
-  }
-  
-  .sectionTitle, .sectionTitleLight {
-    font-size: 2.8rem;
-  }
-  
-  .ctaTitle {
-    font-size: 3rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .heroTitle {
-    font-size: 2.5rem;
-  }
-  
-  .statsContainer {
-    grid-template-columns: 1fr;
-  }
-  
-  .ctaButtons {
+    display: flex;
     flex-direction: column;
   }
-  
+  .ctaButtons {
+    justify-content: center;
+    width: 100%;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+  }
   .primaryButton, .secondaryButton {
     width: 100%;
     justify-content: center;
     padding: 1.2rem;
+    margin-bottom: 0.5rem;
   }
-  
-  .processContainer {
+  .statsContainer {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  .statCard {
+    margin-bottom: 1.5rem;
+    padding: 2rem;
+  }
+  .section, .sectionDark {
+    padding: 8rem 6%;
+  }
+  .sectionTitle, .sectionTitleLight {
+    font-size: 2.8rem;
+  }
+  .ctaTitle {
+    font-size: 3rem;
+  }
+  .processContainer, .techGrid, .testimonialWrapper {
     grid-template-columns: 1fr;
+    gap: 2rem;
   }
-  
-  .techGrid {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  .processCard, .techCard, .testimonialCard {
+    padding: 2rem 1rem;
   }
-  
-  .testimonialWrapper {
+  .leaderboardCard {
+    margin: 0 1rem;
+    max-width: 100%;
+  }
+  .leaderboardItem {
+    grid-template-columns: 40px 1fr;
+    grid-template-rows: auto auto;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+  .scoreContainer {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+  .leaderboardFilters {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+  }
+  .leaderboardSelect {
+    width: 100%;
+    padding: 0.7rem 1.2rem;
+  }
+}
+@media (max-width: 480px) {
+  .heroTitle {
+    font-size: 2.2rem;
+  }
+  .statsContainer {
     grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .statCard {
+    padding: 1.2rem;
+    margin-bottom: 1rem;
+  }
+  .ctaButtons {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .primaryButton, .secondaryButton {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1rem;
+  }
+  .processContainer, .techGrid, .testimonialWrapper {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .processCard, .techCard, .testimonialCard {
+    padding: 1.2rem 0.5rem;
+  }
+  .leaderboardHeader h3 {
+    font-size: 1.2rem;
+  }
+  .leaderboardItem {
+    padding: 0.7rem;
+  }
+  .rankContainer {
+    width: 32px;
+    height: 32px;
+  }
+  .goldIcon, .silverIcon, .bronzeIcon {
+    font-size: 1.1rem;
+  }
+  .scoreBadge {
+    font-size: 0.7rem;
+    padding: 0.3rem 0.6rem;
   }
 }
 
@@ -1044,7 +1107,7 @@
 }
 
 .leaderboardCard {
-  background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(10, 15, 31, 0.9));
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.95), rgba(10, 15, 31, 0.95));
   border-radius: 25px;
   box-shadow: 0 16px 60px rgba(0, 0, 0, 0.4);
   overflow: hidden;
