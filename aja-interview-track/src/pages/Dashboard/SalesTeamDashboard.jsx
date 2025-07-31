@@ -47,7 +47,8 @@ import {
   updateProfilePicture,
   getProfilePicture,
   getClientInterviewFeedback,
-  getUserByRole
+  getUserByRole,
+  getClientInterviewCount
 } from "../../API/sales";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
@@ -507,26 +508,26 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
     const techScoreNum = Number(techScore);
     const commScoreNum = Number(commScore);
 
-    if (isNaN(techScoreNum) || techScoreNum < 0 || techScoreNum > 10) {
-      setError("Technical score must be a number between 0 and 10");
+    if (isNaN(techScoreNum)) {
+      setError("Technical score must be a number");
       return;
     }
-    if (isNaN(commScoreNum) || commScoreNum < 0 || commScoreNum > 10) {
-      setError("Communication score must be a number between 0 and 10");
-      return;
-    }
-    if (!feedback.trim()) {
-      setError("Feedback cannot be empty");
+    if (isNaN(commScoreNum)) {
+      setError("Communication score must be a number");
       return;
     }
 
+    const feedbackData = {
+      result: "completed",
+      feedback,
+      technicalScore: techScoreNum,
+      communicationScore: commScoreNum,
+      deployedStatus: Boolean(deployedStatus)
+    };
+
     onSubmit(
       interview.id,
-      "completed",
-      feedback,
-      techScoreNum,
-      commScoreNum,
-      deployedStatus
+      feedbackData
     );
   };
 
@@ -560,6 +561,7 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
                 type="number"
                 min="0"
                 max="10"
+                step="0.1"
                 value={techScore}
                 onChange={(e) => setTechScore(e.target.value)}
                 className={styles.input}
@@ -573,6 +575,7 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
                 type="number"
                 min="0"
                 max="10"
+                step="0.1"
                 value={commScore}
                 onChange={(e) => setCommScore(e.target.value)}
                 className={styles.input}
@@ -647,6 +650,7 @@ const SalesTeamDashboard = () => {
   const [clients, setClients] = useState([]);
   const [jobDescriptions, setJobDescriptions] = useState([]);
   const [deployedEmployees, setDeployedEmployees] = useState([]);
+  const [interviewCount, setInterviewCount] = useState(0);
 
   // Modal states
   const [showClientModal, setShowClientModal] = useState(false);
@@ -725,6 +729,7 @@ const SalesTeamDashboard = () => {
   useEffect(() => {
     fetchData();
     fetchUserData();
+    fetchInterviewCount();
   }, []);
 
   // Cleanup effect to prevent memory leaks
@@ -736,6 +741,15 @@ const SalesTeamDashboard = () => {
       }
     };
   }, [profilePic]);
+
+  const fetchInterviewCount = async () => {
+    try {
+      const count = await getClientInterviewCount();
+      setInterviewCount(count);
+    } catch (error) {
+      console.error("Error fetching interview count:", error);
+    }
+  };
 
   const fetchUserData = async () => {
     try {
@@ -834,6 +848,7 @@ const SalesTeamDashboard = () => {
     setIsRefreshing(true);
     try {
       await fetchData();
+      await fetchInterviewCount();
       toast.success("Data refreshed successfully");
     } catch (error) {
       toast.error("Failed to refresh data");
@@ -876,7 +891,7 @@ const SalesTeamDashboard = () => {
       // Update profile picture using the API
       const response = await updateProfilePicture(salesUserData.empId, file);
 
-      if (response && response.success) {
+      if (response) {
         // Fetch updated profile picture
         const pictureBlob = await getProfilePicture(salesUserData.empId);
         if (pictureBlob && pictureBlob instanceof Blob) {
@@ -956,6 +971,7 @@ const SalesTeamDashboard = () => {
         setInterviewDetails(initialInterviewDetails);
         toast.success("Interview scheduled successfully!");
         await fetchData();
+        await fetchInterviewCount();
       }
     } catch (error) {
       console.error("Error scheduling interview:", error);
@@ -1106,16 +1122,17 @@ const SalesTeamDashboard = () => {
     try {
       toast.info("Uploading job description...");
 
-      const response = await addJobDescription({
-        title: jdModalFields.title,
-        client: jdModalFields.client,
-        receivedDate: jdModalFields.receivedDate || new Date().toISOString().split("T")[0],
-        deadline: jdModalFields.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        technology: jdModalFields.technology,
-        resourceType: jdModalFields.resourceType,
-        description: jdModalFields.description,
-        file: jdModalFile
-      });
+      const formData = new FormData();
+      formData.append("title", jdModalFields.title);
+      formData.append("client", jdModalFields.client);
+      formData.append("technology", jdModalFields.technology);
+      formData.append("resourceType", jdModalFields.resourceType);
+      formData.append("description", jdModalFields.description || "");
+      formData.append("receivedDate", jdModalFields.receivedDate || new Date().toISOString().split("T")[0]);
+      formData.append("deadline", jdModalFields.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
+      formData.append("file", jdModalFile);
+
+      const response = await addJobDescription(formData);
 
       if (response) {
         setJobDescriptions((prev) => [...prev, response]);
@@ -1210,29 +1227,10 @@ const SalesTeamDashboard = () => {
     });
   };
 
-  const handleUpdateFeedback = async (interviewId, status, feedback, techScore, commScore, deployedStatus) => {
+  const handleUpdateFeedback = async (interviewId, feedbackData) => {
     setIsLoading(true);
     setError(null);
     try {
-      // Ensure scores are numbers as required by backend
-      const techScoreNum = Number(techScore);
-      const commScoreNum = Number(commScore);
-
-      if (isNaN(techScoreNum) || techScoreNum < 0 || techScoreNum > 10) {
-        throw new Error('Technical score must be a number between 0 and 10');
-      }
-      if (isNaN(commScoreNum) || commScoreNum < 0 || commScoreNum > 10) {
-        throw new Error('Communication score must be a number between 0 and 10');
-      }
-
-      const feedbackData = {
-        result: status,
-        feedback,
-        technicalScore: techScoreNum,
-        communicationScore: commScoreNum,
-        deployedStatus: Boolean(deployedStatus)
-      };
-
       const response = await updateClientInterview(interviewId, feedbackData);
       
       if (response) {
@@ -1248,6 +1246,7 @@ const SalesTeamDashboard = () => {
         toast.success('Interview feedback updated successfully');
         setShowFeedbackModal(false);
         setSelectedInterviewForFeedback(null);
+        await fetchInterviewCount();
       }
     } catch (error) {
       console.error('Error updating feedback:', error);
@@ -2242,6 +2241,10 @@ const SalesTeamDashboard = () => {
         </p>
       </div>
       <div className={styles.headerActions}>
+        <div className={styles.interviewCountBadge}>
+          <FiCalendar />
+          <span>Interviews: {interviewCount}</span>
+        </div>
         <button
           className={`${styles.button} ${styles.secondary}`}
           onClick={handleRefresh}
@@ -2386,6 +2389,10 @@ const SalesTeamDashboard = () => {
                     placeholder="Enter JD title"
                     className={styles.input}
                   />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Client *</label>
+                  <select
                     value={jdModalFields.client}
                     onChange={(e) =>
                       setJDModalFields({
@@ -2394,13 +2401,14 @@ const SalesTeamDashboard = () => {
                       })
                     }
                     className={styles.input}
-                  
+                  >
                     <option value="">Select client</option>
                     {clients.map((client) => (
                       <option key={client.id} value={client.name}>
                         {client.name}
                       </option>
                     ))}
+                  </select>
                 </div>
                 <div className={styles.formGroup}>
                   <label>Technology *</label>
