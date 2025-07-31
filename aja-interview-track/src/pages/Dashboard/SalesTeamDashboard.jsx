@@ -752,7 +752,7 @@ const SalesTeamDashboard = () => {
 
       // Then fetch detailed user data using the getUserByRole API
       const userData = await getUserByRole();
-      
+
       setSalesUserData({
         fullName: userData.fullName || fullName,
         email: userData.email || email,
@@ -766,18 +766,19 @@ const SalesTeamDashboard = () => {
       });
 
       // Fetch profile picture if empId exists
-      if (userData.empId || decoded.empId) {
+      const empIdToUse = userData.empId || decoded.empId;
+      if (empIdToUse) {
         try {
-          const empIdToUse = userData.empId || decoded.empId;
           const pictureBlob = await getProfilePicture(empIdToUse);
-          if (pictureBlob) {
+          if (pictureBlob && pictureBlob instanceof Blob) {
             const imageUrl = URL.createObjectURL(pictureBlob);
             setProfilePic(imageUrl);
+          } else {
+            console.error("getProfilePicture did not return a Blob:", pictureBlob);
+            setProfilePic(null);
           }
         } catch (pictureError) {
           console.error("Error fetching profile picture:", pictureError);
-          // Don't show toast error for profile picture loading failures
-          // Just log the error and use default avatar
           setProfilePic(null);
         }
       }
@@ -850,13 +851,11 @@ const SalesTeamDashboard = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Check if empId is available
     if (!salesUserData.empId) {
       toast.error("Employee ID not available. Please refresh the page and try again.");
       return;
     }
 
-    // Validate file type and size according to backend requirements
     const allowedTypes = ["image/jpeg", "image/png"];
     const maxSize = 2 * 1024 * 1024; // 2MB
 
@@ -876,19 +875,24 @@ const SalesTeamDashboard = () => {
 
       // Update profile picture using the API
       const response = await updateProfilePicture(salesUserData.empId, file);
-      
-      if (response) {
+
+      if (response && response.success) {
         // Fetch updated profile picture
         const pictureBlob = await getProfilePicture(salesUserData.empId);
-        if (pictureBlob) {
-          // Clean up previous object URL to prevent memory leaks
+        if (pictureBlob && pictureBlob instanceof Blob) {
           if (profilePic && profilePic.startsWith('blob:')) {
             URL.revokeObjectURL(profilePic);
           }
           const imageUrl = URL.createObjectURL(pictureBlob);
           setProfilePic(imageUrl);
           toast.success("Profile picture updated successfully");
+        } else {
+          console.error("getProfilePicture did not return a Blob:", pictureBlob);
+          toast.error("Failed to fetch updated profile picture");
         }
+      } else {
+        console.error("updateProfilePicture response:", response);
+        toast.error("Failed to update profile picture");
       }
     } catch (error) {
       console.error("Error updating profile picture:", error);
@@ -2382,10 +2386,6 @@ const SalesTeamDashboard = () => {
                     placeholder="Enter JD title"
                     className={styles.input}
                   />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Client *</label>
-                  <select
                     value={jdModalFields.client}
                     onChange={(e) =>
                       setJDModalFields({
@@ -2394,14 +2394,13 @@ const SalesTeamDashboard = () => {
                       })
                     }
                     className={styles.input}
-                  >
+                  
                     <option value="">Select client</option>
                     {clients.map((client) => (
                       <option key={client.id} value={client.name}>
                         {client.name}
                       </option>
                     ))}
-                  </select>
                 </div>
                 <div className={styles.formGroup}>
                   <label>Technology *</label>
