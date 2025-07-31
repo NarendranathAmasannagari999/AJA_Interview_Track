@@ -48,7 +48,9 @@ import {
   getProfilePicture,
   getClientInterviewFeedback,
   getUserByRole,
-  getClientInterviewCount
+  getClientInterviewCount,
+  getAllEmployeeResumes,
+  getFilteredResumes,
 } from "../../API/sales";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
@@ -258,6 +260,7 @@ const ScheduleInterviewModal = ({
   jobDescriptions,
 }) => {
   const [error, setError] = useState("");
+  const [interviewFile, setInterviewFile] = useState(null);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -282,10 +285,14 @@ const ScheduleInterviewModal = ({
       if (!interviewDetails.meetingLink?.trim()) {
         throw new Error("Meeting link is required");
       }
+      if (interviewFile && !['application/pdf', 'image/jpeg', 'image/png'].includes(interviewFile.type)) {
+        throw new Error("File must be a PDF, JPEG, or PNG");
+      }
 
       onSubmit(
         selectedCandidates[0].empId,
-        interviewDetails
+        interviewDetails,
+        interviewFile
       );
       onClose();
     } catch (err) {
@@ -443,6 +450,21 @@ const ScheduleInterviewModal = ({
                 required
                 placeholder="Enter meeting link"
               />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Upload File (Optional)</label>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) => setInterviewFile(e.target.files[0])}
+                className={styles.input}
+              />
+              {interviewFile && (
+                <span style={{ fontSize: "0.9em" }}>
+                  {interviewFile.name}
+                </span>
+              )}
             </div>
 
             <div className={styles.formGroup}>
@@ -646,6 +668,7 @@ const SalesTeamDashboard = () => {
 
   // Data states
   const [candidates, setCandidates] = useState([]);
+  const [resumes, setResumes] = useState([]);
   const [clientInterviews, setClientInterviews] = useState([]);
   const [clients, setClients] = useState([]);
   const [jobDescriptions, setJobDescriptions] = useState([]);
@@ -748,6 +771,7 @@ const SalesTeamDashboard = () => {
       setInterviewCount(count);
     } catch (error) {
       console.error("Error fetching interview count:", error);
+      toast.error(error.message || "Failed to fetch interview count");
     }
   };
 
@@ -814,13 +838,15 @@ const SalesTeamDashboard = () => {
         interviewsData,
         clientsData,
         jobDescriptionsData,
-        deployedEmployeesData
+        deployedEmployeesData,
+        resumesData
       ] = await Promise.all([
         getCandidates(filterTech, filterStatus, filterResourceType),
         getClientInterviews(searchTerm),
         getClients(searchTerm),
         getAllJobDescriptions(),
-        getDeployedEmployees()
+        getDeployedEmployees(),
+        getFilteredResumes(filterTech, filterResourceType)
       ].map(p => p.catch(error => {
         console.error("Error in fetchData:", error);
         toast.error(`Failed to fetch some data: ${error.message}`);
@@ -833,6 +859,7 @@ const SalesTeamDashboard = () => {
       if (clientsData) setClients(clientsData);
       if (jobDescriptionsData) setJobDescriptions(jobDescriptionsData);
       if (deployedEmployeesData) setDeployedEmployees(deployedEmployeesData);
+      if (resumesData) setResumes(resumesData);
 
     } catch (error) {
       console.error("Error in fetchData:", error);
@@ -917,7 +944,7 @@ const SalesTeamDashboard = () => {
     }
   };
 
-  const handleScheduleInterview = async (empId, details) => {
+  const handleScheduleInterview = async (empId, details, file) => {
     if (!empId || !details) {
       toast.error("Missing required interview details");
       return;
@@ -944,24 +971,18 @@ const SalesTeamDashboard = () => {
     setError(null);
 
     try {
-      // Format time to HH:mm:ss as required by backend
-      const formattedTime = details.time.includes(':') 
-        ? details.time.split(':').length === 2 
-          ? `${details.time}:00` 
-          : details.time
-        : details.time;
-
       toast.info("Scheduling interview...");
 
       const response = await scheduleClientInterview(
         empId,
         details.client,
         details.date,
-        formattedTime,
+        details.time,
         details.level,
         details.jobDescriptionTitle,
         details.meetingLink,
-        details.deployedStatus || false
+        details.deployedStatus || false,
+        file
       );
 
       if (response) {
@@ -1006,6 +1027,36 @@ const SalesTeamDashboard = () => {
     } catch (error) {
       console.error("Error downloading job description:", error);
       toast.error(error.message || "Failed to download job description");
+    }
+  };
+
+  const handleDownloadResume = async (employeeId) => {
+    if (!employeeId) {
+      toast.error("Employee ID is required");
+      return;
+    }
+
+    try {
+      toast.info("Downloading resume...");
+      const employees = await getAllEmployeeResumes();
+      const employee = employees.find(emp => emp.empId === employeeId);
+      if (!employee || !employee.resumeUrl) {
+        throw new Error("Resume not found for this employee");
+      }
+      const response = await fetch(employee.resumeUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `resume_${employeeId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Resume downloaded successfully");
+    } catch (error) {
+      console.error("Error downloading resume:", error);
+      toast.error(error.message || "Failed to download resume");
     }
   };
 
@@ -1061,7 +1112,7 @@ const SalesTeamDashboard = () => {
         name: clientModalFields.name,
         contactEmail: clientModalFields.contactEmail,
         activePositions: clientModalFields.activePositions,
-        technologies: clientModalFields.technologies.join(",")
+        technologies: clientModalFields.technologies
       });
 
       if (response) {
@@ -1122,17 +1173,18 @@ const SalesTeamDashboard = () => {
     try {
       toast.info("Uploading job description...");
 
-      const formData = new FormData();
-      formData.append("title", jdModalFields.title);
-      formData.append("client", jdModalFields.client);
-      formData.append("technology", jdModalFields.technology);
-      formData.append("resourceType", jdModalFields.resourceType);
-      formData.append("description", jdModalFields.description || "");
-      formData.append("receivedDate", jdModalFields.receivedDate || new Date().toISOString().split("T")[0]);
-      formData.append("deadline", jdModalFields.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
-      formData.append("file", jdModalFile);
+      const jdData = {
+        title: jdModalFields.title,
+        client: jdModalFields.client,
+        technology: jdModalFields.technology,
+        resourceType: jdModalFields.resourceType,
+        description: jdModalFields.description || "",
+        receivedDate: jdModalFields.receivedDate || new Date().toISOString().split("T")[0],
+        deadline: jdModalFields.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        file: jdModalFile
+      };
 
-      const response = await addJobDescription(formData);
+      const response = await addJobDescription(jdData);
 
       if (response) {
         setJobDescriptions((prev) => [...prev, response]);
@@ -1427,7 +1479,7 @@ const SalesTeamDashboard = () => {
                       className={`${styles.techBadge} ${
                         styles[jd.technology?.toLowerCase()]
                       }`}
-                      >
+                    >
                       {jd.technology}
                     </span>
                     <span
@@ -1465,13 +1517,7 @@ const SalesTeamDashboard = () => {
                     className={`${styles.button} ${styles.danger}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (
-                        window.confirm(
-                          "Are you sure you want to delete this JD?"
-                        )
-                      ) {
-                        handleDeleteJD(jd.id);
-                      }
+                      handleDeleteJD(jd.id);
                     }}
                   >
                     <FiX /> Delete
@@ -1492,7 +1538,7 @@ const SalesTeamDashboard = () => {
   };
 
   const ResumePoolTab = () => {
-    const filteredResumes = filterCandidates(candidates);
+    const filteredResumes = filterCandidates(resumes);
 
     return (
       <motion.div
@@ -1520,7 +1566,7 @@ const SalesTeamDashboard = () => {
               className={styles.filterSelect}
             >
               <option value="all">All Technologies</option>
-              {Array.from(new Set(candidates.map((c) => c.technology))).map(
+              {Array.from(new Set(resumes.map((c) => c.technology))).map(
                 (tech) => (
                   <option key={tech} value={tech}>
                     {tech}
@@ -1537,7 +1583,7 @@ const SalesTeamDashboard = () => {
               className={styles.filterSelect}
             >
               <option value="all">All Types</option>
-              {Array.from(new Set(candidates.map((c) => c.resourceType))).map(
+              {Array.from(new Set(resumes.map((c) => c.resourceType))).map(
                 (type) => (
                   <option key={type} value={type}>
                     {type}
@@ -1594,16 +1640,14 @@ const SalesTeamDashboard = () => {
                     <td>
                       <button
                         className={`${styles.button} ${styles.small}`}
-                        onClick={() => {
-                          // Handle view resume
-                        }}
+                        onClick={() => handleDownloadResume(candidate.empId)}
                       >
                         <FiDownload /> Resume
                       </button>
                       <button
                         className={`${styles.button} ${styles.small} ${styles.primary}`}
                         onClick={() => {
-                          setSelectedForInterview([candidate.id]);
+                          setSelectedForInterview([candidate]);
                           setShowInterviewScheduler(true);
                         }}
                       >
@@ -2099,64 +2143,64 @@ const SalesTeamDashboard = () => {
     };
 
     return (
-       <div className={styles.sectionContainer}>
-      <h3 className={styles.sectionTitle}>My Profile</h3>
-      <div className={styles.profileSection}>
-        <div className={styles.profileCard}>
-          <div className={styles.profileHeader}>
-            <div className={styles.profilePictureContainer}>
-              {isLoading ? (
-                <div className={styles.loadingSpinner} />
-              ) : profilePic ? (
-                <img src={profilePic} alt="Profile" className={styles.profilePicture} />
-              ) : (
-                <div className={styles.noProfilePic}>
-                  <FiUser size={48} />
+      <div className={styles.sectionContainer}>
+        <h3 className={styles.sectionTitle}>My Profile</h3>
+        <div className={styles.profileSection}>
+          <div className={styles.profileCard}>
+            <div className={styles.profileHeader}>
+              <div className={styles.profilePictureContainer}>
+                {isLoading ? (
+                  <div className={styles.loadingSpinner} />
+                ) : profilePic ? (
+                  <img src={profilePic} alt="Profile" className={styles.profilePicture} />
+                ) : (
+                  <div className={styles.noProfilePic}>
+                    <FiUser size={48} />
+                  </div>
+                )}
+                <input
+                  type="file"
+                  id="profilePictureUpload"
+                  accept="image/jpeg,image/png"
+                  onChange={handleProfilePictureChange}
+                  style={{ display: 'none' }}
+                />
+                <label htmlFor="profilePictureUpload" className={styles.profilePictureUpload}>
+                  <FiUpload size={18} /> Update Photo
+                </label>
+              </div>
+              <div className={styles.profileInfo}>
+                <h2>{salesUserData.fullName}</h2>
+                <p className={styles.profileRole}>{salesUserData.role}</p>
+                <p className={styles.profileEmail}>{salesUserData.email}</p>
+                <p className={styles.profileId}>Employee ID: {salesUserData.empId || "AJA1007"}</p>
+              </div>
+            </div>
+            
+            <div className={styles.profileDetails}>
+              <h4>Profile Details</h4>
+              <div className={styles.profileTable}>
+                <div className={styles.tableRow}>
+                  <div className={styles.tableHeader}>Name</div>
+                  <div className={styles.tableValue}>{salesUserData.fullName}</div>
                 </div>
-              )}
-              <input
-                type="file"
-                id="profilePictureUpload"
-                accept="image/jpeg,image/png"
-                onChange={handleProfilePictureChange}
-                style={{ display: 'none' }}
-              />
-              <label htmlFor="profilePictureUpload" className={styles.profilePictureUpload}>
-                <FiUpload size={18} /> Update Photo
-              </label>
-            </div>
-            <div className={styles.profileInfo}>
-              <h2>{salesUserData.fullName}</h2>
-              <p className={styles.profileRole}>{salesUserData.role}</p>
-              <p className={styles.profileEmail}>{salesUserData.email}</p>
-              <p className={styles.profileId}>Employee ID: {salesUserData.empId || "AJA1007"}</p>
-            </div>
-          </div>
-          
-          <div className={styles.profileDetails}>
-            <h4>Profile Details</h4>
-            <div className={styles.profileTable}>
-              <div className={styles.tableRow}>
-                <div className={styles.tableHeader}>Name</div>
-                <div className={styles.tableValue}>{salesUserData.fullName}</div>
-              </div>
-              <div className={styles.tableRow}>
-                <div className={styles.tableHeader}>Email</div>
-                <div className={styles.tableValue}>{salesUserData.email}</div>
-              </div>
-              <div className={styles.tableRow}>
-                <div className={styles.tableHeader}>Role</div>
-                <div className={styles.tableValue}>{salesUserData.role}</div>
-              </div>
-              <div className={styles.tableRow}>
-                <div className={styles.tableHeader}>Employee ID</div>
-                <div className={styles.tableValue}>{salesUserData.empId || "AJA1007"}</div>
+                <div className={styles.tableRow}>
+                  <div className={styles.tableHeader}>Email</div>
+                  <div className={styles.tableValue}>{salesUserData.email}</div>
+                </div>
+                <div className={styles.tableRow}>
+                  <div className={styles.tableHeader}>Role</div>
+                  <div className={styles.tableValue}>{salesUserData.role}</div>
+                </div>
+                <div className={styles.tableRow}>
+                  <div className={styles.tableHeader}>Employee ID</div>
+                  <div className={styles.tableValue}>{salesUserData.empId || "AJA1007"}</div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
     );
   };
 
@@ -2197,7 +2241,7 @@ const SalesTeamDashboard = () => {
           <>
             <ResumePoolTab />
             <Pagination
-              totalItems={candidates.length}
+              totalItems={resumes.length}
               currentPage={currentPage}
               onPageChange={setCurrentPage}
             />
@@ -2369,25 +2413,19 @@ const SalesTeamDashboard = () => {
                 </button>
               </div>
               <div className={styles.modalContent}>
-                {jdModalError && (
-                  <div className={styles.errorMessage}>{jdModalError}</div>
-                )}
-                {jdModalSuccess && (
-                  <div className={styles.successMessage}>{jdModalSuccess}</div>
-                )}
+                {jdModalError && <div className={styles.errorMessage}>{jdModalError}</div>}
+                {jdModalSuccess && <div className={styles.successMessage}>{jdModalSuccess}</div>}
                 <div className={styles.formGroup}>
                   <label>Title *</label>
                   <input
                     type="text"
                     value={jdModalFields.title}
                     onChange={(e) =>
-                      setJDModalFields({
-                        ...jdModalFields,
-                        title: e.target.value,
-                      })
+                      setJDModalFields({ ...jdModalFields, title: e.target.value })
                     }
-                    placeholder="Enter JD title"
+                    placeholder="Enter job title"
                     className={styles.input}
+                    required
                   />
                 </div>
                 <div className={styles.formGroup}>
@@ -2395,14 +2433,12 @@ const SalesTeamDashboard = () => {
                   <select
                     value={jdModalFields.client}
                     onChange={(e) =>
-                      setJDModalFields({
-                        ...jdModalFields,
-                        client: e.target.value,
-                      })
+                      setJDModalFields({ ...jdModalFields, client: e.target.value })
                     }
                     className={styles.input}
+                    required
                   >
-                    <option value="">Select client</option>
+                    <option value="">Select Client</option>
                     {clients.map((client) => (
                       <option key={client.id} value={client.name}>
                         {client.name}
@@ -2415,21 +2451,19 @@ const SalesTeamDashboard = () => {
                   <select
                     value={jdModalFields.technology}
                     onChange={(e) =>
-                      setJDModalFields({
-                        ...jdModalFields,
-                        technology: e.target.value,
-                      })
+                      setJDModalFields({ ...jdModalFields, technology: e.target.value })
                     }
                     className={styles.input}
+                    required
                   >
-                    <option value="">Select technology</option>
-                    <option value="Java">Java</option>
-                    <option value="Python">Python</option>
-                    <option value=".NET">.NET</option>
-                    <option value="DevOps">DevOps</option>
-                    <option value="SalesForce">SalesForce</option>
-                    <option value="UI">UI</option>
-                    <option value="Testing">Testing</option>
+                    <option value="">Select Technology</option>
+                    {["Java", "Python", ".NET", "DevOps", "SalesForce", "UI", "Testing"].map(
+                      (tech) => (
+                        <option key={tech} value={tech}>
+                          {tech}
+                        </option>
+                      )
+                    )}
                   </select>
                 </div>
                 <div className={styles.formGroup}>
@@ -2437,16 +2471,17 @@ const SalesTeamDashboard = () => {
                   <select
                     value={jdModalFields.resourceType}
                     onChange={(e) =>
-                      setJDModalFields({
-                        ...jdModalFields,
-                        resourceType: e.target.value,
-                      })
+                      setJDModalFields({ ...jdModalFields, resourceType: e.target.value })
                     }
                     className={styles.input}
+                    required
                   >
-                    <option value="">Select type</option>
-                    <option value="OM">OM</option>
-                    <option value="TCT1">TCT1</option>
+                    <option value="">Select Resource Type</option>
+                    {["Developer", "Engineer", "Consultant", "Analyst"].map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className={styles.formGroup}>
@@ -2454,13 +2489,11 @@ const SalesTeamDashboard = () => {
                   <textarea
                     value={jdModalFields.description}
                     onChange={(e) =>
-                      setJDModalFields({
-                        ...jdModalFields,
-                        description: e.target.value,
-                      })
+                      setJDModalFields({ ...jdModalFields, description: e.target.value })
                     }
-                    placeholder="Enter JD description"
-                    className={styles.input}
+                    placeholder="Enter job description"
+                    className={styles.textarea}
+                    rows="4"
                   />
                 </div>
                 <div className={styles.formGroup}>
@@ -2469,10 +2502,7 @@ const SalesTeamDashboard = () => {
                     type="date"
                     value={jdModalFields.receivedDate}
                     onChange={(e) =>
-                      setJDModalFields({
-                        ...jdModalFields,
-                        receivedDate: e.target.value,
-                      })
+                      setJDModalFields({ ...jdModalFields, receivedDate: e.target.value })
                     }
                     className={styles.input}
                   />
@@ -2483,10 +2513,7 @@ const SalesTeamDashboard = () => {
                     type="date"
                     value={jdModalFields.deadline}
                     onChange={(e) =>
-                      setJDModalFields({
-                        ...jdModalFields,
-                        deadline: e.target.value,
-                      })
+                      setJDModalFields({ ...jdModalFields, deadline: e.target.value })
                     }
                     className={styles.input}
                   />
@@ -2498,11 +2525,10 @@ const SalesTeamDashboard = () => {
                     accept=".pdf,.doc,.docx"
                     onChange={(e) => setJDModalFile(e.target.files[0])}
                     className={styles.input}
+                    required
                   />
                   {jdModalFile && (
-                    <span style={{ fontSize: "0.9em" }}>
-                      {jdModalFile.name}
-                    </span>
+                    <span style={{ fontSize: "0.9em" }}>{jdModalFile.name}</span>
                   )}
                 </div>
                 <div className={styles.modalFooter}>
@@ -2510,7 +2536,6 @@ const SalesTeamDashboard = () => {
                     className={`${styles.button} ${styles.secondary}`}
                     type="button"
                     onClick={() => setSelectedJD(null)}
-                    disabled={jdModalLoading}
                   >
                     Cancel
                   </button>
@@ -2519,7 +2544,7 @@ const SalesTeamDashboard = () => {
                     type="submit"
                     disabled={jdModalLoading}
                   >
-                    {jdModalLoading ? "Uploading..." : "Submit"}
+                    {jdModalLoading ? "Uploading..." : "Upload JD"}
                   </button>
                 </div>
               </div>
@@ -2533,40 +2558,26 @@ const SalesTeamDashboard = () => {
         onClose={() => {
           setShowInterviewScheduler(false);
           setSelectedForInterview([]);
-          setInterviewDetails({
-            level: 1,
-            date: "",
-            time: "",
-            client: "",
-            jobDescriptionTitle: "",
-            meetingLink: "",
-            deployedStatus: false,
-          });
+          setInterviewDetails(initialInterviewDetails);
         }}
-        onSubmit={(empId, details) => handleScheduleInterview(empId, details)}
-        selectedCandidates={candidates.filter((c) =>
-          selectedForInterview.includes(c.id)
-        )}
+        onSubmit={handleScheduleInterview}
+        selectedCandidates={selectedForInterview}
         interviewDetails={interviewDetails}
         setInterviewDetails={setInterviewDetails}
         clients={clients}
         jobDescriptions={jobDescriptions}
       />
 
-      <AnimatePresence>
-        {showFeedbackModal && selectedInterviewForFeedback && (
-          <FeedbackModal
-            show={showFeedbackModal}
-            onClose={() => {
-              setShowFeedbackModal(false);
-              setSelectedInterviewForFeedback(null);
-            }}
-            interview={selectedInterviewForFeedback}
-            onSubmit={handleUpdateFeedback}
-            salesUserData={salesUserData}
-          />
-        )}
-      </AnimatePresence>
+      <FeedbackModal
+        show={showFeedbackModal}
+        onClose={() => {
+          setShowFeedbackModal(false);
+          setSelectedInterviewForFeedback(null);
+        }}
+        interview={selectedInterviewForFeedback || {}}
+        onSubmit={handleUpdateFeedback}
+        salesUserData={salesUserData}
+      />
     </div>
   );
 };

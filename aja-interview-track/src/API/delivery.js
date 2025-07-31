@@ -32,20 +32,29 @@ export const scheduleInterview = async ({
     empId,
     date,
     time,
-    interviewerId
+    interviewerId,
+    files
 }) => {
     try {
         if (!empId || !date || !time || !interviewerId) {
             throw new Error('Missing required fields: empId, date, time, and interviewerId are required');
         }
-        console.debug('Scheduling interview with params:', { empId, date, time, interviewerId });
-        const response = await axiosInstance.post(`${API_BASE_URL}/schedule`, null, {
-            params: {
-                empId,
-                interviewType: 'mock',
-                date,
-                time,
-                interviewerId
+        console.debug('Scheduling interview with params:', { empId, date, time, interviewerId, files });
+        const formData = new FormData();
+        formData.append('empId', empId);
+        formData.append('interviewType', 'mock');
+        formData.append('date', date);
+        formData.append('time', time);
+        formData.append('interviewerId', interviewerId);
+        if (files && files.length > 0) {
+            files.forEach((file, index) => {
+                formData.append(`files[${index}]`, file);
+            });
+        }
+
+        const response = await axiosInstance.post(`${API_BASE_URL}/schedule`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
             }
         });
         if (typeof response.data !== 'object' || response.data === null) {
@@ -69,21 +78,27 @@ export const scheduleInterview = async ({
 };
 
 // Update mock interview feedback
-export const updateMockInterviewFeedback = async (interviewId, technicalFeedback, communicationFeedback, technicalScore, communicationScore, sentToSales) => {
+export const updateMockInterviewFeedback = async (interviewId, technicalFeedback, communicationFeedback, technicalScore, communicationScore, sentToSales, file) => {
     try {
         if (!interviewId || !technicalFeedback || !communicationFeedback || 
             !Number.isInteger(technicalScore) || !Number.isInteger(communicationScore) || 
             typeof sentToSales !== 'boolean') {
             throw new Error('Invalid feedback data: All fields are required, scores must be integers, and sentToSales must be a boolean');
         }
-        console.debug('Updating feedback for interview:', { interviewId, technicalScore, communicationScore, sentToSales });
-        const response = await axiosInstance.put(`${API_BASE_URL}/mock-interviews/${interviewId}/feedback`, null, {
-            params: {
-                technicalFeedback,
-                communicationFeedback,
-                technicalScore,
-                communicationScore,
-                sentToSales
+        console.debug('Updating feedback for interview:', { interviewId, technicalFeedback, communicationFeedback, technicalScore, communicationScore, sentToSales, file });
+        const formData = new FormData();
+        formData.append('technicalFeedback', technicalFeedback);
+        formData.append('communicationFeedback', communicationFeedback);
+        formData.append('technicalScore', technicalScore);
+        formData.append('communicationScore', communicationScore);
+        formData.append('sentToSales', sentToSales);
+        if (file) {
+            formData.append('file', file);
+        }
+
+        const response = await axiosInstance.put(`${API_BASE_URL}/mock-interviews/${interviewId}/feedback`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
             }
         });
         if (typeof response.data !== 'object' || response.data === null) {
@@ -173,14 +188,14 @@ export const updateInterviewStatus = async (interviewId) => {
 };
 
 // Update profile picture
-export const updateProfilePicture = async (Id, file) => {
+export const updateProfilePicture = async (employeeId, file) => {
     try {
-        if (!Id || !file) {
-            throw new Error('User ID and file are required');
+        if (!employeeId || !file) {
+            throw new Error('Employee ID and file are required');
         }
-        console.debug('Updating profile picture for user:', { Id });
+        console.debug('Updating profile picture for employee:', { employeeId });
         const formData = new FormData();
-        formData.append('Id', Id);
+        formData.append('employeeId', employeeId);
         formData.append('file', file);
 
         const response = await axiosInstance.put(`${API_BASE_URL}/profile-picture`, formData, {

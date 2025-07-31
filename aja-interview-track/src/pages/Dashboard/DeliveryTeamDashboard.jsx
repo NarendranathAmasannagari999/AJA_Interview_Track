@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FiUsers, FiCalendar, FiCheckCircle, FiClock, FiFileText, 
   FiSend, FiEdit, FiPlus, FiFilter, FiSearch, FiBarChart2,
-  FiChevronDown, FiChevronUp, FiExternalLink, FiMail, FiUser, FiX, FiPlay, FiImage, FiUpload
+  FiChevronDown, FiChevronUp, FiExternalLink, FiMail, FiUser, FiX, FiPlay, FiImage, FiUpload, FiDownload
 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -66,9 +66,11 @@ const DeliveryTeamDashboard = () => {
     name: '',
     email: '',
     role: '',
-    empId: ''
+    empId: '',
+    id: ''
   });
   const [performanceData, setPerformanceData] = useState([]);
+  const [feedbackFile, setFeedbackFile] = useState(null);
 
   const technologies = ['Java', 'Python', '.NET', 'DevOps', 'SalesForce', 'UI Development', 'Testing'];
   const resourceTypes = ['OM', 'TCT1', 'TCT2'];
@@ -93,26 +95,6 @@ const DeliveryTeamDashboard = () => {
       </button>
     </div>
   );
-
-  const validateEmployeeData = (employee) => {
-    return employee && typeof employee === 'object' && 
-           typeof employee.id === 'string' &&
-           typeof employee.name === 'string' &&
-           typeof employee.technology === 'string' &&
-           typeof employee.resourceType === 'string';
-  };
-
-  const validateInterviewData = (interview) => {
-    return interview && typeof interview === 'object' &&
-           typeof interview.id === 'string' &&
-           typeof interview.employeeId === 'string' &&
-           typeof interview.status === 'string' &&
-           (!interview.ratings || (
-             typeof interview.ratings === 'object' &&
-             typeof interview.ratings.technical === 'number' &&
-             typeof interview.ratings.communication === 'number'
-           ));
-  };
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -154,10 +136,11 @@ const DeliveryTeamDashboard = () => {
         ...upcomingData,
         ...completedData,
       ].map(interview => {
-        const employee = employeesData.find(e => e && e.id === interview.employeeId);
+        const employee = employeesData.find(e => e && e.empId === interview.employeeId);
         return {
           ...interview,
-          employeeName: employee?.user?.fullName || 'Unknown Employee'
+          employeeName: employee?.user?.fullName || 'Unknown Employee',
+          employee: employee
         };
       });
       setMockInterviews(allInterviews);
@@ -199,7 +182,7 @@ const DeliveryTeamDashboard = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [technologyFilter, resourceTypeFilter]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -243,6 +226,29 @@ const DeliveryTeamDashboard = () => {
     }
   };
 
+  const handleFeedbackFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setFeedbackFile(file);
+    }
+  };
+
+  const downloadFile = async (s3Key) => {
+    try {
+      const presignedUrl = s3Key;
+      const link = document.createElement('a');
+      link.href = presignedUrl;
+      link.download = s3Key.split('/').pop() || 'download';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('File download started.');
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast.error('Failed to download file.');
+    }
+  };
+
   const filteredEmployees = Array.isArray(employees) ?
     employees.filter(employee => {
       if (!employee || !employee.user) return false;
@@ -263,14 +269,14 @@ const DeliveryTeamDashboard = () => {
 
   const techPerformanceData = technologies.map(tech => {
     const techInterviews = completedInterviews.filter(i => {
-      const emp = (employees || []).find(e => e && e.id === i.employeeId);
+      const emp = (employees || []).find(e => e && e.empId === i.employeeId);
       return emp && emp.technology === tech;
     });
     const avgTechnical = techInterviews.length > 0 
-      ? techInterviews.reduce((sum, i) => sum + (i.ratings?.technical || 0), 0) / techInterviews.length
+      ? techInterviews.reduce((sum, i) => sum + (i.technicalRating || 0), 0) / techInterviews.length
       : 0;
     const avgCommunication = techInterviews.length > 0 
-      ? techInterviews.reduce((sum, i) => sum + (i.ratings?.communication || 0), 0) / techInterviews.length
+      ? techInterviews.reduce((sum, i) => sum + (i.communicationRating || 0), 0) / techInterviews.length
       : 0;
     return { 
       name: tech, 
@@ -282,14 +288,14 @@ const DeliveryTeamDashboard = () => {
 
   const resourcePerformanceData = resourceTypes.map(type => {
     const typeInterviews = completedInterviews.filter(i => {
-      const emp = (employees || []).find(e => e && e.id === i.employeeId);
+      const emp = (employees || []).find(e => e && e.empId === i.employeeId);
       return emp && emp.resourceType === type;
     });
     const avgTechnical = typeInterviews.length > 0 
-      ? typeInterviews.reduce((sum, i) => sum + (i.ratings?.technical || 0), 0) / typeInterviews.length
+      ? typeInterviews.reduce((sum, i) => sum + (i.technicalRating || 0), 0) / typeInterviews.length
       : 0;
     const avgCommunication = typeInterviews.length > 0 
-      ? typeInterviews.reduce((sum, i) => sum + (i.ratings?.communication || 0), 0) / typeInterviews.length
+      ? typeInterviews.reduce((sum, i) => sum + (i.communicationRating || 0), 0) / typeInterviews.length
       : 0;
     return { 
       name: type, 
@@ -322,13 +328,15 @@ const DeliveryTeamDashboard = () => {
         empId: interviewData.empId,
         date: interviewData.date,
         time: interviewData.time,
-        interviewerId: interviewData.interviewerId
+        interviewerId: interviewData.interviewerId,
+        files: interviewData.files
       });
       if (response) {
         setMockInterviews(prev => {
           const newInterview = {
             ...response,
-            employeeName: employees.find(e => e.id === response.employeeId)?.user?.fullName || 'Unknown Employee'
+            employeeName: employees.find(e => e.empId === response.employeeId)?.user?.fullName || 'Unknown Employee',
+            employee: employees.find(e => e.empId === response.employeeId)
           };
           return [...prev, newInterview];
         });
@@ -356,7 +364,8 @@ const DeliveryTeamDashboard = () => {
         data.communicationFeedback,
         data.technicalRating,
         data.communicationRating,
-        data.sentToSales || false
+        data.sentToSales || false,
+        feedbackFile
       );
       const updatedInterviews = mockInterviews.map(interview => {
         if (interview.id === data.interviewId) {
@@ -370,6 +379,7 @@ const DeliveryTeamDashboard = () => {
       });
       setMockInterviews(updatedInterviews);
       setSelectedInterviewId(null);
+      setFeedbackFile(null);
       toast.success('Feedback updated successfully!');
       const completedData = await getCompletedInterviews();
       if (Array.isArray(completedData)) {
@@ -377,10 +387,11 @@ const DeliveryTeamDashboard = () => {
           ...mockInterviews.filter(i => i.status === 'scheduled'),
           ...completedData
         ].map(interview => {
-          const employee = employees.find(e => e && e.id === interview.employeeId);
+          const employee = employees.find(e => e && e.empId === interview.employeeId);
           return {
             ...interview,
-            employeeName: employee?.user?.fullName || 'Unknown Employee'
+            employeeName: employee?.user?.fullName || 'Unknown Employee',
+            employee
           };
         });
         setMockInterviews(allInterviews);
@@ -397,6 +408,7 @@ const DeliveryTeamDashboard = () => {
 
   const handleCloseFeedbackModal = () => {
     setSelectedInterviewId(null);
+    setFeedbackFile(null);
     setError(null);
   };
 
@@ -410,7 +422,8 @@ const DeliveryTeamDashboard = () => {
         interview.communicationFeedback,
         interview.technicalRating,
         interview.communicationRating,
-        true
+        true,
+        null
       );
       toast.success('Profile sent to sales successfully!');
       await fetchData();
@@ -533,9 +546,9 @@ const DeliveryTeamDashboard = () => {
                     <div className={styles.userAvatar}>
                       {isLoading ? (
                         <div className={styles.loadingSpinner} />
-                      ) : employee.profilePic ? (
+                      ) : employee.profilePicS3Key ? (
                         <img
-                          src={employee.profilePic}
+                          src={employee.profilePicS3Key}
                           alt={`${employee.user?.fullName || 'Employee'}'s profile`}
                           className={styles.profilePicture}
                           onError={(e) => {
@@ -692,6 +705,20 @@ const DeliveryTeamDashboard = () => {
                         <div className={styles.detailRow}>
                           <p><strong>Interviewer:</strong> {interview.interviewer?.fullName || 'N/A'}</p>
                         </div>
+                        {interview.fileS3Keys && interview.fileS3Keys.length > 0 && (
+                          <div className={styles.detailRow}>
+                            <p><strong>Files:</strong></p>
+                            {interview.fileS3Keys.map((s3Key, index) => (
+                              <button
+                                key={index}
+                                className={styles.downloadButton}
+                                onClick={() => downloadFile(s3Key)}
+                              >
+                                <FiDownload /> Download File {index + 1}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       
                       <div className={styles.interviewActions}>
@@ -776,8 +803,22 @@ const DeliveryTeamDashboard = () => {
                       </div>
                       
                       <div className={styles.interviewDetails}>
-                        <p><strong>Employee ID:</strong> {interview.employee?.empId || 'AJA4444'}</p>
+                        <p><strong>Employee ID:</strong> {interview.employee?.empId || 'N/A'}</p>
                         <p><strong>Interviewer:</strong> {interview.interviewer?.fullName || 'N/A'}</p>
+                        {interview.fileS3Keys && interview.fileS3Keys.length > 0 && (
+                          <div className={styles.detailRow}>
+                            <p><strong>Files:</strong></p>
+                            {interview.fileS3Keys.map((s3Key, index) => (
+                              <button
+                                key={index}
+                                className={styles.downloadButton}
+                                onClick={() => downloadFile(s3Key)}
+                              >
+                                <FiDownload /> Download File {index + 1}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       
                       <div className={styles.interviewScores}>
@@ -824,6 +865,7 @@ const DeliveryTeamDashboard = () => {
                           className={styles.secondaryButton}
                           onClick={() => {
                             setSelectedInterviewId(interview.id);
+                            setFeedbackFile(null);
                           }}
                         >
                           <FiEdit /> Edit Feedback
@@ -870,7 +912,7 @@ const DeliveryTeamDashboard = () => {
                 <h5>Avg Technical Score</h5>
                 <p className={styles.statValue}>
                   {completedInterviews.length > 0 
-                    ? (completedInterviews.reduce((sum, i) => sum + (i.ratings?.technical || 0), 0) / completedInterviews.length).toFixed(1)
+                    ? (completedInterviews.reduce((sum, i) => sum + (i.technicalRating || 0), 0) / completedInterviews.length).toFixed(1)
                     : '0.0'}
                 </p>
                 <p className={styles.statLabel}>/ 10.0</p>
@@ -885,7 +927,7 @@ const DeliveryTeamDashboard = () => {
                 <h5>Avg Communication Score</h5>
                 <p className={styles.statValue}>
                   {completedInterviews.length > 0 
-                    ? (completedInterviews.reduce((sum, i) => sum + (i.ratings?.communication || 0), 0) / completedInterviews.length).toFixed(1)
+                    ? (completedInterviews.reduce((sum, i) => sum + (i.communicationRating || 0), 0) / completedInterviews.length).toFixed(1)
                     : '0.0'}
                 </p>
                 <p className={styles.statLabel}>/ 10.0</p>
@@ -987,9 +1029,9 @@ const DeliveryTeamDashboard = () => {
                           <div className={styles.userAvatarSmall}>
                             {isLoading ? (
                               <div className={styles.loadingSpinner} />
-                            ) : performer.profilePic ? (
+                            ) : performer.profilePicS3Key ? (
                               <img
-                                src={performer.profilePic}
+                                src={performer.profilePicS3Key}
                                 alt={`${performer.employeeName || 'Performer'}'s profile`}
                                 className={styles.profilePictureSmall}
                                 onError={(e) => {
@@ -1111,7 +1153,6 @@ const DeliveryTeamDashboard = () => {
       <button 
         type="submit" 
         className={styles.primaryButton}
-        onClick={handleUpdateFeedback}
         disabled={isSubmitting || isFeedbackLoading}
       >
         {isSubmitting ? 'Updating...' : 'Update Feedback'}
@@ -1251,6 +1292,9 @@ const DeliveryTeamDashboard = () => {
                   setSelectedInterview={setSelectedInterviewId}
                   mockInterviews={mockInterviews}
                   onUpdate={handleUpdateFeedback}
+                  feedbackFile={feedbackFile}
+                  onFileChange={handleFeedbackFileChange}
+                  onDownloadFile={downloadFile}
                 />
               )}
             </AnimatePresence>

@@ -44,6 +44,7 @@ export const getCandidates = async (technology = 'all', status = 'all', resource
  * @param {string} jobDescriptionTitle - Job description title
  * @param {string} meetingLink - Meeting link
  * @param {boolean} deployedStatus - Deployment status
+ * @param {File} file - Optional file to upload (e.g., resume)
  * @returns {Promise<ClientInterview>} Scheduled interview object
  */
 export const scheduleClientInterview = async (
@@ -54,20 +55,38 @@ export const scheduleClientInterview = async (
   level,
   jobDescriptionTitle,
   meetingLink,
-  deployedStatus = false
+  deployedStatus = false,
+  file = null
 ) => {
   try {
-    const response = await axiosInstance.post(`${BASE_URL}/interviews/schedule`, null, {
-      params: {
-        empId,
-        interviewType: 'client',
-        date,
-        time: time.includes(':') ? time : `${time}:00`,
-        client,
-        level,
-        jobDescriptionTitle,
-        meetingLink,
-        deployedStatus,
+    // Validate inputs
+    if (!empId || !client || !date || !time || level == null || !jobDescriptionTitle || !meetingLink) {
+      throw new Error('All required fields must be provided');
+    }
+    if (file && !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
+      throw new Error('File must be a PDF, JPEG, or PNG');
+    }
+
+    // Ensure time includes seconds (HH:mm:ss)
+    const formattedTime = time.includes(':') && time.split(':').length === 2 ? `${time}:00` : time;
+
+    const formData = new FormData();
+    formData.append('empId', empId);
+    formData.append('interviewType', 'client');
+    formData.append('date', date);
+    formData.append('time', formattedTime);
+    formData.append('client', client);
+    formData.append('level', level);
+    formData.append('jobDescriptionTitle', jobDescriptionTitle);
+    formData.append('meetingLink', meetingLink);
+    formData.append('deployedStatus', deployedStatus);
+    if (file) {
+      formData.append('file', file);
+    }
+
+    const response = await axiosInstance.post(`${BASE_URL}/interviews/schedule`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
       },
     });
     return response.data;
@@ -84,6 +103,12 @@ export const scheduleClientInterview = async (
  */
 export const scheduleMultipleClientInterviews = async (empId, schedules) => {
   try {
+    if (!empId) {
+      throw new Error('Employee ID is required');
+    }
+    if (!schedules || !Array.isArray(schedules) || schedules.length === 0) {
+      throw new Error('Schedules must be a non-empty array');
+    }
     const response = await axiosInstance.post(`${BASE_URL}/employees/${empId}/interviews`, schedules);
     return response.data;
   } catch (error) {
@@ -112,6 +137,9 @@ export const updateClientInterview = async (interviewId, feedbackData) => {
     }
     if (isNaN(commScore) || commScore < 0 || commScore > 10) {
       throw new Error('Communication score must be a number between 0 and 10');
+    }
+    if (!feedbackData.result || !feedbackData.feedback) {
+      throw new Error('Result and feedback are required');
     }
 
     const formattedData = {
@@ -169,6 +197,9 @@ export const getClientInterviewCount = async () => {
  */
 export const addClient = async (clientData) => {
   try {
+    if (!clientData.name || !clientData.contactEmail || clientData.activePositions == null || !clientData.technologies) {
+      throw new Error('All client fields (name, contactEmail, activePositions, technologies) are required');
+    }
     const response = await axiosInstance.post(`${BASE_URL}/clients`, null, {
       params: clientData,
     });
@@ -204,11 +235,18 @@ export const getClients = async (search = null) => {
  * @param {string} jdData.technology - Technology
  * @param {string} jdData.resourceType - Resource type
  * @param {string} jdData.description - Job description
- * @param {File} jdData.file - Job description file
+ * @param {File} jdData.file - Optional job description file
  * @returns {Promise<JobDescription>} Added job description object
  */
 export const addJobDescription = async (jdData) => {
   try {
+    if (!jdData.title || !jdData.client || !jdData.receivedDate || !jdData.deadline || !jdData.technology || !jdData.resourceType || !jdData.description) {
+      throw new Error('All job description fields (title, client, receivedDate, deadline, technology, resourceType, description) are required');
+    }
+    if (jdData.file && !['application/pdf'].includes(jdData.file.type)) {
+      throw new Error('Job description file must be a PDF');
+    }
+
     const formData = new FormData();
     Object.entries(jdData).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -284,6 +322,36 @@ export const getClientInterviewFeedback = async (interviewId) => {
 };
 
 /**
+ * Get all employee resumes
+ * @returns {Promise<Array<Employee>>} List of employees with resume information
+ */
+export const getAllEmployeeResumes = async () => {
+  try {
+    const response = await axiosInstance.get(`${BASE_URL}/resumes`);
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+/**
+ * Get filtered employee resumes
+ * @param {string} technology - Optional technology filter (default: 'all')
+ * @param {string} resourceType - Optional resource type filter (default: 'all')
+ * @returns {Promise<Array<Employee>>} List of filtered employees with resume information
+ */
+export const getFilteredResumes = async (technology = 'all', resourceType = 'all') => {
+  try {
+    const response = await axiosInstance.get(`${BASE_URL}/resumes/filter`, {
+      params: { technology, resourceType },
+    });
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+/**
  * Get deployed employees
  * @returns {Promise<Array<Employee>>} List of deployed employees
  */
@@ -304,12 +372,15 @@ export const getDeployedEmployees = async () => {
  */
 export const updateProfilePicture = async (employeeId, file) => {
   try {
+    if (!employeeId) {
+      throw new Error('Employee ID is required');
+    }
     if (!file || !['image/jpeg', 'image/png'].includes(file.type)) {
       throw new Error('Profile picture must be a JPEG or PNG file');
     }
 
     const formData = new FormData();
-    formData.append('Id', employeeId); // Backend expects 'Id' parameter
+    formData.append('Id', employeeId);
     formData.append('file', file);
 
     const response = await axiosInstance.put(`${BASE_URL}/profile-picture`, formData, {
@@ -330,6 +401,9 @@ export const updateProfilePicture = async (employeeId, file) => {
  */
 export const getProfilePicture = async (employeeId) => {
   try {
+    if (!employeeId) {
+      throw new Error('Employee ID is required');
+    }
     const response = await axiosInstance.get(`${BASE_URL}/profile-picture/${employeeId}`, {
       responseType: 'blob',
     });
@@ -357,10 +431,12 @@ const handleApiError = (error) => {
       case 404:
         return new Error(errorMessage || 'Resource not found');
       case 500:
-        return new Error('Internal server error. Please try again later.');
+        return new Error(errorMessage || 'Internal server error. Please try again later.');
       default:
         return new Error(errorMessage);
     }
+  } else if (error.message.includes('Failed to upload file') || error.message.includes('Failed to download file')) {
+    return new Error('File operation failed. Please check the file and try again.');
   }
   return new Error(error.message || 'An error occurred while processing your request');
 };
@@ -381,6 +457,8 @@ export default {
   downloadJobDescription,
   deleteJobDescription,
   getClientInterviewFeedback,
+  getAllEmployeeResumes,
+  getFilteredResumes,
   getDeployedEmployees,
   updateProfilePicture,
   getProfilePicture,
