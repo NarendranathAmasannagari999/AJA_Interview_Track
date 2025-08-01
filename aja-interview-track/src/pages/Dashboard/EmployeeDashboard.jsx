@@ -198,6 +198,8 @@ const EmployeeDashboard = () => {
             setProfilePic(picUrl);
           } catch (picError) {
             console.warn('Could not load profile picture:', picError.message);
+            // Don't show error toast for profile picture as it's optional
+            setProfilePic(null);
           }
         }
 
@@ -322,7 +324,13 @@ const EmployeeDashboard = () => {
       }
     } catch (err) {
       console.error('Error fetching deployed employees:', err);
-      toast.error(err.message || 'Failed to fetch deployed employees');
+      if (err.message.includes('Access denied')) {
+        toast.error('You do not have permission to view deployed employees');
+      } else if (err.message.includes('Unauthorized')) {
+        toast.error('Please log in again to access this feature');
+      } else {
+        toast.error(err.message || 'Failed to fetch deployed employees');
+      }
       setDeployedEmployees([]);
     } finally {
       setLoading(false);

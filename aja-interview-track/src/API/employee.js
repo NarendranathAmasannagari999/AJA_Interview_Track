@@ -317,18 +317,24 @@ export const getProfilePicture = async (employeeId) => {
       throw new Error('Employee ID is required');
     }
 
+    console.log('Fetching profile picture for employee ID:', employeeId);
     const response = await axiosInstance.get(`${BASE_URL}/profile-picture/${employeeId}`, {
       responseType: 'blob', // Important for downloading binary data like images
     });
+    console.log('Profile picture response received:', response.status);
     return response.data;
   } catch (error) {
+    console.error('Error fetching profile picture for employee ID:', employeeId, error);
     if (error.response?.status === 401) {
       throw new Error('Unauthorized: Please login to access this resource');
     }
-     if (error.response?.status === 400 || error.response?.status === 404) {
-      throw new Error(error.response.data || 'Profile picture not found or invalid ID');
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid employee ID or profile picture not found');
     }
-    throw error.response?.data || error.message;
+    if (error.response?.status === 404) {
+      throw new Error('Employee not found or no profile picture available');
+    }
+    throw new Error(error.response?.data || 'Failed to fetch profile picture');
   }
 };
 
@@ -366,7 +372,7 @@ export const getEmployeesReadyForDeployment = async (technology = null, resource
  */
 export const getDeployedEmployees = async () => {
   try {
-    const response = await axiosInstance.get('/api/sales/employees/deployed');
+    const response = await axiosInstance.get(`${BASE_URL}/deployed`);
     return response.data;
   } catch (error) {
     console.error('Error fetching deployed employees:', error);
