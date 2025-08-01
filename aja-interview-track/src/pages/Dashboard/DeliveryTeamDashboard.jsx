@@ -231,7 +231,12 @@ const DeliveryTeamDashboard = () => {
         return {
           ...interview,
           employeeName: employee?.user?.fullName || 'Unknown Employee',
-          employee: employee
+          employee: employee,
+          // Add additional employee details for better display
+          employeeId: employee?.empId || interview.employeeId,
+          employeeTechnology: employee?.technology || 'Unknown',
+          employeeResourceType: employee?.resourceType || 'Unknown',
+          employeeStatus: employee?.status || 'Unknown'
         };
       });
       setMockInterviews(allInterviews);
@@ -956,11 +961,14 @@ const DeliveryTeamDashboard = () => {
                         <div className={styles.interviewHeaderLeft}>
                           <h4>{interview.employeeName || 'Unknown Employee'}</h4>
                           <div className={styles.interviewMeta}>
-                            <span className={`${styles.techBadge} ${styles[interview.employee?.technology?.replace(' ', '')]}`}>
-                              {interview.employee?.technology || 'Unknown'}
+                            <span className={styles.employeeId}>
+                              {interview.employeeId || 'N/A'}
                             </span>
-                            <span className={`${styles.resourceBadge} ${styles[interview.employee?.resourceType]}`}>
-                              {interview.employee?.resourceType || 'Unknown'}
+                            <span className={`${styles.techBadge} ${styles[interview.employeeTechnology?.replace(' ', '')]}`}>
+                              {interview.employeeTechnology || 'Unknown'}
+                            </span>
+                            <span className={`${styles.resourceBadge} ${styles[interview.employeeResourceType]}`}>
+                              {interview.employeeResourceType || 'Unknown'}
                             </span>
                           </div>
                         </div>
@@ -1059,11 +1067,14 @@ const DeliveryTeamDashboard = () => {
                         <div>
                           <h4>{interview.employeeName || 'Unknown Employee'}</h4>
                           <div className={styles.interviewMeta}>
-                            <span className={`${styles.techBadge} ${styles[interview.employee?.technology?.replace(' ', '')]}`}>
-                              {interview.employee?.technology || 'Unknown'}
+                            <span className={styles.employeeId}>
+                              {interview.employeeId || 'N/A'}
                             </span>
-                            <span className={`${styles.resourceBadge} ${styles[interview.employee?.resourceType]}`}>
-                              {interview.employee?.resourceType || 'Unknown'}
+                            <span className={`${styles.techBadge} ${styles[interview.employeeTechnology?.replace(' ', '')]}`}>
+                              {interview.employeeTechnology || 'Unknown'}
+                            </span>
+                            <span className={`${styles.resourceBadge} ${styles[interview.employeeResourceType]}`}>
+                              {interview.employeeResourceType || 'Unknown'}
                             </span>
                             <span className={styles.status}>
                               {interview.status}
@@ -1081,7 +1092,7 @@ const DeliveryTeamDashboard = () => {
                       </div>
                       
                       <div className={styles.interviewDetails}>
-                        <p><strong>Employee ID:</strong> {interview.employee?.empId || 'N/A'}</p>
+                        <p><strong>Employee ID:</strong> {interview.employeeId || 'N/A'}</p>
                         <p><strong>Interviewer:</strong> {interview.interviewer?.fullName || 'N/A'}</p>
                         {interview.fileS3Keys && interview.fileS3Keys.length > 0 && (
                           <div className={styles.detailRow}>

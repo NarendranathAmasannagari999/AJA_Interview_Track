@@ -47,6 +47,7 @@ import {
   scheduleMultipleClientInterviews,
   updateClientInterview,
   getClientInterviews,
+  getClientInterviewById,
   getClientInterviewCount,
   addClient,
   getClients,
@@ -296,7 +297,13 @@ const ScheduleInterviewModal = ({
       if (!interviewDetails.meetingLink?.trim()) {
         throw new Error("Meeting link is required");
       }
-      if (interviewFile && !['application/pdf', 'image/jpeg', 'image/png'].includes(interviewFile.type)) {
+      if (!interviewDetails.interviewerEmail?.trim()) {
+        throw new Error("Interviewer email is required");
+      }
+      if (!interviewFile) {
+        throw new Error("File upload is required");
+      }
+      if (!['application/pdf', 'image/jpeg', 'image/png'].includes(interviewFile.type)) {
         throw new Error("File must be a PDF, JPEG, or PNG");
       }
 
@@ -464,12 +471,30 @@ const ScheduleInterviewModal = ({
             </div>
 
             <div className={styles.formGroup}>
-              <label>Upload File (Optional)</label>
+              <label>Interviewer Email *</label>
+              <input
+                type="email"
+                value={interviewDetails.interviewerEmail || ""}
+                onChange={(e) =>
+                  setInterviewDetails({
+                    ...interviewDetails,
+                    interviewerEmail: e.target.value,
+                  })
+                }
+                className={styles.input}
+                required
+                placeholder="Enter interviewer email"
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Upload File *</label>
               <input
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
                 onChange={(e) => setInterviewFile(e.target.files[0])}
                 className={styles.input}
+                required
               />
               {interviewFile && (
                 <span style={{ fontSize: "0.9em" }}>
@@ -521,7 +546,7 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
   const [commScore, setCommScore] = useState(interview.communicationScore || 0);
   const [feedback, setFeedback] = useState(interview.feedback || "");
   const [deployedStatus, setDeployedStatus] = useState(interview.deployedStatus || false);
-  const [feedbackFile, setFeedbackFile] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [error, setError] = useState("");
 
   const hasUpdatePermission = () => {
@@ -542,24 +567,7 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
     return effectiveRole === "ROLE_SALES" || effectiveRole === "ROLE_ADMIN";
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Validate file type
-      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-      if (!allowedTypes.includes(file.type)) {
-        setError('Please select a PDF, JPEG, or PNG file');
-        return;
-      }
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB');
-        return;
-      }
-      setFeedbackFile(file);
-      setError("");
-    }
-  };
+
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -583,18 +591,24 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
       return;
     }
 
+    // Validate file if selected
+    if (selectedFile && !['application/pdf', 'image/jpeg', 'image/png'].includes(selectedFile.type)) {
+      setError("File must be a PDF, JPEG, or PNG");
+      return;
+    }
+
     const feedbackData = {
       result: "completed",
       feedback,
       technicalScore: techScoreNum,
       communicationScore: commScoreNum,
-      deployedStatus: Boolean(deployedStatus),
-      file: feedbackFile // Include the file in the feedback data
+      deployedStatus: Boolean(deployedStatus)
     };
 
     onSubmit(
       interview.id,
-      feedbackData
+      feedbackData,
+      selectedFile
     );
   };
 
@@ -663,16 +677,39 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
             </div>
 
             <div className={styles.formGroup}>
-              <label>Feedback File (Optional)</label>
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={handleFileChange}
-                className={styles.input}
-              />
-              <small className={styles.helpText}>
-                Supported formats: PDF, JPEG, PNG (Max 5MB)
-              </small>
+              <label>Upload Feedback File (Optional)</label>
+              <div className={styles.fileUploadContainer}>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setSelectedFile(e.target.files[0] || null)}
+                  className={styles.fileInput}
+                  id="feedback-file"
+                />
+                <label htmlFor="feedback-file" className={styles.fileUploadLabel}>
+                  <FiUpload className={styles.uploadIcon} />
+                  {selectedFile ? selectedFile.name : "Choose a file (PDF, JPG, PNG)"}
+                </label>
+                {selectedFile && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFile(null)}
+                    className={styles.removeFileButton}
+                    title="Remove file"
+                  >
+                    <FiX />
+                  </button>
+                )}
+              </div>
+              {selectedFile && (
+                <div className={styles.fileInfo}>
+                  <FiFile className={styles.fileIcon} />
+                  <span>{selectedFile.name}</span>
+                  <span className={styles.fileSize}>
+                    ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className={styles.formGroup}>
@@ -764,6 +801,7 @@ const SalesTeamDashboard = () => {
     client: "",
     jobDescriptionTitle: "",
     meetingLink: "",
+    interviewerEmail: "",
     deployedStatus: false,
   };
   const [interviewDetails, setInterviewDetails] = useState(
@@ -805,6 +843,9 @@ const SalesTeamDashboard = () => {
     status: "Active",
   });
   const [profilePic, setProfilePic] = useState(null);
+  
+  // Fetched interview details
+  const [fetchedInterviewDetails, setFetchedInterviewDetails] = useState(null);
 
   // Fetch all data on component mount
   useEffect(() => {
@@ -1035,7 +1076,8 @@ const SalesTeamDashboard = () => {
       time: "Interview time",
       level: "Interview level",
       jobDescriptionTitle: "Job description title",
-      meetingLink: "Meeting link"
+      meetingLink: "Meeting link",
+      interviewerEmail: "Interviewer email"
     };
 
     for (const [field, label] of Object.entries(requiredFields)) {
@@ -1059,6 +1101,7 @@ const SalesTeamDashboard = () => {
         details.level,
         details.jobDescriptionTitle,
         details.meetingLink,
+        details.interviewerEmail,
         details.deployedStatus || false,
         file
       );
@@ -1403,7 +1446,7 @@ const SalesTeamDashboard = () => {
     });
   };
 
-  const handleUpdateFeedback = async (interviewId, feedbackData) => {
+  const handleUpdateFeedback = async (interviewId, feedbackData, file = null) => {
     setIsLoading(true);
     setError(null);
     
@@ -1427,7 +1470,7 @@ const SalesTeamDashboard = () => {
     
     try {
       console.log('Attempting to update feedback with role:', userRole);
-      const response = await updateClientInterview(interviewId, feedbackData);
+      const response = await updateClientInterview(interviewId, feedbackData, file);
       
       if (response) {
         // Update the interviews list with the new feedback
@@ -1474,6 +1517,46 @@ const SalesTeamDashboard = () => {
       }
       
       setError(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGetClientInterviewById = async (interviewId) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      if (!interviewId) {
+        throw new Error('Interview ID is required');
+      }
+      
+      console.log('Fetching client interview with ID:', interviewId);
+      const interview = await getClientInterviewById(interviewId);
+      
+      if (interview) {
+        setFetchedInterviewDetails(interview);
+        toast.success('Client interview details loaded successfully');
+        return interview;
+      } else {
+        throw new Error('Interview not found');
+      }
+    } catch (error) {
+      console.error('Error fetching client interview:', error);
+      
+      if (error.message.includes('Interview not found')) {
+        toast.error(`Interview with ID ${interviewId} not found`);
+      } else if (error.message.includes('Authentication required')) {
+        toast.error('Please log in again to continue.');
+      } else if (error.message.includes('Access denied')) {
+        toast.error('You do not have permission to access this interview.');
+      } else {
+        toast.error(error.message || 'Failed to fetch interview details');
+      }
+      
+      setError(error.message);
+      setFetchedInterviewDetails(null);
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -2108,7 +2191,133 @@ const SalesTeamDashboard = () => {
               )}
             </select>
           </div>
+          <div className={styles.filterGroup}>
+            <label>Fetch by ID</label>
+            <div className={styles.idSearchContainer}>
+              <input
+                type="number"
+                placeholder="Enter Interview ID"
+                className={styles.idSearchInput}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    const interviewId = parseInt(e.target.value);
+                    if (interviewId) {
+                      handleGetClientInterviewById(interviewId);
+                    }
+                  }
+                }}
+              />
+              <button
+                className={`${styles.button} ${styles.small}`}
+                onClick={(e) => {
+                  const input = e.target.previousSibling;
+                  const interviewId = parseInt(input.value);
+                  if (interviewId) {
+                    handleGetClientInterviewById(interviewId);
+                  } else {
+                    toast.error('Please enter a valid Interview ID');
+                  }
+                }}
+                title="Fetch Interview by ID"
+              >
+                <FiSearch />
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Display fetched interview details */}
+        {fetchedInterviewDetails && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className={styles.fetchedInterviewCard}
+          >
+            <div className={styles.fetchedInterviewHeader}>
+              <h3>Fetched Interview Details</h3>
+              <button
+                className={`${styles.button} ${styles.small}`}
+                onClick={() => setFetchedInterviewDetails(null)}
+                title="Close Details"
+              >
+                <FiX />
+              </button>
+            </div>
+            <div className={styles.fetchedInterviewContent}>
+              <div className={styles.fetchedInterviewDetails}>
+                <div className={styles.detailRow}>
+                  <label>Interview ID:</label>
+                  <span>{fetchedInterviewDetails.id}</span>
+                </div>
+                <div className={styles.detailRow}>
+                  <label>Client:</label>
+                  <span>{fetchedInterviewDetails.client}</span>
+                </div>
+                <div className={styles.detailRow}>
+                  <label>Employee:</label>
+                  <span>{fetchedInterviewDetails.employee?.user?.fullName || 'N/A'}</span>
+                </div>
+                <div className={styles.detailRow}>
+                  <label>Date:</label>
+                  <span>{new Date(fetchedInterviewDetails.date).toLocaleDateString()}</span>
+                </div>
+                <div className={styles.detailRow}>
+                  <label>Time:</label>
+                  <span>{fetchedInterviewDetails.time}</span>
+                </div>
+                <div className={styles.detailRow}>
+                  <label>Level:</label>
+                  <span>Level {fetchedInterviewDetails.level}</span>
+                </div>
+                <div className={styles.detailRow}>
+                  <label>Job Description:</label>
+                  <span>{fetchedInterviewDetails.jobDescriptionTitle}</span>
+                </div>
+                <div className={styles.detailRow}>
+                  <label>Status:</label>
+                  <span className={`${styles.statusBadge} ${styles[fetchedInterviewDetails.status?.toLowerCase()]}`}>
+                    {fetchedInterviewDetails.status}
+                  </span>
+                </div>
+                {fetchedInterviewDetails.result && (
+                  <div className={styles.detailRow}>
+                    <label>Result:</label>
+                    <span className={`${styles.statusBadge} ${styles[fetchedInterviewDetails.result?.toLowerCase()]}`}>
+                      {fetchedInterviewDetails.result}
+                    </span>
+                  </div>
+                )}
+                {fetchedInterviewDetails.feedback && (
+                  <div className={styles.detailRow}>
+                    <label>Feedback:</label>
+                    <span>{fetchedInterviewDetails.feedback}</span>
+                  </div>
+                )}
+                {fetchedInterviewDetails.technicalScore && (
+                  <div className={styles.detailRow}>
+                    <label>Technical Score:</label>
+                    <span>{fetchedInterviewDetails.technicalScore}/10</span>
+                  </div>
+                )}
+                {fetchedInterviewDetails.communicationScore && (
+                  <div className={styles.detailRow}>
+                    <label>Communication Score:</label>
+                    <span>{fetchedInterviewDetails.communicationScore}/10</span>
+                  </div>
+                )}
+                {fetchedInterviewDetails.deployedStatus !== undefined && (
+                  <div className={styles.detailRow}>
+                    <label>Deployed Status:</label>
+                    <span className={`${styles.statusBadge} ${fetchedInterviewDetails.deployedStatus ? styles.deployed : styles.notDeployed}`}>
+                      {fetchedInterviewDetails.deployedStatus ? 'Deployed' : 'Not Deployed'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {filteredInterviews.length > 0 ? (
           <div>
@@ -2163,6 +2372,20 @@ const SalesTeamDashboard = () => {
                             <FiMessageSquare /> Update Feedback
                           </button>
                         )}
+
+                        <button
+                          className={`${styles.button} ${styles.secondary}`}
+                          onClick={async () => {
+                            const fetchedInterview = await handleGetClientInterviewById(interview.id);
+                            if (fetchedInterview) {
+                              console.log('Fetched interview details:', fetchedInterview);
+                              toast.success(`Interview ${interview.id} details loaded successfully`);
+                            }
+                          }}
+                          title="Fetch Interview Details"
+                        >
+                          <FiEye /> View Details
+                        </button>
                       </>
                     )}
                   </div>

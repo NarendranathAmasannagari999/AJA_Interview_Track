@@ -1930,11 +1930,17 @@
 }
 
 .employeeId {
-  display: flex;
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  color: #64748b;
-  font-size: 1rem;
+  gap: 4px;
+  margin-right: 8px;
+  border: 1px solid #bbdefb;
 }
 
 .employeeId svg {

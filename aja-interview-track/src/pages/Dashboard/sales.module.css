@@ -2376,3 +2376,217 @@
     font-size: var(--font-size-xs); /* 14px */
   }
 }
+
+/* Fetched Interview Details Styles */
+.fetchedInterviewCard {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 2rem;
+  overflow: hidden;
+  border: 2px solid var(--primary-color);
+}
+
+.fetchedInterviewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+  color: white;
+}
+
+.fetchedInterviewHeader h3 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+}
+
+.fetchedInterviewContent {
+  padding: 2rem;
+}
+
+.fetchedInterviewDetails {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--primary-color);
+}
+
+.detailRow label {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 150px;
+}
+
+.detailRow span {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ID Search Container Styles */
+.idSearchContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.idSearchInput {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  transition: var(--transition);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.idSearchInput:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.idSearchInput::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Responsive styles for fetched interview details */
+@media (max-width: 768px) {
+  .fetchedInterviewDetails {
+    grid-template-columns: 1fr;
+  }
+  
+  .detailRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .detailRow label {
+    min-width: auto;
+  }
+  
+  .idSearchContainer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* File Upload Styles */
+.fileUploadContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.fileInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.fileUploadLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(45deg, var(--bg-tertiary), var(--bg-secondary));
+  border: 2px dashed var(--primary-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition);
+  font-size: var(--font-size-base);
+  color: var(--primary-color);
+  font-weight: 500;
+  min-width: 200px;
+}
+
+.fileUploadLabel:hover {
+  background: linear-gradient(45deg, var(--primary-color), var(--primary-dark));
+  color: white;
+  border-color: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.uploadIcon {
+  font-size: 1.2rem;
+  transition: var(--transition);
+}
+
+.fileUploadLabel:hover .uploadIcon {
+  transform: scale(1.1);
+}
+
+.removeFileButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  background: var(--danger-color);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: var(--transition);
+  font-size: 0.875rem;
+}
+
+.removeFileButton:hover {
+  background: var(--danger-dark);
+  transform: scale(1.1);
+  box-shadow: var(--shadow-sm);
+}
+
+.fileInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.fileIcon {
+  color: var(--primary-color);
+  font-size: 1rem;
+}
+
+.fileSize {
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .fileUploadContainer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fileUploadLabel {
+    min-width: auto;
+    justify-content: center;
+  }
+
+  .fileInfo {
+    flex-wrap: wrap;
+  }
+}

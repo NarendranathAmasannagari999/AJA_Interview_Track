@@ -32,8 +32,9 @@ export const getCandidates = async (technology = 'all', status = 'all', resource
  * @param {number} level - Interview level
  * @param {string} jobDescriptionTitle - Job description title
  * @param {string} meetingLink - Meeting link
+ * @param {string} interviewerEmail - Interviewer email (REQUIRED)
  * @param {boolean} deployedStatus - Deployment status
- * @param {File} file - Optional file to upload (e.g., resume)
+ * @param {File} file - File to upload (REQUIRED)
  * @returns {Promise<ClientInterview>} Scheduled interview object
  */
 export const scheduleClientInterview = async (
@@ -44,16 +45,16 @@ export const scheduleClientInterview = async (
   level,
   jobDescriptionTitle,
   meetingLink,
+  interviewerEmail,
   deployedStatus = false,
-  file = null,
-  interviewerEmail = null
+  file = null
 ) => {
   try {
-    // Validate inputs
-    if (!empId || !client || !date || !time || level == null || !jobDescriptionTitle || !meetingLink) {
-      throw new Error('All required fields must be provided');
+    // Validate inputs - ALL fields are required according to backend
+    if (!empId || !client || !date || !time || level == null || !jobDescriptionTitle || !meetingLink || !interviewerEmail || !file) {
+      throw new Error('All required fields must be provided: empId, client, date, time, level, jobDescriptionTitle, meetingLink, interviewerEmail, and file');
     }
-    if (file && !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
+    if (!['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
       throw new Error('File must be a PDF, JPEG, or PNG');
     }
 
@@ -62,20 +63,20 @@ export const scheduleClientInterview = async (
 
     const formData = new FormData();
     formData.append('empId', empId);
-    formData.append('interviewType', 'client');
+    formData.append('interviewType', 'client'); // Must be "client" for sales team
     formData.append('date', date);
     formData.append('time', formattedTime);
     formData.append('client', client);
     formData.append('level', level);
     formData.append('jobDescriptionTitle', jobDescriptionTitle);
     formData.append('meetingLink', meetingLink);
+    formData.append('interviewerEmail', interviewerEmail);
     formData.append('deployedStatus', deployedStatus);
-    if (file) {
-      formData.append('file', file);
-    }
-    if (interviewerEmail) {
-      formData.append('interviewerEmail', interviewerEmail);
-    }
+    formData.append('file', file);
+
+    console.debug('Scheduling client interview with data:', {
+      empId, client, date, time: formattedTime, level, jobDescriptionTitle, meetingLink, interviewerEmail, deployedStatus, fileName: file.name
+    });
 
     const response = await axiosInstance.post(`${BASE_URL}/interviews/schedule`, formData, {
       headers: {
@@ -84,6 +85,16 @@ export const scheduleClientInterview = async (
     });
     return response.data;
   } catch (error) {
+    console.error('Error scheduling client interview:', error);
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid request data');
+    }
+    if (error.response?.status === 401) {
+      throw new Error('Authentication required. Please log in again.');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('Access denied. You do not have permission to schedule interviews.');
+    }
     throw handleApiError(error);
   }
 };
@@ -118,10 +129,9 @@ export const scheduleMultipleClientInterviews = async (empId, schedules) => {
  * @param {number} feedbackData.technicalScore - Technical score (0-10)
  * @param {number} feedbackData.communicationScore - Communication score (0-10)
  * @param {boolean} feedbackData.deployedStatus - Deployment status
- * @param {File} feedbackData.file - Optional feedback file to upload
  * @returns {Promise<Object>} Updated interview object
  */
-export const updateClientInterview = async (interviewId, feedbackData) => {
+export const updateClientInterview = async (interviewId, feedbackData, file = null) => {
   try {
     const techScore = Number(feedbackData.technicalScore);
     const commScore = Number(feedbackData.communicationScore);
@@ -136,33 +146,34 @@ export const updateClientInterview = async (interviewId, feedbackData) => {
       throw new Error('Result and feedback are required');
     }
 
-    // Create FormData for file upload
+    // Validate file if provided
+    if (file && !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
+      throw new Error('File must be a PDF, JPEG, or PNG');
+    }
+
+    // Create FormData for multipart request
     const formData = new FormData();
     formData.append('result', String(feedbackData.result));
     formData.append('feedback', String(feedbackData.feedback));
     formData.append('technicalScore', techScore);
     formData.append('communicationScore', commScore);
     
+    // Add deployedStatus if provided
     if (feedbackData.deployedStatus !== undefined) {
       formData.append('deployedStatus', Boolean(feedbackData.deployedStatus));
     }
-    
+
     // Add file if provided
-    if (feedbackData.file) {
-      formData.append('file', feedbackData.file);
+    if (file) {
+      formData.append('file', file);
     }
 
     // Debug logging
     console.log('Updating client interview:', {
       interviewId,
-      feedbackData: {
-        result: feedbackData.result,
-        feedback: feedbackData.feedback,
-        technicalScore: techScore,
-        communicationScore: commScore,
-        deployedStatus: feedbackData.deployedStatus,
-        hasFile: !!feedbackData.file
-      }
+      feedbackData,
+      hasFile: !!file,
+      fileName: file ? file.name : 'No file'
     });
 
     const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, formData, {
@@ -186,7 +197,7 @@ export const updateClientInterview = async (interviewId, feedbackData) => {
         tokenPreview: token ? `${token.substring(0, 20)}...` : 'No token'
       });
       
-      throw new Error('Access denied. You do not have permission to update client interviews. Please ensure you are logged in with the correct role (SALES_TEAM or ADMIN).');
+      throw new Error('Access denied. You do not have permission to update client interviews. Please ensure you are logged in with the correct role (ROLE_SALES or ADMIN).');
     }
     
     if (error.response?.status === 401) {
@@ -211,6 +222,45 @@ export const getClientInterviews = async (search = null) => {
     const response = await axiosInstance.get(`${BASE_URL}/client-interviews`, {
       params: { search },
     });
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+/**
+ * Get a specific client interview by ID
+ * @param {number} interviewId - Interview ID
+ * @returns {Promise<ClientInterview>} Client interview object
+ */
+export const getClientInterviewById = async (interviewId) => {
+  try {
+    if (!interviewId) {
+      throw new Error('Interview ID is required');
+    }
+    
+    // First try to get the full interview details from the list
+    const allInterviews = await getClientInterviews();
+    const interview = allInterviews.find(i => i.id === interviewId);
+    
+    if (!interview) {
+      throw new Error(`Interview not found with ID: ${interviewId}`);
+    }
+    
+    return interview;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+/**
+ * Get client interview feedback by ID
+ * @param {number} interviewId - Interview ID
+ * @returns {Promise<Object>} Interview feedback object
+ */
+export const getClientInterviewFeedback = async (interviewId) => {
+  try {
+    const response = await axiosInstance.get(`${BASE_URL}/client-interviews/${interviewId}/feedback`);
     return response.data;
   } catch (error) {
     throw handleApiError(error);
@@ -390,20 +440,6 @@ export const downloadJobDescription = async (jdId) => {
 export const deleteJobDescription = async (jdId) => {
   try {
     await axiosInstance.delete(`${BASE_URL}/job-descriptions/${jdId}`);
-  } catch (error) {
-    throw handleApiError(error);
-  }
-};
-
-/**
- * Get client interview feedback
- * @param {number} interviewId - Interview ID
- * @returns {Promise<Object>} Interview feedback object
- */
-export const getClientInterviewFeedback = async (interviewId) => {
-  try {
-    const response = await axiosInstance.get(`${BASE_URL}/client-interviews/${interviewId}/feedback`);
-    return response.data;
   } catch (error) {
     throw handleApiError(error);
   }
@@ -592,6 +628,7 @@ export default {
   scheduleMultipleClientInterviews,
   updateClientInterview,
   getClientInterviews,
+  getClientInterviewById,
   getClientInterviewCount,
   addClient,
   getClients,
