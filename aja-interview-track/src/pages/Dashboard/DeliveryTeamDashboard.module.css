@@ -1,52 +1,79 @@
-/* Profile Styles */
+/* Enhanced Profile Styles */
 .profileContainer {
-  padding: 20px;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  min-height: 100vh;
 }
 
 .profileHeader {
-  margin-bottom: 20px;
+  margin-bottom: 2rem;
+  text-align: center;
 }
 
 .profileCard {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  padding: 20px;
-  max-width: 800px;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+  padding: 2.5rem;
+  max-width: 900px;
   margin: 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.profileCard:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.12);
 }
 
 .profileInfo {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 3rem;
+  text-align: center;
 }
 
 .profileAvatar {
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
-  background: #f0f0f0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 20px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.profileAvatar:hover {
+  transform: scale(1.05);
+  box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
 }
 
 .profileDetails h3 {
-  margin: 0 0 5px 0;
-  font-size: 1.5rem;
+  margin: 0 0 0.5rem 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: -0.02em;
 }
 
 .profileTitle {
-  margin: 0 0 5px 0;
-  color: #555;
+  margin: 0 0 0.5rem 0;
+  color: #64748b;
+  font-size: 1.1rem;
+  font-weight: 500;
 }
 
 .profileEmail, .profileId {
-  margin: 5px 0;
-  color: #666;
+  margin: 0.25rem 0;
+  color: #94a3b8;
+  font-size: 0.95rem;
 }
 
 .profileSection {
@@ -251,26 +278,57 @@
   --line-height-relaxed: 1.75;
 }
 
-/* Dashboard Container */
+/* Enhanced Dashboard Container */
 .dashboardContainer {
   padding: 3rem;
-  background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
   min-height: 100vh;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  transition: background-color 0.5s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-x: hidden;
+  position: relative;
 }
 
-/* Dashboard Header */
+.dashboardContainer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.05), transparent 50%),
+              radial-gradient(circle at 80% 20%, rgba(124, 58, 237, 0.05), transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Enhanced Dashboard Header */
 .dashboardHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 3rem;
-  padding: 2rem;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  padding: 2.5rem;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
   animation: slideInDown 0.6s ease-out;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.dashboardHeader::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 10% 20%, rgba(102, 126, 234, 0.1), transparent 50%);
+  z-index: 0;
 }
 
 .dashboardHeader h2 {
@@ -357,46 +415,67 @@
   line-height: var(--line-height-normal);
 }
 
-/* Tabs */
+/* Enhanced Tabs */
 .tabs {
   display: flex;
   gap: 1rem;
   margin-bottom: 2.5rem;
-  background: #ffffff;
-  padding: 0.75rem;
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  padding: 1rem;
+  border-radius: 20px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
   animation: fadeInUp 0.6s ease-out;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 1;
+}
+
+.tabs::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 30% 70%, rgba(102, 126, 234, 0.05), transparent 50%);
+  border-radius: 20px;
+  z-index: 0;
 }
 
 .tab {
   flex: 1;
-  padding: 1.5rem 2rem;
-  background: var(--bg-tertiary);
-  border: none;
-  border-radius: var(--radius-md);
+  padding: 1.25rem 2rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 16px;
   cursor: pointer;
   font-weight: 600;
-  color: var(--text-secondary);
-  transition: var(--transition);
+  color: #64748b;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  font-size: var(--font-size-base);
+  font-size: 1rem;
+  position: relative;
+  z-index: 1;
 }
 
 .tab:hover {
-  background: #e0e7ff;
-  color: #4f46e5;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  color: #475569;
   transform: translateY(-3px);
-  box-shadow: 0 6px 12px rgba(79, 70, 229, 0.2);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-color: rgba(102, 126, 234, 0.2);
 }
 
 .tab.active {
-  background: linear-gradient(45deg, #4f46e5, #7c3aed);
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
   color: white;
-  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 8px 25px rgba(79, 70, 229, 0.4);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .tabContent {
@@ -530,26 +609,45 @@
   box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
 }
 
-/* Card Grid */
+/* Enhanced Card Grid */
 .cardGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
   gap: 2.5rem;
 }
 
 .card {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 2rem;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-  transition: transform 0.4s ease, box-shadow 0.4s ease;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 20px;
+  padding: 2.5rem;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
-  border: 1px solid #eff6ff;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.05), transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-10px);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+}
+
+.card:hover::before {
+  opacity: 1;
 }
 
 .cardHeader {
@@ -721,33 +819,51 @@
   transform: translateY(-2px);
 }
 
-/* Buttons */
+/* Enhanced Buttons */
 .primaryButton {
-  background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
   color: white;
   border: none;
   padding: 1.25rem 2.5rem;
-  border-radius: var(--radius-md);
+  border-radius: 16px;
   cursor: pointer;
-  transition: var(--transition);
-  font-size: var(--font-size-base);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 1rem;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 25px rgba(79, 70, 229, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.primaryButton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
 }
 
 .primaryButton:hover {
-  background: linear-gradient(45deg, #4338ca, #6d28d9);
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+  background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(79, 70, 229, 0.5);
+}
+
+.primaryButton:hover::before {
+  left: 100%;
 }
 
 .primaryButton:disabled {
   background: #9ca3af;
   cursor: not-allowed;
   box-shadow: none;
+  transform: none;
 }
 
 .secondaryButton {
