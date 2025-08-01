@@ -9,6 +9,9 @@ const EvaluationModal = ({
   setSelectedInterview,
   mockInterviews,
   onUpdate,
+  feedbackFile,
+  onFileChange,
+  onDownloadFile
 }) => {
   const [formData, setFormData] = useState({
     technicalFeedback: '',
@@ -168,6 +171,37 @@ const EvaluationModal = ({
                   Send to Sales Team
                 </label>
               </div>
+              
+              <div className={styles.formGroup}>
+                <label>Upload Feedback File (Optional)</label>
+                <input
+                  type="file"
+                  onChange={onFileChange}
+                  accept=".pdf,.doc,.docx,.txt"
+                  className={styles.fileInput}
+                />
+                {feedbackFile && (
+                  <p className={styles.fileInfo}>Selected: {feedbackFile.name}</p>
+                )}
+              </div>
+              
+              {selectedInterview.fileS3Keys && selectedInterview.fileS3Keys.length > 0 && (
+                <div className={styles.formGroup}>
+                  <label>Interview Files</label>
+                  <div className={styles.fileList}>
+                    {selectedInterview.fileS3Keys.map((s3Key, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className={styles.downloadButton}
+                        onClick={() => onDownloadFile(s3Key)}
+                      >
+                        Download File {index + 1}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

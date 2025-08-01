@@ -18,6 +18,7 @@ const ScheduleInterviewModal = ({
   const [level, setLevel] = useState('');
   const [jobDescriptionTitle, setJobDescriptionTitle] = useState('');
   const [meetingLink, setMeetingLink] = useState('');
+  const [files, setFiles] = useState([]);
   const [error, setError] = useState(null); // Local error state for validation
   const [isSubmitting, setIsSubmitting] = useState(false); // Local submitting state
 
@@ -31,6 +32,7 @@ const ScheduleInterviewModal = ({
     setLevel('');
     setJobDescriptionTitle('');
     setMeetingLink('');
+    setFiles([]);
     setError(null);
     setIsSubmitting(false);
   }, [show, initialSelectedEmployee]);
@@ -90,6 +92,7 @@ const ScheduleInterviewModal = ({
       level: interviewType !== 'mock' ? level : null,
       jobDescriptionTitle: interviewType !== 'mock' ? jobDescriptionTitle : null,
       meetingLink: interviewType !== 'mock' ? meetingLink : null,
+      files: files,
     });
     setIsSubmitting(false);
     // Parent component should handle closing the modal and resetting its own state on success
@@ -251,6 +254,28 @@ const ScheduleInterviewModal = ({
               </div>
             </>
           )}
+
+          {/* File Upload */}
+          <div className={styles.formGroup}>
+            <label htmlFor="interviewFiles">Upload Files (Optional)</label>
+            <input
+              id="interviewFiles"
+              type="file"
+              multiple
+              onChange={(e) => setFiles(Array.from(e.target.files))}
+              className={styles.fileInput}
+              accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+            />
+            {files.length > 0 && (
+              <div className={styles.fileList}>
+                {files.map((file, index) => (
+                  <div key={index} className={styles.fileInfo}>
+                    {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {error && <div className={styles.errorMessage}>{error}</div>}
 

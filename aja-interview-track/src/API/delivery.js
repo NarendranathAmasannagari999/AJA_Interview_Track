@@ -6,6 +6,29 @@ import axiosInstance from './axiosConfig';
 // Base URL for API endpoints
 const API_BASE_URL = '/api/delivery';
 
+// Debug function to check current user's role and token
+export const debugUserInfo = () => {
+    const token = localStorage.getItem('jwt_token');
+    const role = localStorage.getItem('userRole');
+    
+    console.log('=== DEBUG USER INFO ===');
+    console.log('Token exists:', !!token);
+    console.log('Role from localStorage:', role);
+    
+    if (token) {
+        try {
+            // Decode JWT token to see what's inside
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            console.log('JWT Token payload:', payload);
+            console.log('Role from JWT:', payload.role);
+        } catch (error) {
+            console.error('Error decoding JWT token:', error);
+        }
+    }
+    
+    return { token: !!token, role, hasToken: !!token };
+};
+
 // Get employees with optional technology and resource type filters
 export const getEmployees = async (technology = 'all', resourceType = 'all') => {
     try {
@@ -48,7 +71,7 @@ export const scheduleInterview = async ({
         formData.append('interviewerId', interviewerId);
         if (files && files.length > 0) {
             files.forEach((file, index) => {
-                formData.append(`files[${index}]`, file);
+                formData.append('files', file);
             });
         }
 
@@ -195,7 +218,7 @@ export const updateProfilePicture = async (employeeId, file) => {
         }
         console.debug('Updating profile picture for employee:', { employeeId });
         const formData = new FormData();
-        formData.append('employeeId', employeeId);
+        formData.append('Id', employeeId);
         formData.append('file', file);
 
         const response = await axiosInstance.put(`${API_BASE_URL}/profile-picture`, formData, {
@@ -263,31 +286,6 @@ export const getMockInterviewPerformance = async () => {
     }
 };
 
-// Get user by role
-export const getUserByRole = async () => {
-    try {
-        console.debug('Fetching user with role: ROLE_DELIVERY_TEAM');
-        const response = await axiosInstance.get(`${API_BASE_URL}/user`);
-        if (typeof response.data !== 'object' || response.data === null) {
-            throw new Error('Expected a user object');
-        }
-        return response.data;
-    } catch (error) {
-        if (error.response?.status === 401) {
-            throw new Error('Please log in to fetch user by role');
-        } else if (error.response?.status === 403) {
-            throw new Error('You do not have permission to fetch user by role');
-        } else if (error.response?.status === 404) {
-            throw new Error('User not found with role: ROLE_DELIVERY_TEAM');
-        } else if (error.response?.status === 429) {
-            throw new Error('Too many requests. Please try again later.');
-        } else if (error.response?.status >= 500) {
-            throw new Error('Server error. Please try again later.');
-        }
-        throw error.response?.data || error.message;
-    }
-};
-
 // Export all functions as a single object
 export default {
     getEmployees,
@@ -299,5 +297,5 @@ export default {
     updateProfilePicture,
     getProfilePicture,
     getMockInterviewPerformance,
-    getUserByRole
+    debugUserInfo
 };

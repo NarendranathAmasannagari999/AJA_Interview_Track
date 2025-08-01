@@ -37,6 +37,11 @@ export const registerUser = async (userData) => {
       localStorage.setItem('jwt_token', token);
     }
     
+    // Store user role
+    if (role) {
+      setUserRole(role);
+    }
+    
     return { token, role, user: response.data };
   } catch (error) {
     if (error.response) {
@@ -76,7 +81,7 @@ export const loginUser = async (email, password) => {
       }
     });
     
-    // Handle the AuthResponse from backend
+    // Handle the complex response structure from backend
     const { token, role, user, employee, employeeId } = response.data;
     
     // Store the token in localStorage

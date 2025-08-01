@@ -32,74 +32,35 @@ axiosInstance.interceptors.response.use(
         case 401:
           // Token expired or invalid
           localStorage.removeItem('jwt_token');
+          localStorage.removeItem('userRole');
+          localStorage.removeItem('employeeId');
           window.location.href = '/login';
           break;
         case 403:
           // Insufficient permissions
           console.error('Authorization failed: Insufficient permissions');
           break;
+        case 429:
+          // Rate limiting
+          console.error('Rate limit exceeded');
+          break;
+        case 500:
+          // Server error
+          console.error('Server error:', error.response.data);
+          break;
         default:
           console.error('API Error:', error.response.data);
       }
+    } else if (error.request) {
+      // Network error
+      console.error('Network error: No response received');
+    } else {
+      // Request setup error
+      console.error('Request setup error:', error.message);
     }
     return Promise.reject(error);
   }
 );
-
-// Auth API endpoints
-export const authAPI = {
-  login: async (email, password) => {
-    try {
-      const response = await axiosInstance.post('/api/auth/login', null, {
-        params: { email, password }
-      });
-      const { token, role } = response.data;
-      if (token) {
-        localStorage.setItem('jwt_token', token);
-      }
-      return { token, role };
-    } catch (error) {
-      throw error;
-    }
-  },
-
-  register: async (userData) => {
-    try {
-      const response = await axiosInstance.post('/api/auth/register', null, {
-        params: {
-          fullName: userData.fullName,
-          empId: userData.empId,
-          email: userData.email,
-          password: userData.password,
-          role: userData.role,
-          technology: userData.technology || '',
-          resourceType: userData.resourceType || ''
-        }
-      });
-      const { token, role } = response.data;
-      if (token) {
-        localStorage.setItem('jwt_token', token);
-      }
-      return { token, role, user: response.data };
-    } catch (error) {
-      throw error;
-    }
-  },
-
-  logout: () => {
-    localStorage.removeItem('jwt_token');
-    window.location.href = '/login';
-  },
-
-  getCurrentUser: async () => {
-    try {
-      const response = await axiosInstance.get('/api/auth/current-user');
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
-};
 
 export default axiosInstance; 
 

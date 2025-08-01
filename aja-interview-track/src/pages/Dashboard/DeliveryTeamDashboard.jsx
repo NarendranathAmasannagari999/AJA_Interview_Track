@@ -1,3 +1,21 @@
+/**
+ * Delivery Team Dashboard Component
+ * 
+ * This component integrates with the delivery.js API service to provide:
+ * - Employee management and filtering
+ * - Interview scheduling with file uploads
+ * - Feedback updates with file attachments
+ * - Profile picture management
+ * - Performance analytics
+ * - File downloads for interview materials
+ * 
+ * API Integration:
+ * - Uses all functions from delivery.js API service
+ * - Handles file uploads for interviews and feedback
+ * - Manages profile picture uploads
+ * - Downloads files using presigned URLs from backend
+ * - Provides comprehensive error handling and validation
+ */
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FiUsers, FiCalendar, FiCheckCircle, FiClock, FiFileText, 
@@ -10,23 +28,25 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import styles from './DeliveryTeamDashboard.module.css';
-import { 
-  getEmployees, 
-  scheduleInterview,
-  updateMockInterviewFeedback,
-  getUpcomingInterviews,
-  getCompletedInterviews,
-  updateInterviewStatus,
-  updateProfilePicture,
-  getProfilePicture,
-  getMockInterviewPerformance,
-  getUserByRole 
+import {
+    getEmployees,
+    scheduleInterview,
+    updateMockInterviewFeedback,
+    getUpcomingInterviews,
+    getCompletedInterviews,
+    updateInterviewStatus,
+    updateProfilePicture,
+    getProfilePicture,
+    getMockInterviewPerformance,
+    debugUserInfo
 } from '../../API/delivery';
 import ScheduleInterviewModal from './ScheduleInterviewModal';
 import EvaluationModal from '../../components/EvaluationModal';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 
 const DeliveryTeamDashboard = () => {
+  const { employee, user } = useAuth();
   const [activeTab, setActiveTab] = useState('employees');
   const [employees, setEmployees] = useState([]);
   const [mockInterviews, setMockInterviews] = useState([]);
@@ -71,9 +91,66 @@ const DeliveryTeamDashboard = () => {
   });
   const [performanceData, setPerformanceData] = useState([]);
   const [feedbackFile, setFeedbackFile] = useState(null);
+  const [roleError, setRoleError] = useState(null);
 
   const technologies = ['Java', 'Python', '.NET', 'DevOps', 'SalesForce', 'UI Development', 'Testing'];
   const resourceTypes = ['OM', 'TCT1', 'TCT2'];
+
+  // Debug function to check current user's role and token
+  const debugUserInfo = () => {
+    const token = localStorage.getItem('jwt_token');
+    const role = localStorage.getItem('userRole');
+    
+    console.log('=== DEBUG USER INFO ===');
+    console.log('Token exists:', !!token);
+    console.log('Role from localStorage:', role);
+    
+    if (token) {
+      try {
+        // Decode JWT token to see what's inside
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        console.log('JWT Token payload:', payload);
+        console.log('Role from JWT:', payload.role);
+        
+        // Check if user has required role
+        if (payload.role !== 'ROLE_DELIVERY_TEAM') {
+          console.error('❌ USER ROLE MISMATCH:');
+          console.error('Current role:', payload.role);
+          console.error('Required role: ROLE_DELIVERY_TEAM');
+          console.error('To fix this:');
+          console.error('1. Register a new user with role "delivery_team"');
+          console.error('2. Or update the backend to allow your current role');
+          console.error('3. Or update the frontend to use a different dashboard');
+          
+          setRoleError({
+            currentRole: payload.role,
+            requiredRole: 'ROLE_DELIVERY_TEAM',
+            message: `You need ROLE_DELIVERY_TEAM to access this dashboard. Current role: ${payload.role}`
+          });
+        } else {
+          console.log('✅ User has correct ROLE_DELIVERY_TEAM role');
+          setRoleError(null);
+        }
+      } catch (error) {
+        console.error('Error decoding JWT token:', error);
+      }
+    }
+    
+    return { token: !!token, role, hasToken: !!token };
+  };
+
+  // Utility function to validate API responses
+  const validateApiResponse = (data, expectedType, dataName) => {
+    if (expectedType === 'array' && !Array.isArray(data)) {
+      console.error(`Invalid ${dataName} data received:`, data);
+      return false;
+    }
+    if (expectedType === 'object' && (typeof data !== 'object' || data === null)) {
+      console.error(`Invalid ${dataName} data received:`, data);
+      return false;
+    }
+    return true;
+  };
 
   const LoadingSpinner = () => (
     <div className={styles.loadingContainer}>
@@ -97,41 +174,54 @@ const DeliveryTeamDashboard = () => {
   );
 
   const fetchData = async () => {
+    // Don't fetch data if there's a role error
+    if (roleError) {
+      console.log('Skipping API calls due to role error:', roleError.message);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
+      // Fetch employees data
       const employeesData = await getEmployees(technologyFilter, resourceTypeFilter);
-      if (Array.isArray(employeesData)) {
+      if (validateApiResponse(employeesData, 'array', 'employees')) {
         setEmployees(employeesData);
       } else {
-        console.error('Invalid employees data received:', employeesData);
         setEmployees([]);
       }
 
+      // Fetch upcoming interviews
       let upcomingData = [];
       try {
         upcomingData = await getUpcomingInterviews();
-        if (!Array.isArray(upcomingData)) {
-          console.error('Invalid upcoming interviews data received:', upcomingData);
+        if (validateApiResponse(upcomingData, 'array', 'upcoming interviews')) {
+          // Data is valid, keep it
+        } else {
           upcomingData = [];
         }
       } catch (error) {
         console.error('Error fetching upcoming interviews:', error);
-        setError(error.message || 'Failed to load upcoming interviews');
+        // Don't set error for upcoming interviews as it's not critical
+        upcomingData = [];
       }
 
+      // Fetch completed interviews
       let completedData = [];
       try {
         completedData = await getCompletedInterviews();
-        if (!Array.isArray(completedData)) {
-          console.error('Invalid completed interviews data received:', completedData);
+        if (validateApiResponse(completedData, 'array', 'completed interviews')) {
+          // Data is valid, keep it
+        } else {
           completedData = [];
         }
       } catch (error) {
         console.error('Error fetching completed interviews:', error);
-        setError(error.message || 'Failed to load completed interviews');
+        // Don't set error for completed interviews as it's not critical
+        completedData = [];
       }
 
+      // Combine and process interview data
       const allInterviews = [
         ...upcomingData,
         ...completedData,
@@ -145,6 +235,7 @@ const DeliveryTeamDashboard = () => {
       });
       setMockInterviews(allInterviews);
 
+      // Process statistics
       const sentToSales = completedData
         .filter(i => i && i.sentToSales)
         .map(i => i.employeeId);
@@ -155,17 +246,18 @@ const DeliveryTeamDashboard = () => {
         .map(i => i.employeeId);
       setDeployedEmployees(deployed);
 
+      // Fetch performance data
       try {
         const performance = await getMockInterviewPerformance();
-        if (Array.isArray(performance)) {
+        if (validateApiResponse(performance, 'array', 'performance')) {
           setPerformanceData(performance);
         } else {
-          console.error('Invalid performance data received:', performance);
           setPerformanceData([]);
         }
       } catch (error) {
         console.error('Error fetching performance data:', error);
         toast.error('Could not load performance data.');
+        setPerformanceData([]);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -180,40 +272,86 @@ const DeliveryTeamDashboard = () => {
     }
   };
 
+  // First useEffect: Check user role and set roleError state
   useEffect(() => {
-    fetchData();
-  }, [technologyFilter, resourceTypeFilter]);
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const user = await getUserByRole();
-        setUserData({
-          name: user.fullName || 'N/A',
-          email: user.email || 'N/A',
-          role: user.role || 'ROLE_DELIVERY_TEAM',
-          empId: user.empId || 'N/A',
-          id: user.id || 'N/A'
-        });
-
-        try {
-          const response = await getProfilePicture(user.id);
-          setProfilePic(response);
-        } catch (error) {
-          console.error('Error fetching profile picture:', error);
-        }
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-        toast.error(error.message || 'Failed to load user data');
-      }
-    };
-    fetchUserData();
+    debugUserInfo();
   }, []);
+
+  // Second useEffect: Fetch data only if no role error
+  useEffect(() => {
+    if (roleError === null) {
+      // roleError is null means debugUserInfo has run and found no issues
+      fetchData();
+    }
+  }, [roleError, technologyFilter, resourceTypeFilter]);
+
+  // Third useEffect: Fetch user data only if no role error
+  useEffect(() => {
+    if (roleError === null) {
+      const fetchUserData = async () => {
+        try {
+          // Use actual employee data from AuthContext
+          if (employee && user) {
+            const actualUserData = {
+              name: employee.user?.fullName || 'Delivery Team Member',
+              email: employee.user?.email || 'delivery@aja.com',
+              role: user.role || 'ROLE_DELIVERY_TEAM',
+              empId: employee.empId || 'DEL001',
+              id: employee.id // Use actual employee ID
+            };
+            setUserData(actualUserData);
+
+            try {
+              const response = await getProfilePicture(actualUserData.id);
+              if (response) {
+                setProfilePic(response);
+              }
+            } catch (error) {
+              console.error('Error fetching profile picture:', error);
+              // Don't show error toast for profile picture as it's optional
+              setProfilePic(null);
+            }
+          } else {
+            // Fallback to default data if no employee data available
+            const defaultUserData = {
+              name: 'Delivery Team Member',
+              email: 'delivery@aja.com',
+              role: 'ROLE_DELIVERY_TEAM',
+              empId: 'DEL001',
+              id: 1
+            };
+            setUserData(defaultUserData);
+            console.warn('No employee data available, using default user data');
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+          toast.error(error.message || 'Failed to load user data');
+        }
+      };
+      fetchUserData();
+    }
+  }, [roleError]);
 
   const handleProfilePictureChange = async (event) => {
     const file = event.target.files[0];
     if (file) {
+      // Don't proceed if there's a role error
+      if (roleError) {
+        toast.error('Cannot update profile picture due to role restrictions. Please fix the role issue first.');
+        return;
+      }
+
       try {
+        // Validate file type
+        if (!file.type.match(/^image\/(jpeg|png)$/)) {
+          throw new Error('Please select a JPEG or PNG image file');
+        }
+        
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error('File size must be less than 5MB');
+        }
+        
         setSelectedFile(file);
         await updateProfilePicture(userData.id, file);
         const response = await getProfilePicture(userData.id);
@@ -234,11 +372,28 @@ const DeliveryTeamDashboard = () => {
   };
 
   const downloadFile = async (s3Key) => {
+    // Don't proceed if there's a role error
+    if (roleError) {
+      toast.error('Cannot download files due to role restrictions. Please fix the role issue first.');
+      return;
+    }
+
     try {
-      const presignedUrl = s3Key;
+      // Check if s3Key is already a URL or needs to be processed
+      let downloadUrl = s3Key;
+      
+      // If it's not a URL, it might be an S3 key that needs to be converted
+      if (!s3Key.startsWith('http')) {
+        console.warn('S3 key provided instead of presigned URL:', s3Key);
+        // In a real implementation, you might need to call an API to get the presigned URL
+        // For now, we'll assume it's already a presigned URL from the backend
+        downloadUrl = s3Key;
+      }
+      
       const link = document.createElement('a');
-      link.href = presignedUrl;
+      link.href = downloadUrl;
       link.download = s3Key.split('/').pop() || 'download';
+      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -320,18 +475,31 @@ const DeliveryTeamDashboard = () => {
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28'];
 
   const handleScheduleInterviewSubmit = async (interviewData) => {
+    // Don't proceed if there's a role error
+    if (roleError) {
+      toast.error('Cannot schedule interview due to role restrictions. Please fix the role issue first.');
+      return;
+    }
+
     setIsLoading(true);
     setIsInterviewsLoading(true);
     setError(null);
     try {
+      // Validate required fields
+      if (!interviewData.empId || !interviewData.date || !interviewData.time || !interviewData.interviewerId) {
+        throw new Error('Missing required fields: Employee ID, Date, Time, and Interviewer ID are required');
+      }
+
       const response = await scheduleInterview({
         empId: interviewData.empId,
         date: interviewData.date,
         time: interviewData.time,
         interviewerId: interviewData.interviewerId,
-        files: interviewData.files
+        files: interviewData.files || []
       });
+      
       if (response) {
+        // Update the interviews list with the new interview
         setMockInterviews(prev => {
           const newInterview = {
             ...response,
@@ -340,9 +508,12 @@ const DeliveryTeamDashboard = () => {
           };
           return [...prev, newInterview];
         });
+        
         setShowInterviewScheduler(false);
         setSelectedEmployeeForScheduling(null);
         toast.success('Interview scheduled successfully!');
+        
+        // Refresh data to get the latest state
         await fetchData();
       }
     } catch (error) {
@@ -355,9 +526,21 @@ const DeliveryTeamDashboard = () => {
   };
 
   const handleUpdateFeedback = async (data) => {
+    // Don't proceed if there's a role error
+    if (roleError) {
+      toast.error('Cannot update feedback due to role restrictions. Please fix the role issue first.');
+      return;
+    }
+
     setIsFeedbackLoading(true);
     setError(null);
     try {
+      // Validate required fields
+      if (!data.interviewId || !data.technicalFeedback || !data.communicationFeedback || 
+          !data.technicalRating || !data.communicationRating) {
+        throw new Error('Missing required fields: Interview ID, feedback, and ratings are required');
+      }
+
       const updatedInterview = await updateMockInterviewFeedback(
         data.interviewId,
         data.technicalFeedback,
@@ -367,6 +550,8 @@ const DeliveryTeamDashboard = () => {
         data.sentToSales || false,
         feedbackFile
       );
+      
+      // Update the interviews list with the updated interview
       const updatedInterviews = mockInterviews.map(interview => {
         if (interview.id === data.interviewId) {
           return {
@@ -381,6 +566,8 @@ const DeliveryTeamDashboard = () => {
       setSelectedInterviewId(null);
       setFeedbackFile(null);
       toast.success('Feedback updated successfully!');
+      
+      // Refresh data to get the latest state
       const completedData = await getCompletedInterviews();
       if (Array.isArray(completedData)) {
         const allInterviews = [
@@ -413,17 +600,29 @@ const DeliveryTeamDashboard = () => {
   };
 
   const sendToSales = async (interview) => {
+    // Don't proceed if there's a role error
+    if (roleError) {
+      toast.error('Cannot send to sales due to role restrictions. Please fix the role issue first.');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
     try {
+      // Validate interview data
+      if (!interview.id || !interview.technicalFeedback || !interview.communicationFeedback || 
+          !interview.technicalRating || !interview.communicationRating) {
+        throw new Error('Interview data is incomplete. Please update feedback first.');
+      }
+
       await updateMockInterviewFeedback(
         interview.id,
         interview.technicalFeedback,
         interview.communicationFeedback,
         interview.technicalRating,
         interview.communicationRating,
-        true,
-        null
+        true, // sentToSales = true
+        null  // no additional file
       );
       toast.success('Profile sent to sales successfully!');
       await fetchData();
@@ -436,7 +635,17 @@ const DeliveryTeamDashboard = () => {
   };
 
   const handleUpdateInterviewStatus = async (interviewId) => {
+    // Don't proceed if there's a role error
+    if (roleError) {
+      toast.error('Cannot update interview status due to role restrictions. Please fix the role issue first.');
+      return;
+    }
+
     try {
+      if (!interviewId) {
+        throw new Error('Interview ID is required');
+      }
+      
       setIsLoading(true);
       await updateInterviewStatus(interviewId);
       toast.success('Interview status updated successfully!');
@@ -496,6 +705,8 @@ const DeliveryTeamDashboard = () => {
               <button 
                 className={styles.primaryButton}
                 onClick={() => setShowInterviewScheduler(true)}
+                disabled={roleError}
+                title={roleError ? 'Disabled due to role restrictions' : 'Schedule a new interview'}
               >
                 <FiPlus /> Schedule Interview
               </button>
@@ -583,6 +794,8 @@ const DeliveryTeamDashboard = () => {
                         setSelectedEmployeeForScheduling(employee);
                         setShowInterviewScheduler(true);
                       }}
+                      disabled={roleError}
+                      title={roleError ? 'Disabled due to role restrictions' : 'Schedule interview for this employee'}
                     >
                       <FiCalendar /> Schedule
                     </button>
@@ -713,6 +926,8 @@ const DeliveryTeamDashboard = () => {
                                 key={index}
                                 className={styles.downloadButton}
                                 onClick={() => downloadFile(s3Key)}
+                                disabled={roleError}
+                                title={roleError ? 'Disabled due to role restrictions' : 'Download this file'}
                               >
                                 <FiDownload /> Download File {index + 1}
                               </button>
@@ -723,25 +938,30 @@ const DeliveryTeamDashboard = () => {
                       
                       <div className={styles.interviewActions}>
                         <div className={styles.actionButtons}>
-                          <button 
-                            className={`${styles.button} ${styles.primary}`}
-                            onClick={() => {/* handle start interview */}}
-                          >
-                            <FiPlay /> Start Interview
-                          </button>
-                          <button 
-                            className={`${styles.button} ${styles.secondary}`}
-                            onClick={() => {/* handle reschedule */}}
-                          >
-                            <FiCalendar /> Reschedule
-                          </button>
-                          <button 
-                            className={`${styles.button} ${styles.success}`}
-                            onClick={() => handleUpdateInterviewStatus(interview.id)}
-                            disabled={isLoading}
-                          >
-                            <FiCheckCircle /> Update Interview
-                          </button>
+                                                  <button 
+                          className={`${styles.button} ${styles.primary}`}
+                          onClick={() => {/* handle start interview */}}
+                          disabled={roleError}
+                          title={roleError ? 'Disabled due to role restrictions' : 'Start the interview'}
+                        >
+                          <FiPlay /> Start Interview
+                        </button>
+                        <button 
+                          className={`${styles.button} ${styles.secondary}`}
+                          onClick={() => {/* handle reschedule */}}
+                          disabled={roleError}
+                          title={roleError ? 'Disabled due to role restrictions' : 'Reschedule the interview'}
+                        >
+                          <FiCalendar /> Reschedule
+                        </button>
+                        <button 
+                          className={`${styles.button} ${styles.success}`}
+                          onClick={() => handleUpdateInterviewStatus(interview.id)}
+                          disabled={isLoading || roleError}
+                          title={roleError ? 'Disabled due to role restrictions' : 'Update interview status'}
+                        >
+                          <FiCheckCircle /> Update Interview
+                        </button>
                         </div>
                       </div>
                     </motion.div>
@@ -813,6 +1033,8 @@ const DeliveryTeamDashboard = () => {
                                 key={index}
                                 className={styles.downloadButton}
                                 onClick={() => downloadFile(s3Key)}
+                                disabled={roleError}
+                                title={roleError ? 'Disabled due to role restrictions' : 'Download this file'}
                               >
                                 <FiDownload /> Download File {index + 1}
                               </button>
@@ -867,6 +1089,8 @@ const DeliveryTeamDashboard = () => {
                             setSelectedInterviewId(interview.id);
                             setFeedbackFile(null);
                           }}
+                          disabled={roleError}
+                          title={roleError ? 'Disabled due to role restrictions' : 'Edit feedback for this interview'}
                         >
                           <FiEdit /> Edit Feedback
                         </button>
@@ -875,7 +1099,8 @@ const DeliveryTeamDashboard = () => {
                           <button
                             className={styles.successButton}
                             onClick={() => sendToSales(interview)}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || roleError}
+                            title={roleError ? 'Disabled due to role restrictions' : 'Send this profile to sales team'}
                           >
                             <FiSend /> Send to Sales
                           </button>
@@ -1102,8 +1327,13 @@ const DeliveryTeamDashboard = () => {
                       accept="image/jpeg,image/png"
                       onChange={handleProfilePictureChange}
                       style={{ display: 'none' }}
+                      disabled={roleError}
                     />
-                    <label htmlFor="profilePictureUpload" className={styles.profilePictureUpload}>
+                    <label 
+                      htmlFor="profilePictureUpload" 
+                      className={`${styles.profilePictureUpload} ${roleError ? styles.disabled : ''}`}
+                      title={roleError ? 'Disabled due to role restrictions' : 'Update your profile picture'}
+                    >
                       <FiUpload size={18} /> Update Photo
                     </label>
                   </div>
@@ -1232,6 +1462,37 @@ const DeliveryTeamDashboard = () => {
                 </div>
               </div>
             </div>
+            
+            {/* Role Error Display */}
+            {roleError && (
+              <motion.div
+                className={styles.roleErrorContainer}
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className={styles.roleErrorContent}>
+                  <div className={styles.roleErrorIcon}>⚠️</div>
+                  <div className={styles.roleErrorText}>
+                    <h4>Access Denied</h4>
+                    <p>{roleError.message}</p>
+                    <div className={styles.roleErrorDetails}>
+                      <p><strong>Current Role:</strong> {roleError.currentRole}</p>
+                      <p><strong>Required Role:</strong> {roleError.requiredRole}</p>
+                    </div>
+                                       <div className={styles.roleErrorActions}>
+                     <p><strong>To fix this:</strong></p>
+                     <ul>
+                       <li><strong>Register a new user with role "delivery_team"</strong></li>
+                       <li>Or contact your administrator to update your role to "delivery_team"</li>
+                       <li>Or use a different dashboard that matches your current role</li>
+                     </ul>
+                     <p><em>Note: The role "delivery_team" will be converted to "ROLE_DELIVERY_TEAM" by the backend</em></p>
+                   </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
             
             <div className={styles.tabs}>
               <motion.button

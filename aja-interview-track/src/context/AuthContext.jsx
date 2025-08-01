@@ -37,14 +37,21 @@ export const AuthProvider = ({ children }) => {
           if (token && role) {
             setUser({ token, role });
             
-            // Try to extract employee ID from JWT token first
+            // Try to extract employee ID and role from JWT token first
             let empId = null;
+            let userRole = null;
             try {
               const decodedToken = jwtDecode(token);
               empId = decodedToken.employeeId || getEmployeeId();
+              userRole = decodedToken.role || getUserRole();
+              // Update localStorage with role from token if available
+              if (userRole && userRole !== getUserRole()) {
+                setUserRole(userRole);
+              }
             } catch (error) {
               console.warn('Could not decode JWT token:', error.message);
               empId = getEmployeeId();
+              userRole = getUserRole();
             }
             
             // If we have an employee ID, fetch employee details
@@ -90,6 +97,17 @@ export const AuthProvider = ({ children }) => {
         setEmployee(employeeData);
       } else if (userData.role === 'ROLE_EMPLOYEE') {
         console.warn('Employee login but no employee data or ID provided');
+      }
+      
+      // Also try to extract role from JWT token for consistency
+      try {
+        const decodedToken = jwtDecode(userData.token);
+        if (decodedToken.role && decodedToken.role !== userData.role) {
+          console.warn('Role mismatch between response and token:', userData.role, 'vs', decodedToken.role);
+          // Prefer the role from the response as it's more reliable
+        }
+      } catch (error) {
+        console.warn('Could not decode JWT token during login:', error.message);
       }
     } catch (error) {
       console.error('Error during login:', error);

@@ -3,18 +3,7 @@ import axiosInstance from './axiosConfig';
 // Base URL for sales-related endpoints
 const BASE_URL = '/api/sales';
 
-/**
- * Get user by role (ROLE_SALES_TEAM)
- * @returns {Promise<User>} User object with ROLE_SALES_TEAM
- */
-export const getUserByRole = async () => {
-  try {
-    const response = await axiosInstance.get(`${BASE_URL}/user`);
-    return response.data;
-  } catch (error) {
-    throw handleApiError(error);
-  }
-};
+
 
 /**
  * Get candidates with optional filters
@@ -56,7 +45,8 @@ export const scheduleClientInterview = async (
   jobDescriptionTitle,
   meetingLink,
   deployedStatus = false,
-  file = null
+  file = null,
+  interviewerEmail = null
 ) => {
   try {
     // Validate inputs
@@ -82,6 +72,9 @@ export const scheduleClientInterview = async (
     formData.append('deployedStatus', deployedStatus);
     if (file) {
       formData.append('file', file);
+    }
+    if (interviewerEmail) {
+      formData.append('interviewerEmail', interviewerEmail);
     }
 
     const response = await axiosInstance.post(`${BASE_URL}/interviews/schedule`, formData, {
@@ -119,12 +112,13 @@ export const scheduleMultipleClientInterviews = async (empId, schedules) => {
 /**
  * Update client interview feedback
  * @param {number} interviewId - Interview ID
- * @param {Object} feedbackData - Interview feedback data
- * @param {string} feedbackData.result - Interview result
- * @param {string} feedbackData.feedback - Interview feedback
- * @param {string|number} feedbackData.technicalScore - Technical score
- * @param {string|number} feedbackData.communicationScore - Communication score
+ * @param {Object} feedbackData - Feedback data
+ * @param {string} feedbackData.result - Interview result (pass/fail)
+ * @param {string} feedbackData.feedback - Feedback text
+ * @param {number} feedbackData.technicalScore - Technical score (0-10)
+ * @param {number} feedbackData.communicationScore - Communication score (0-10)
  * @param {boolean} feedbackData.deployedStatus - Deployment status
+ * @param {File} feedbackData.file - Optional feedback file to upload
  * @returns {Promise<Object>} Updated interview object
  */
 export const updateClientInterview = async (interviewId, feedbackData) => {
@@ -142,15 +136,27 @@ export const updateClientInterview = async (interviewId, feedbackData) => {
       throw new Error('Result and feedback are required');
     }
 
-    const formattedData = {
-      result: String(feedbackData.result),
-      feedback: String(feedbackData.feedback),
-      technicalScore: techScore,
-      communicationScore: commScore,
-      deployedStatus: Boolean(feedbackData.deployedStatus),
-    };
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append('result', String(feedbackData.result));
+    formData.append('feedback', String(feedbackData.feedback));
+    formData.append('technicalScore', techScore);
+    formData.append('communicationScore', commScore);
+    
+    if (feedbackData.deployedStatus !== undefined) {
+      formData.append('deployedStatus', Boolean(feedbackData.deployedStatus));
+    }
+    
+    // Add file if provided
+    if (feedbackData.file) {
+      formData.append('file', feedbackData.file);
+    }
 
-    const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, formattedData);
+    const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   } catch (error) {
     throw handleApiError(error);
@@ -200,8 +206,23 @@ export const addClient = async (clientData) => {
     if (!clientData.name || !clientData.contactEmail || clientData.activePositions == null || !clientData.technologies) {
       throw new Error('All client fields (name, contactEmail, activePositions, technologies) are required');
     }
-    const response = await axiosInstance.post(`${BASE_URL}/clients`, null, {
-      params: clientData,
+    
+    const formData = new FormData();
+    formData.append('name', clientData.name);
+    formData.append('contactEmail', clientData.contactEmail);
+    formData.append('activePositions', clientData.activePositions);
+    
+    // Handle technologies array
+    if (Array.isArray(clientData.technologies)) {
+      clientData.technologies.forEach(tech => {
+        formData.append('technologies', tech);
+      });
+    }
+    
+    const response = await axiosInstance.post(`${BASE_URL}/clients`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     });
     return response.data;
   } catch (error) {
@@ -315,6 +336,22 @@ export const deleteJobDescription = async (jdId) => {
 export const getClientInterviewFeedback = async (interviewId) => {
   try {
     const response = await axiosInstance.get(`${BASE_URL}/client-interviews/${interviewId}/feedback`);
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+/**
+ * Download feedback file for a client interview
+ * @param {number} interviewId - Interview ID
+ * @returns {Promise<Blob>} Feedback file as blob
+ */
+export const downloadFeedbackFile = async (interviewId) => {
+  try {
+    const response = await axiosInstance.get(`${BASE_URL}/client-interviews/${interviewId}/feedback-file`, {
+      responseType: 'blob',
+    });
     return response.data;
   } catch (error) {
     throw handleApiError(error);
@@ -443,7 +480,6 @@ const handleApiError = (error) => {
 
 // Export all functions as a single object
 export default {
-  getUserByRole,
   getCandidates,
   scheduleClientInterview,
   scheduleMultipleClientInterviews,
@@ -457,6 +493,7 @@ export default {
   downloadJobDescription,
   deleteJobDescription,
   getClientInterviewFeedback,
+  downloadFeedbackFile,
   getAllEmployeeResumes,
   getFilteredResumes,
   getDeployedEmployees,

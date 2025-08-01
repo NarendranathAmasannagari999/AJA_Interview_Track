@@ -29,28 +29,38 @@ import {
   FiAlertCircle,
   FiChevronLeft,
   FiChevronRight,
+  FiFile,
+  FiPlus,
+  FiTrash2,
+  FiEye,
+  FiClock,
+  FiMapPin,
+  FiPhone,
+  FiGlobe,
+  FiStar,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import styles from "./Sales.module.css";
 import {
   getCandidates,
   scheduleClientInterview,
+  scheduleMultipleClientInterviews,
   updateClientInterview,
   getClientInterviews,
+  getClientInterviewCount,
   addClient,
   getClients,
   addJobDescription,
+  getAllJobDescriptions,
   downloadJobDescription,
   deleteJobDescription,
-  getAllJobDescriptions,
+  getClientInterviewFeedback,
+  downloadFeedbackFile,
+  getAllEmployeeResumes,
+  getFilteredResumes,
   getDeployedEmployees,
   updateProfilePicture,
   getProfilePicture,
-  getClientInterviewFeedback,
-  getUserByRole,
-  getClientInterviewCount,
-  getAllEmployeeResumes,
-  getFilteredResumes,
 } from "../../API/sales";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
@@ -510,11 +520,31 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
   const [commScore, setCommScore] = useState(interview.communicationScore || 0);
   const [feedback, setFeedback] = useState(interview.feedback || "");
   const [deployedStatus, setDeployedStatus] = useState(interview.deployedStatus || false);
+  const [feedbackFile, setFeedbackFile] = useState(null);
   const [error, setError] = useState("");
 
   const hasUpdatePermission = () => {
     const role = salesUserData?.role;
     return role === "ROLE_SALES_TEAM" || role === "ROLE_ADMIN";
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+      if (!allowedTypes.includes(file.type)) {
+        setError('Please select a PDF, JPEG, or PNG file');
+        return;
+      }
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('File size must be less than 5MB');
+        return;
+      }
+      setFeedbackFile(file);
+      setError("");
+    }
   };
 
   const handleSubmit = (e) => {
@@ -544,7 +574,8 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
       feedback,
       technicalScore: techScoreNum,
       communicationScore: commScoreNum,
-      deployedStatus: Boolean(deployedStatus)
+      deployedStatus: Boolean(deployedStatus),
+      file: feedbackFile // Include the file in the feedback data
     };
 
     onSubmit(
@@ -615,6 +646,19 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
                 rows="5"
                 required
               />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Feedback File (Optional)</label>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={handleFileChange}
+                className={styles.input}
+              />
+              <small className={styles.helpText}>
+                Supported formats: PDF, JPEG, PNG (Max 5MB)
+              </small>
             </div>
 
             <div className={styles.formGroup}>
@@ -788,23 +832,21 @@ const SalesTeamDashboard = () => {
       const role = decoded.role || localStorage.getItem("userRole") || "N/A";
       const fullName = email !== "N/A" ? email.split("@")[0] : "N/A";
 
-      // Then fetch detailed user data using the getUserByRole API
-      const userData = await getUserByRole();
-
+      // Use JWT token data since getUserByRole endpoint doesn't exist
       setSalesUserData({
-        fullName: userData.fullName || fullName,
-        email: userData.email || email,
-        role: userData.role || role,
-        empId: userData.empId || decoded.empId || "",
-        id: userData.id || decoded.id || "",
-        technology: userData.technology || decoded.technology || "",
-        resourceType: userData.resourceType || decoded.resourceType || "",
-        level: userData.level || decoded.level || "",
-        status: userData.status || decoded.status || "Active",
+        fullName: fullName,
+        email: email,
+        role: role,
+        empId: decoded.empId || "",
+        id: decoded.id || "",
+        technology: decoded.technology || "",
+        resourceType: decoded.resourceType || "",
+        level: decoded.level || "",
+        status: decoded.status || "Active",
       });
 
       // Fetch profile picture if empId exists
-      const empIdToUse = userData.empId || decoded.empId;
+      const empIdToUse = decoded.empId;
       if (empIdToUse) {
         try {
           const pictureBlob = await getProfilePicture(empIdToUse);
@@ -846,7 +888,7 @@ const SalesTeamDashboard = () => {
         getClients(searchTerm),
         getAllJobDescriptions(),
         getDeployedEmployees(),
-        getFilteredResumes(filterTech, filterResourceType)
+        getAllEmployeeResumes()
       ].map(p => p.catch(error => {
         console.error("Error in fetchData:", error);
         toast.error(`Failed to fetch some data: ${error.message}`);
@@ -860,6 +902,16 @@ const SalesTeamDashboard = () => {
       if (jobDescriptionsData) setJobDescriptions(jobDescriptionsData);
       if (deployedEmployeesData) setDeployedEmployees(deployedEmployeesData);
       if (resumesData) setResumes(resumesData);
+
+      // Debug logging
+      console.log("Data fetched:", {
+        candidates: candidatesData?.length || 0,
+        interviews: interviewsData?.length || 0,
+        clients: clientsData?.length || 0,
+        jobDescriptions: jobDescriptionsData?.length || 0,
+        deployedEmployees: deployedEmployeesData?.length || 0,
+        resumes: resumesData?.length || 0
+      });
 
     } catch (error) {
       console.error("Error in fetchData:", error);
@@ -1004,29 +1056,38 @@ const SalesTeamDashboard = () => {
   };
 
   const handleDownloadJD = async (jdId) => {
-    if (!jdId) {
-      toast.error("Job description ID is required");
-      return;
-    }
-
     try {
-      toast.info("Downloading job description...");
       const blob = await downloadJobDescription(jdId);
-      
-      if (blob) {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `job_description_${jdId}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success("Job description downloaded successfully");
-      }
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `job_description_${jdId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Job description downloaded successfully');
     } catch (error) {
-      console.error("Error downloading job description:", error);
-      toast.error(error.message || "Failed to download job description");
+      console.error('Error downloading job description:', error);
+      toast.error(error.message || 'Failed to download job description');
+    }
+  };
+
+  const handleDownloadFeedbackFile = async (interviewId) => {
+    try {
+      const blob = await downloadFeedbackFile(interviewId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `feedback_file_${interviewId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Feedback file downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading feedback file:', error);
+      toast.error(error.message || 'Failed to download feedback file');
     }
   };
 
@@ -1538,7 +1599,39 @@ const SalesTeamDashboard = () => {
   };
 
   const ResumePoolTab = () => {
-    const filteredResumes = filterCandidates(resumes);
+    // Use resumes data, fallback to candidates if resumes is empty
+    const dataToUse = resumes.length > 0 ? resumes : candidates;
+    
+    // Apply search filter to resumes
+    const searchFilteredResumes = dataToUse.filter((candidate) => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        (candidate.user?.fullName || "").toLowerCase().includes(searchLower) ||
+        (candidate.empId || "").toLowerCase().includes(searchLower) ||
+        (candidate.technology || "").toLowerCase().includes(searchLower) ||
+        (candidate.resourceType || "").toLowerCase().includes(searchLower)
+      );
+    });
+
+    // Apply technology and resource type filters
+    const filteredResumes = searchFilteredResumes.filter((candidate) => {
+      const matchesTech = filterTech === "all" || candidate.technology === filterTech;
+      const matchesResourceType = filterResourceType === "all" || candidate.resourceType === filterResourceType;
+      return matchesTech && matchesResourceType;
+    });
+
+    // Debug logging
+    console.log("Resume Pool Debug:", {
+      totalResumes: resumes.length,
+      totalCandidates: candidates.length,
+      dataSource: resumes.length > 0 ? "resumes" : "candidates (fallback)",
+      totalDataToUse: dataToUse.length,
+      searchFiltered: searchFilteredResumes.length,
+      finalFiltered: filteredResumes.length,
+      searchTerm,
+      filterTech,
+      filterResourceType
+    });
 
     return (
       <motion.div
@@ -1552,7 +1645,7 @@ const SalesTeamDashboard = () => {
             <FiSearch className={styles.searchIcon} />
             <input
               type="text"
-              placeholder="Search resumes..."
+              placeholder="Search resumes by name, ID, technology..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className={styles.searchInput}
@@ -1566,7 +1659,7 @@ const SalesTeamDashboard = () => {
               className={styles.filterSelect}
             >
               <option value="all">All Technologies</option>
-              {Array.from(new Set(resumes.map((c) => c.technology))).map(
+              {Array.from(new Set(dataToUse.map((c) => c.technology).filter(Boolean))).map(
                 (tech) => (
                   <option key={tech} value={tech}>
                     {tech}
@@ -1583,7 +1676,7 @@ const SalesTeamDashboard = () => {
               className={styles.filterSelect}
             >
               <option value="all">All Types</option>
-              {Array.from(new Set(resumes.map((c) => c.resourceType))).map(
+              {Array.from(new Set(dataToUse.map((c) => c.resourceType).filter(Boolean))).map(
                 (type) => (
                   <option key={type} value={type}>
                     {type}
@@ -1600,6 +1693,7 @@ const SalesTeamDashboard = () => {
               <thead>
                 <tr>
                   <th>Name</th>
+                  <th>Employee ID</th>
                   <th>Technology</th>
                   <th>Resource Type</th>
                   <th>Status</th>
@@ -1610,13 +1704,14 @@ const SalesTeamDashboard = () => {
                 {filteredResumes.map((candidate) => (
                   <tr key={candidate.id}>
                     <td>{candidate.user?.fullName || "N/A"}</td>
+                    <td>{candidate.empId || "N/A"}</td>
                     <td>
                       <span
                         className={`${styles.techBadge} ${
                           styles[candidate.technology?.toLowerCase()]
                         }`}
                       >
-                        {candidate.technology}
+                        {candidate.technology || "N/A"}
                       </span>
                     </td>
                     <td>
@@ -1625,7 +1720,7 @@ const SalesTeamDashboard = () => {
                           styles[candidate.resourceType?.toLowerCase()]
                         }`}
                       >
-                        {candidate.resourceType}
+                        {candidate.resourceType || "N/A"}
                       </span>
                     </td>
                     <td>
@@ -1634,13 +1729,14 @@ const SalesTeamDashboard = () => {
                           styles[candidate.status?.toLowerCase()]
                         }`}
                       >
-                        {candidate.status}
+                        {candidate.status || "N/A"}
                       </span>
                     </td>
                     <td>
                       <button
                         className={`${styles.button} ${styles.small}`}
                         onClick={() => handleDownloadResume(candidate.empId)}
+                        disabled={!candidate.empId}
                       >
                         <FiDownload /> Resume
                       </button>
@@ -1659,11 +1755,21 @@ const SalesTeamDashboard = () => {
               </tbody>
             </table>
           ) : (
-            <div className={styles.emptyState}>
-              <FiUpload size={48} />
-              <h4>No resumes found</h4>
-              <p>No candidates have been sent to sales team yet.</p>
-            </div>
+                          <div className={styles.emptyState}>
+                <FiUpload size={48} />
+                <h4>No resumes found</h4>
+                <p>
+                  {dataToUse.length === 0 
+                    ? "No employee resumes available. Please check if employees have been added to the system."
+                    : "No resumes match your current search criteria. Try adjusting your filters."
+                  }
+                </p>
+                {dataToUse.length > 0 && (
+                  <div style={{ marginTop: '10px', fontSize: '0.9em', color: '#666' }}>
+                    Total {resumes.length > 0 ? 'resumes' : 'candidates'}: {dataToUse.length} | Filtered: {filteredResumes.length}
+                  </div>
+                )}
+              </div>
           )}
         </div>
       </motion.div>
@@ -1832,6 +1938,25 @@ const SalesTeamDashboard = () => {
                             <p>{interview.feedback}</p>
                           </div>
                         </div>
+
+                        {/* Feedback File Download Section */}
+                        {interview.feedbackFileS3Key && (
+                          <div className={styles.feedbackFileSection}>
+                            <div className={styles.feedbackFileHeader}>
+                              <FiFile />
+                              <h5>Feedback File</h5>
+                            </div>
+                            <div className={styles.feedbackFileContent}>
+                              <button
+                                className={`${styles.button} ${styles.secondary}`}
+                                onClick={() => handleDownloadFeedbackFile(interview.id)}
+                                title="Download Feedback File"
+                              >
+                                <FiDownload /> Download Feedback File
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
