@@ -74,14 +74,14 @@ const Login = () => {
       const normalizedRole = userData.role.replace('ROLE_', '').toLowerCase();
       
       // Redirect based on role
-      switch(normalizedRole) {
+      switch(normalizedRole.toLowerCase()) {
         case 'employee':
           navigate('/dashboard/employee');
           break;
-        case 'delivery_team':
+        case 'delivery':
           navigate('/dashboard/delivery-team');
           break;
-        case 'sales_team':
+        case 'sales':
           navigate('/dashboard/sales-team');
           break;
         default:

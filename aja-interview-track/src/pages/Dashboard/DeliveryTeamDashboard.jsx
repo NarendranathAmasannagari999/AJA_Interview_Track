@@ -38,6 +38,7 @@ import {
     updateProfilePicture,
     getProfilePicture,
     getMockInterviewPerformance,
+    getCurrentUser,
     debugUserInfo
 } from '../../API/delivery';
 import ScheduleInterviewModal from './ScheduleInterviewModal';
@@ -113,10 +114,10 @@ const DeliveryTeamDashboard = () => {
         console.log('Role from JWT:', payload.role);
         
         // Check if user has required role
-        if (payload.role !== 'ROLE_DELIVERY_TEAM') {
+        if (payload.role !== 'ROLE_DELIVERY') {
           console.error('❌ USER ROLE MISMATCH:');
           console.error('Current role:', payload.role);
-          console.error('Required role: ROLE_DELIVERY_TEAM');
+          console.error('Required role: ROLE_DELIVERY');
           console.error('To fix this:');
           console.error('1. Register a new user with role "delivery_team"');
           console.error('2. Or update the backend to allow your current role');
@@ -124,11 +125,11 @@ const DeliveryTeamDashboard = () => {
           
           setRoleError({
             currentRole: payload.role,
-            requiredRole: 'ROLE_DELIVERY_TEAM',
-            message: `You need ROLE_DELIVERY_TEAM to access this dashboard. Current role: ${payload.role}`
+            requiredRole: 'ROLE_DELIVERY',
+            message: `You need ROLE_DELIVERY to access this dashboard. Current role: ${payload.role}`
           });
         } else {
-          console.log('✅ User has correct ROLE_DELIVERY_TEAM role');
+          console.log('✅ User has correct ROLE_DELIVERY role');
           setRoleError(null);
         }
       } catch (error) {
@@ -290,38 +291,73 @@ const DeliveryTeamDashboard = () => {
     if (roleError === null) {
       const fetchUserData = async () => {
         try {
-          // Use actual employee data from AuthContext
-          if (employee && user) {
+          // Try to get current user from API first
+          try {
+            const currentUser = await getCurrentUser();
             const actualUserData = {
-              name: employee.user?.fullName || 'Delivery Team Member',
-              email: employee.user?.email || 'delivery@aja.com',
-              role: user.role || 'ROLE_DELIVERY_TEAM',
-              empId: employee.empId || 'DEL001',
-              id: employee.id // Use actual employee ID
+              name: currentUser.fullName || 'Delivery Team Member',
+              email: currentUser.email || 'delivery@aja.com',
+              role: currentUser.role || 'ROLE_DELIVERY',
+              empId: currentUser.empId || 'DEL001',
+              id: currentUser.id // Use actual user ID
             };
             setUserData(actualUserData);
 
+            // Try to fetch profile picture using the user ID
             try {
-              const response = await getProfilePicture(actualUserData.id);
-              if (response) {
-                setProfilePic(response);
+              const picBlob = await getProfilePicture(currentUser.id);
+              if (picBlob && picBlob.size > 0) {
+                const picUrl = URL.createObjectURL(picBlob);
+                setProfilePic(picUrl);
+                console.log('Profile picture loaded successfully');
+              } else {
+                console.warn('Profile picture blob is empty or null');
+                setProfilePic(null);
               }
-            } catch (error) {
-              console.error('Error fetching profile picture:', error);
-              // Don't show error toast for profile picture as it's optional
+            } catch (picError) {
+              console.warn('Could not load profile picture:', picError.message);
               setProfilePic(null);
             }
-          } else {
-            // Fallback to default data if no employee data available
-            const defaultUserData = {
-              name: 'Delivery Team Member',
-              email: 'delivery@aja.com',
-              role: 'ROLE_DELIVERY_TEAM',
-              empId: 'DEL001',
-              id: 1
-            };
-            setUserData(defaultUserData);
-            console.warn('No employee data available, using default user data');
+          } catch (apiError) {
+            console.warn('Could not fetch user from API, using AuthContext data:', apiError.message);
+            
+            // Fallback to AuthContext data
+            if (employee && user) {
+              const actualUserData = {
+                name: employee.user?.fullName || 'Delivery Team Member',
+                email: employee.user?.email || 'delivery@aja.com',
+                role: user.role || 'ROLE_DELIVERY',
+                empId: employee.empId || 'DEL001',
+                id: employee.id // Use actual employee ID
+              };
+              setUserData(actualUserData);
+
+              try {
+                const picBlob = await getProfilePicture(employee.id);
+                if (picBlob && picBlob.size > 0) {
+                  const picUrl = URL.createObjectURL(picBlob);
+                  setProfilePic(picUrl);
+                  console.log('Profile picture loaded successfully');
+                } else {
+                  console.warn('Profile picture blob is empty or null');
+                  setProfilePic(null);
+                }
+              } catch (picError) {
+                console.warn('Could not load profile picture:', picError.message);
+                setProfilePic(null);
+              }
+            } else {
+              // Fallback to default data if no employee data available
+              const defaultUserData = {
+                name: 'Delivery Team Member',
+                email: 'delivery@aja.com',
+                role: 'ROLE_DELIVERY',
+                empId: 'DEL001',
+                id: 1
+              };
+              setUserData(defaultUserData);
+              console.warn('No employee data available, using default user data');
+            }
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
@@ -353,10 +389,32 @@ const DeliveryTeamDashboard = () => {
         }
         
         setSelectedFile(file);
-        await updateProfilePicture(userData.id, file);
-        const response = await getProfilePicture(userData.id);
-        setProfilePic(response);
-        toast.success('Profile picture updated successfully!');
+        
+        // Use the current user ID for profile picture update
+        const userId = userData.id;
+        if (!userId) {
+          throw new Error('User ID not available. Please refresh the page and try again.');
+        }
+        
+        console.log('Uploading profile picture for user ID:', userId);
+        const updatedUser = await updateProfilePicture(userId, file);
+        console.log('Profile picture upload response:', updatedUser);
+        
+        if (updatedUser) {
+          try {
+            const picBlob = await getProfilePicture(userId);
+            if (picBlob && picBlob.size > 0) {
+              const picUrl = URL.createObjectURL(picBlob);
+              setProfilePic(picUrl);
+              toast.success('Profile picture updated successfully!');
+            } else {
+              toast.error('Profile picture uploaded but could not be retrieved');
+            }
+          } catch (picError) {
+            console.error('Error fetching updated profile picture:', picError);
+            toast.error('Profile picture uploaded but could not be displayed. Please refresh the page.');
+          }
+        }
       } catch (error) {
         console.error('Error updating profile picture:', error);
         toast.error(error.message || 'Failed to update profile picture');
@@ -1487,7 +1545,7 @@ const DeliveryTeamDashboard = () => {
                        <li>Or contact your administrator to update your role to "delivery_team"</li>
                        <li>Or use a different dashboard that matches your current role</li>
                      </ul>
-                     <p><em>Note: The role "delivery_team" will be converted to "ROLE_DELIVERY_TEAM" by the backend</em></p>
+                     <p><em>Note: The role "delivery_team" will be converted to "ROLE_DELIVERY" by the backend</em></p>
                    </div>
                   </div>
                 </div>

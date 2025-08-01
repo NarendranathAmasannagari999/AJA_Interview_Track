@@ -26,10 +26,10 @@ const Sidebar = ({ darkMode, toggleDarkMode, onToggle }) => {
     // ...(userRole === 'ROLE_EMPLOYEE' ? [
     //   { path: "/dashboard/employee", icon: <FiBarChart2 size={20} />, activeIcon: <FaChartLine size={20} />, label: "Employee" },
     // ] : []),
-    ...(userRole === 'ROLE_DELIVERY_TEAM' ? [
+    ...(userRole === 'ROLE_DELIVERY' ? [
       { path: "/dashboard/delivery-team", icon: <FiHome size={20} />, activeIcon: <FaHome size={20} />, label: "Dashboard" },
     ] : []),
-    ...(userRole === 'ROLE_SALES_TEAM' ? [
+    ...(userRole === 'ROLE_SALES' ? [
       { path: "/dashboard/sales-team", icon: <FiShoppingCart size={20} />, activeIcon: <FaShoppingCart size={20} />, label: "Sales" },
     ] : []),
     ...(userRole === 'ROLE_EMPLOYEE' ? [

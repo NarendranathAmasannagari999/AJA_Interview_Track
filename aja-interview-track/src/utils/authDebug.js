@@ -59,7 +59,7 @@ export const checkSalesTeamPermission = () => {
   }
   
   const effectiveRole = userRole || roleFromToken;
-  const hasPermission = effectiveRole === 'ROLE_SALES_TEAM' || effectiveRole === 'ROLE_ADMIN';
+  const hasPermission = effectiveRole === 'ROLE_SALES' || effectiveRole === 'ROLE_ADMIN';
   
   return {
     hasPermission,

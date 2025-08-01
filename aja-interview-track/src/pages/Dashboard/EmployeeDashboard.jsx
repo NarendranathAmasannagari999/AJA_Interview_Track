@@ -16,6 +16,7 @@ import {
   getJobDescriptions,
   uploadResume,
   downloadResume,
+  downloadResumeByEmployeeId,
   deleteResume,
   addInterviewQuestion,
   getInterviewQuestions,
@@ -193,9 +194,16 @@ const EmployeeDashboard = () => {
         // Fetch profile picture
         if (employeeId) {
           try {
+            console.log('Fetching initial profile picture for employee ID:', employeeId);
             const picBlob = await getProfilePicture(employeeId);
-            const picUrl = URL.createObjectURL(picBlob);
-            setProfilePic(picUrl);
+            if (picBlob && picBlob.size > 0) {
+              const picUrl = URL.createObjectURL(picBlob);
+              setProfilePic(picUrl);
+              console.log('Profile picture loaded successfully');
+            } else {
+              console.warn('Profile picture blob is empty or null');
+              setProfilePic(null);
+            }
           } catch (picError) {
             console.warn('Could not load profile picture:', picError.message);
             // Don't show error toast for profile picture as it's optional
@@ -488,6 +496,29 @@ const EmployeeDashboard = () => {
     }
   };
 
+  const handleDownloadResumeByEmployeeId = async (employeeId) => {
+    try {
+      setLoading(true);
+      const blob = await downloadResumeByEmployeeId(employeeId);
+      if (blob) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `resume_employee_${employeeId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success('Resume downloaded successfully!');
+      }
+    } catch (err) {
+      console.error('Error downloading resume by employee ID:', err);
+      toast.error(err.message || 'Failed to download resume');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteResume = async (resumeId) => {
     try {
       setLoading(true);
@@ -532,21 +563,56 @@ const EmployeeDashboard = () => {
   const handleProfilePictureChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Client-side validation
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Profile picture must be a JPEG (.jpg, .jpeg) or PNG (.png) file. Excel, PDF, and Word files are not allowed.');
+      return;
+    }
+
+    if (file.size > maxSize) {
+      toast.error('Profile picture size must be less than 5MB');
+      return;
+    }
+
     try {
       setLoading(true);
+      console.log('Uploading profile picture for employee ID:', employeeId);
+      
       const updatedEmployee = await updateProfilePicture(employeeId, file);
+      console.log('Profile picture upload response:', updatedEmployee);
+      
       if (updatedEmployee) {
-        const picBlob = await getProfilePicture(employeeId);
-        if (picBlob) {
-          const picUrl = URL.createObjectURL(picBlob);
-          setProfilePic(picUrl);
-          toast.success('Profile picture updated successfully!');
-          setSelectedFile(null);
+        // Fetch the updated profile picture
+        try {
+          const picBlob = await getProfilePicture(employeeId);
+          if (picBlob) {
+            const picUrl = URL.createObjectURL(picBlob);
+            setProfilePic(picUrl);
+            toast.success('Profile picture updated successfully!');
+          } else {
+            toast.error('Profile picture uploaded but could not be retrieved');
+          }
+        } catch (picError) {
+          console.error('Error fetching updated profile picture:', picError);
+          toast.error('Profile picture uploaded but could not be displayed. Please refresh the page.');
         }
       }
     } catch (err) {
       console.error('Error updating profile picture:', err);
-      toast.error(err.message || 'Failed to update profile picture');
+      if (err.message.includes('Profile picture must be a JPEG')) {
+        toast.error('Profile picture must be a JPEG (.jpg, .jpeg) or PNG (.png) file. Excel, PDF, and Word files are not allowed.');
+      } else if (err.message.includes('Employee not found')) {
+        toast.error('Employee not found. Please check your login status.');
+      } else if (err.message.includes('Unauthorized')) {
+        toast.error('Please log in again to update your profile picture.');
+        logout();
+      } else {
+        toast.error(err.message || 'Failed to update profile picture');
+      }
     } finally {
       setLoading(false);
     }

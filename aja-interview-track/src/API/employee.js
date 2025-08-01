@@ -186,7 +186,7 @@ export const uploadResume = async (employeeId, jdId, file) => {
 };
 
 /**
- * Download resume
+ * Download resume by resume ID
  * @param {number} resumeId - Resume ID to download
  * @returns {Promise<Blob>} Resume file blob
  */
@@ -202,6 +202,28 @@ export const downloadResume = async (resumeId) => {
     }
     if (error.response?.status === 400) {
       throw new Error(error.response.data || 'Resume not found or invalid ID');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Download resume by employee ID
+ * @param {number} employeeId - Employee ID to download resume for
+ * @returns {Promise<Blob>} Resume file blob
+ */
+export const downloadResumeByEmployeeId = async (employeeId) => {
+  try {
+    const response = await axiosInstance.get(`${BASE_URL}/resumes/employee/${employeeId}/download`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('Unauthorized: Please login to access this resource');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Resume not found for this employee');
     }
     throw error.response?.data || error.message;
   }
@@ -281,13 +303,13 @@ export const getInterviewQuestions = async (technology = 'all') => {
  */
 export const updateProfilePicture = async (employeeId, file) => {
   try {
-    if (!employeeId || !file) {
-      throw new Error('Employee ID and profile picture file are required');
+    if (!file) {
+      throw new Error('Profile picture file is required');
     }
 
     const formData = new FormData();
-    formData.append('employeeId', employeeId);
     formData.append('file', file);
+    formData.append('employeeId', employeeId);
 
     const response = await axiosInstance.put(`${BASE_URL}/profile-picture`, formData, {
       headers: {
@@ -313,10 +335,6 @@ export const updateProfilePicture = async (employeeId, file) => {
  */
 export const getProfilePicture = async (employeeId) => {
   try {
-    if (!employeeId) {
-      throw new Error('Employee ID is required');
-    }
-
     console.log('Fetching profile picture for employee ID:', employeeId);
     const response = await axiosInstance.get(`${BASE_URL}/profile-picture/${employeeId}`, {
       responseType: 'blob', // Important for downloading binary data like images
@@ -329,10 +347,10 @@ export const getProfilePicture = async (employeeId) => {
       throw new Error('Unauthorized: Please login to access this resource');
     }
     if (error.response?.status === 400) {
-      throw new Error(error.response.data || 'Invalid employee ID or profile picture not found');
+      throw new Error(error.response.data || 'Invalid user or profile picture not found');
     }
     if (error.response?.status === 404) {
-      throw new Error('Employee not found or no profile picture available');
+      throw new Error('User not found or no profile picture available');
     }
     throw new Error(error.response?.data || 'Failed to fetch profile picture');
   }

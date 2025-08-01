@@ -29,6 +29,29 @@ export const debugUserInfo = () => {
     return { token: !!token, role, hasToken: !!token };
 };
 
+// Get current user information
+export const getCurrentUser = async () => {
+    try {
+        console.debug('Fetching current user information');
+        const response = await axiosInstance.get(`${API_BASE_URL}/me`);
+        if (typeof response.data !== 'object' || response.data === null) {
+            throw new Error('Expected a user object');
+        }
+        return response.data;
+    } catch (error) {
+        if (error.response?.status === 401) {
+            throw new Error('Please log in to access user information');
+        } else if (error.response?.status === 404) {
+            throw new Error('User not found');
+        } else if (error.response?.status === 429) {
+            throw new Error('Too many requests. Please try again later.');
+        } else if (error.response?.status >= 500) {
+            throw new Error('Server error. Please try again later.');
+        }
+        throw error.response?.data || error.message;
+    }
+};
+
 // Get employees with optional technology and resource type filters
 export const getEmployees = async (technology = 'all', resourceType = 'all') => {
     try {
@@ -210,16 +233,19 @@ export const updateInterviewStatus = async (interviewId) => {
     }
 };
 
-// Update profile picture
-export const updateProfilePicture = async (employeeId, file) => {
+// Update profile picture for the authenticated user
+export const updateProfilePicture = async (userId, file) => {
     try {
-        if (!employeeId || !file) {
-            throw new Error('Employee ID and file are required');
+        if (!file) {
+            throw new Error('Profile picture file is required');
         }
-        console.debug('Updating profile picture for employee:', { employeeId });
+        if (!userId) {
+            throw new Error('User ID is required');
+        }
+        console.debug('Updating profile picture for user ID:', userId);
         const formData = new FormData();
-        formData.append('Id', employeeId);
         formData.append('file', file);
+        formData.append('Id', userId);
 
         const response = await axiosInstance.put(`${API_BASE_URL}/profile-picture`, formData, {
             headers: {
@@ -244,17 +270,17 @@ export const updateProfilePicture = async (employeeId, file) => {
     }
 };
 
-// Get profile picture
+// Get profile picture for a specific employee
 export const getProfilePicture = async (employeeId) => {
     try {
         if (!employeeId) {
             throw new Error('Employee ID is required');
         }
-        console.debug('Fetching profile picture for employee:', { employeeId });
+        console.debug('Fetching profile picture for employee ID:', employeeId);
         const response = await axiosInstance.get(`${API_BASE_URL}/profile-picture/${employeeId}`, {
             responseType: 'blob'
         });
-        return URL.createObjectURL(response.data);
+        return response.data;
     } catch (error) {
         if (error.response?.status === 400) {
             throw new Error('Profile picture not found');
@@ -297,5 +323,6 @@ export default {
     updateProfilePicture,
     getProfilePicture,
     getMockInterviewPerformance,
+    getCurrentUser,
     debugUserInfo
 };

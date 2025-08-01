@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FiX, FiCalendar, FiSend, FiUser } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import styles from './DeliveryTeamDashboard.module.css';
+import { getEmployees } from '../../API/delivery';
 
 const ScheduleInterviewModal = ({
   show,
@@ -14,6 +15,8 @@ const ScheduleInterviewModal = ({
   const [interviewType, setInterviewType] = useState('mock');
   const [interviewDate, setInterviewDate] = useState('');
   const [interviewer, setInterviewer] = useState('');
+  const [interviewers, setInterviewers] = useState([]);
+  const [isLoadingInterviewers, setIsLoadingInterviewers] = useState(false);
   const [client, setClient] = useState('');
   const [level, setLevel] = useState('');
   const [jobDescriptionTitle, setJobDescriptionTitle] = useState('');
@@ -37,6 +40,25 @@ const ScheduleInterviewModal = ({
     setIsSubmitting(false);
   }, [show, initialSelectedEmployee]);
 
+  // Fetch interviewers when modal opens
+  useEffect(() => {
+    if (show) {
+      const fetchInterviewers = async () => {
+        setIsLoadingInterviewers(true);
+        try {
+          const interviewersData = await getEmployees('all', 'all');
+          setInterviewers(interviewersData);
+        } catch (error) {
+          console.error('Error fetching interviewers:', error);
+          setError('Failed to load interviewers. Please try again.');
+        } finally {
+          setIsLoadingInterviewers(false);
+        }
+      };
+      fetchInterviewers();
+    }
+  }, [show]);
+
   if (!show) return null;
 
   const validateForm = () => {
@@ -49,7 +71,7 @@ const ScheduleInterviewModal = ({
       return false;
     }
     if (!interviewer) {
-      setError('Please enter interviewer name');
+      setError('Please select an interviewer');
       return false;
     }
     if (interviewType !== 'mock') {
@@ -87,7 +109,7 @@ const ScheduleInterviewModal = ({
       interviewType,
       date: interviewDate.split('T')[0],
       time: interviewDate.split('T')[1],
-      interviewerId: interviewer, // Assuming interviewer name is used as ID for now
+      interviewerId: parseInt(interviewer), // Convert string to integer for backend
       client: interviewType !== 'mock' ? client : null,
       level: interviewType !== 'mock' ? level : null,
       jobDescriptionTitle: interviewType !== 'mock' ? jobDescriptionTitle : null,
@@ -181,15 +203,26 @@ const ScheduleInterviewModal = ({
           {/* Interviewer */}
           <div className={styles.formGroup}>
             <label htmlFor="interviewer">Interviewer *</label>
-            <input
-              id="interviewer"
-              type="text"
-              placeholder="Enter interviewer name"
-              value={interviewer}
-              onChange={(e) => setInterviewer(e.target.value)}
-              className={styles.input}
-              required
-            />
+                         <select
+               id="interviewer"
+               value={interviewer}
+               onChange={(e) => setInterviewer(e.target.value)}
+               className={styles.input}
+               required
+               disabled={isLoadingInterviewers}
+             >
+               <option value="">Select interviewer</option>
+               {interviewers.map((interviewerEmployee) => (
+                 <option key={interviewerEmployee.id} value={interviewerEmployee.id}>
+                   {interviewerEmployee.user?.fullName || interviewerEmployee.user?.name || 'Unknown Employee'}
+                 </option>
+               ))}
+             </select>
+            {isLoadingInterviewers && (
+              <small style={{ color: '#666', fontSize: '0.8em' }}>
+                Loading interviewers...
+              </small>
+            )}
           </div>
 
           {/* Client Interview Fields */}

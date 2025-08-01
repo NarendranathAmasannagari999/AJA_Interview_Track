@@ -57,10 +57,10 @@ import {
   getClientInterviewFeedback,
   downloadFeedbackFile,
   getAllEmployeeResumes,
-  getFilteredResumes,
   getDeployedEmployees,
   updateProfilePicture,
   getProfilePicture,
+  getCurrentUser,
 } from "../../API/sales";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
@@ -539,7 +539,7 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
       hasToken: !!token
     });
     
-    return effectiveRole === "ROLE_SALES_TEAM" || effectiveRole === "ROLE_ADMIN";
+    return effectiveRole === "ROLE_SALES" || effectiveRole === "ROLE_ADMIN";
   };
 
   const handleFileChange = (e) => {
@@ -796,7 +796,7 @@ const SalesTeamDashboard = () => {
   const [salesUserData, setSalesUserData] = useState({
     fullName: "",
     email: "",
-    role: "ROLE_SALES_TEAM",
+    role: "ROLE_SALES",
     empId: "",
     id: "",
     technology: "",
@@ -846,8 +846,17 @@ const SalesTeamDashboard = () => {
       const role = decoded.role || localStorage.getItem("userRole") || "N/A";
       const fullName = email !== "N/A" ? email.split("@")[0] : "N/A";
 
-      // Use JWT token data since getUserByRole endpoint doesn't exist
-      setSalesUserData({
+      // Try to get current user data from API
+      let currentUser = null;
+      try {
+        currentUser = await getCurrentUser();
+        console.log('Current user data from API:', currentUser);
+      } catch (apiError) {
+        console.warn('Could not fetch current user from API, using JWT data:', apiError.message);
+      }
+
+      // Use API data if available, otherwise fall back to JWT data
+      const userData = currentUser || {
         fullName: fullName,
         email: email,
         role: role,
@@ -857,13 +866,15 @@ const SalesTeamDashboard = () => {
         resourceType: decoded.resourceType || "",
         level: decoded.level || "",
         status: decoded.status || "Active",
-      });
+      };
 
-      // Fetch profile picture if empId exists
-      const empIdToUse = decoded.empId;
-      if (empIdToUse) {
+      setSalesUserData(userData);
+
+      // Fetch profile picture if user ID exists
+      const userIdToUse = userData.id || userData.empId;
+      if (userIdToUse) {
         try {
-          const pictureBlob = await getProfilePicture(empIdToUse);
+          const pictureBlob = await getProfilePicture(userIdToUse);
           if (pictureBlob && pictureBlob instanceof Blob) {
             const imageUrl = URL.createObjectURL(pictureBlob);
             setProfilePic(imageUrl);
@@ -959,8 +970,9 @@ const SalesTeamDashboard = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!salesUserData.empId) {
-      toast.error("Employee ID not available. Please refresh the page and try again.");
+    const userId = salesUserData.id || salesUserData.empId;
+    if (!userId) {
+      toast.error("User ID not available. Please refresh the page and try again.");
       return;
     }
 
@@ -982,11 +994,11 @@ const SalesTeamDashboard = () => {
       toast.info("Updating profile picture...");
 
       // Update profile picture using the API
-      const response = await updateProfilePicture(salesUserData.empId, file);
+      const response = await updateProfilePicture(userId, file);
 
       if (response) {
         // Fetch updated profile picture
-        const pictureBlob = await getProfilePicture(salesUserData.empId);
+        const pictureBlob = await getProfilePicture(userId);
         if (pictureBlob && pictureBlob instanceof Blob) {
           if (profilePic && profilePic.startsWith('blob:')) {
             URL.revokeObjectURL(profilePic);
@@ -1220,6 +1232,22 @@ const SalesTeamDashboard = () => {
     setJDModalError("");
     setJDModalSuccess("");
 
+    // Check authentication before making the request
+    const token = localStorage.getItem('jwt_token');
+    const userRole = localStorage.getItem('userRole');
+
+    if (!token) {
+      toast.error('Authentication required. Please log in again.');
+      setJDModalError('No authentication token found');
+      return;
+    }
+
+    if (!userRole || (userRole !== 'ROLE_SALES' && userRole !== 'ROLE_ADMIN')) {
+      toast.error('Insufficient permissions. You need SALES_TEAM or ADMIN role to add job descriptions.');
+      setJDModalError('Insufficient permissions');
+      return;
+    }
+
     // Validate required fields
     if (!jdModalFields.title.trim() || !jdModalFields.client || 
         !jdModalFields.technology || !jdModalFields.resourceType || !jdModalFile) {
@@ -1246,6 +1274,7 @@ const SalesTeamDashboard = () => {
 
     setJDModalLoading(true);
     try {
+      console.log('Attempting to add job description with role:', userRole);
       toast.info("Uploading job description...");
 
       const jdData = {
@@ -1283,8 +1312,28 @@ const SalesTeamDashboard = () => {
       }
     } catch (error) {
       console.error("Error uploading job description:", error);
+      if (error.message.includes('Access denied')) {
+        toast.error(error.message, {
+          duration: 5000,
+          action: {
+            label: 'Contact Admin',
+            onClick: () => {
+              window.location.href = 'mailto:admin@example.com?subject=Permission%20Request%20for%20Job%20Description%20Upload';
+            }
+          }
+        });
+      } else if (error.message.includes('Authentication required')) {
+        toast.error('Please log in again to continue.', {
+          duration: 5000,
+          icon: '🔐'
+        });
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 3000);
+      } else {
+        toast.error(error.message || "Failed to upload job description");
+      }
       setJDModalError(error.message || "Failed to upload job description");
-      toast.error(error.message || "Failed to upload job description");
     } finally {
       setJDModalLoading(false);
     }
@@ -1369,7 +1418,7 @@ const SalesTeamDashboard = () => {
       return;
     }
     
-    if (!userRole || (userRole !== 'ROLE_SALES_TEAM' && userRole !== 'ROLE_ADMIN')) {
+    if (!userRole || (userRole !== 'ROLE_SALES' && userRole !== 'ROLE_ADMIN')) {
       toast.error('Insufficient permissions. You need SALES_TEAM or ADMIN role to update interviews.');
       setError('Insufficient permissions');
       setIsLoading(false);
@@ -1833,7 +1882,7 @@ const SalesTeamDashboard = () => {
         hasToken: !!token
       });
       
-      return effectiveRole === "ROLE_SALES_TEAM" || effectiveRole === "ROLE_ADMIN";
+      return effectiveRole === "ROLE_SALES" || effectiveRole === "ROLE_ADMIN";
     };
 
     const toggleFeedback = (interviewId, e) => {

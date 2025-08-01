@@ -299,6 +299,8 @@ export const getClients = async (search = null) => {
  */
 export const addJobDescription = async (jdData) => {
   try {
+    console.log('Attempting to add job description with data:', jdData);
+    
     if (!jdData.title || !jdData.client || !jdData.receivedDate || !jdData.deadline || !jdData.technology || !jdData.resourceType || !jdData.description) {
       throw new Error('All job description fields (title, client, receivedDate, deadline, technology, resourceType, description) are required');
     }
@@ -313,13 +315,40 @@ export const addJobDescription = async (jdData) => {
       }
     });
 
+    // Log authentication details for debugging
+    const token = localStorage.getItem('jwt_token');
+    const userRole = localStorage.getItem('userRole');
+    console.log('Authentication details for addJobDescription:', {
+      hasToken: !!token,
+      userRole,
+      tokenPreview: token ? `${token.substring(0, 20)}...` : 'No token'
+    });
+
     const response = await axiosInstance.post(`${BASE_URL}/job-descriptions`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
+    console.log('Job description added successfully:', response.data);
     return response.data;
   } catch (error) {
+    console.error('Error adding job description:', error);
+    if (error.response?.status === 403) {
+      const token = localStorage.getItem('jwt_token');
+      const userRole = localStorage.getItem('userRole');
+      console.error('403 Forbidden - Authentication details:', {
+        hasToken: !!token,
+        userRole,
+        tokenPreview: token ? `${token.substring(0, 20)}...` : 'No token'
+      });
+      throw new Error('Access denied. You do not have permission to add job descriptions. Please ensure you are logged in with the correct role (SALES_TEAM or ADMIN).');
+    }
+    if (error.response?.status === 401) {
+      throw new Error('Authentication required. Please log in again.');
+    }
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid request data');
+    }
     throw handleApiError(error);
   }
 };
@@ -440,23 +469,48 @@ export const getDeployedEmployees = async () => {
 };
 
 /**
- * Update profile picture
- * @param {number} employeeId - Employee ID
+ * Get current user information
+ * @returns {Promise<User>} Current user object
+ */
+export const getCurrentUser = async () => {
+  try {
+    console.debug('Fetching current user information');
+    const response = await axiosInstance.get(`${BASE_URL}/me`);
+    if (typeof response.data !== 'object' || response.data === null) {
+      throw new Error('Expected a user object');
+    }
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching current user:', error);
+    if (error.response?.status === 401) {
+      throw new Error('Authentication required. Please log in again.');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('Access denied. You do not have permission to access this resource.');
+    }
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Update profile picture for the authenticated user
+ * @param {Long} userId - User ID
  * @param {File} file - Profile picture file (JPEG or PNG)
  * @returns {Promise<User>} Updated user object
  */
-export const updateProfilePicture = async (employeeId, file) => {
+export const updateProfilePicture = async (userId, file) => {
   try {
-    if (!employeeId) {
-      throw new Error('Employee ID is required');
+    if (!userId) {
+      throw new Error('User ID is required');
     }
     if (!file || !['image/jpeg', 'image/png'].includes(file.type)) {
       throw new Error('Profile picture must be a JPEG or PNG file');
     }
 
+    console.debug('Updating profile picture for user ID:', userId);
     const formData = new FormData();
-    formData.append('Id', employeeId);
     formData.append('file', file);
+    formData.append('Id', userId); // Match backend parameter name
 
     const response = await axiosInstance.put(`${BASE_URL}/profile-picture`, formData, {
       headers: {
@@ -465,13 +519,20 @@ export const updateProfilePicture = async (employeeId, file) => {
     });
     return response.data;
   } catch (error) {
-    throw handleApiError(error);
+    console.error('Error updating profile picture:', error);
+    if (error.response?.status === 401) {
+      throw new Error('Authentication required. Please log in again.');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('Access denied. You do not have permission to update profile pictures.');
+    }
+    throw error.response?.data || error.message;
   }
 };
 
 /**
- * Get profile picture
- * @param {number} employeeId - Employee ID
+ * Get profile picture for a specific employee
+ * @param {Long} employeeId - Employee ID
  * @returns {Promise<Blob>} Profile picture blob
  */
 export const getProfilePicture = async (employeeId) => {
@@ -479,12 +540,20 @@ export const getProfilePicture = async (employeeId) => {
     if (!employeeId) {
       throw new Error('Employee ID is required');
     }
+    console.debug('Fetching profile picture for employee ID:', employeeId);
     const response = await axiosInstance.get(`${BASE_URL}/profile-picture/${employeeId}`, {
       responseType: 'blob',
     });
-    return response.data;
+    return response.data; // Returns blob directly, not URL.createObjectURL
   } catch (error) {
-    throw handleApiError(error);
+    console.error('Error fetching profile picture:', error);
+    if (error.response?.status === 401) {
+      throw new Error('Authentication required. Please log in again.');
+    }
+    if (error.response?.status === 403) {
+      throw new Error('Access denied. You do not have permission to access profile pictures.');
+    }
+    throw error.response?.data || error.message;
   }
 };
 
@@ -537,4 +606,5 @@ export default {
   getDeployedEmployees,
   updateProfilePicture,
   getProfilePicture,
+  getCurrentUser,
 };
