@@ -1318,6 +1318,236 @@
   100% { transform: translateY(0); opacity: 1; }
 }
 
+/* Performance Tab Styles */
+.performanceGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.chartContainer {
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-light);
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.chartContainer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+}
+
+.chartContainer:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+}
+
+.chartContainer h4 {
+  color: var(--text-primary);
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  position: relative;
+}
+
+.chartContainer h4::after {
+  content: '';
+  position: absolute;
+  bottom: -0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+  border-radius: 2px;
+}
+
+.emptyChart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: var(--text-muted);
+  font-size: var(--font-size-base);
+  text-align: center;
+}
+
+.emptyChart p {
+  margin-top: 1rem;
+  font-weight: 500;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.statCard {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-light);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.statCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+}
+
+.statCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.statCard h5 {
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statValue {
+  color: var(--text-primary);
+  font-size: var(--font-size-3xl);
+  font-weight: 900;
+  margin-bottom: 0.5rem;
+  line-height: 1;
+}
+
+.statLabel {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Performance Metrics Cards */
+.performanceMetrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.metricCard {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+  text-align: center;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.metricCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--success-color), var(--primary-color));
+}
+
+.metricCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.metricCard h6 {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metricValue {
+  color: var(--text-primary);
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+}
+
+.metricLabel {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+/* Performance Summary Section */
+.performanceSummary {
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  padding: 2.5rem;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-light);
+  margin-bottom: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.performanceSummary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color), var(--success-color));
+}
+
+.performanceSummary h3 {
+  color: var(--text-primary);
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  position: relative;
+}
+
+.performanceSummary h3::after {
+  content: '';
+  position: absolute;
+  bottom: -0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+  border-radius: 2px;
+}
+
 /* Responsive Adjustments */
 @media screen and (max-width: 1200px) {
   .performanceGrid {
@@ -1413,6 +1643,50 @@
   
   .card {
     padding: 1.5rem;
+  }
+
+  /* Performance Tab Mobile Styles */
+  .performanceGrid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .chartContainer {
+    padding: 1.5rem;
+  }
+
+  .chartContainer h4 {
+    font-size: var(--font-size-lg);
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .statCard {
+    padding: 1.5rem;
+  }
+
+  .statValue {
+    font-size: var(--font-size-2xl);
+  }
+
+  .performanceMetrics {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .metricCard {
+    padding: 1.25rem;
+  }
+
+  .performanceSummary {
+    padding: 1.5rem;
+  }
+
+  .performanceSummary h3 {
+    font-size: var(--font-size-xl);
   }
 
   .filterSection {
@@ -1669,6 +1943,39 @@
   .uploadButton {
     padding: 0.875rem 1.5rem;
     font-size: var(--font-size-xs);
+  }
+
+  /* Performance Tab Mobile Styles */
+  .performanceGrid {
+    gap: 1rem;
+  }
+
+  .chartContainer {
+    padding: 1rem;
+  }
+
+  .chartContainer h4 {
+    font-size: var(--font-size-base);
+  }
+
+  .statCard {
+    padding: 1rem;
+  }
+
+  .statValue {
+    font-size: var(--font-size-xl);
+  }
+
+  .metricCard {
+    padding: 1rem;
+  }
+
+  .performanceSummary {
+    padding: 1rem;
+  }
+
+  .performanceSummary h3 {
+    font-size: var(--font-size-lg);
   }
   
   .techBadge,
