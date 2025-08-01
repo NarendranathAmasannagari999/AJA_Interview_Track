@@ -73,6 +73,32 @@ export const getEmployees = async (technology = 'all', resourceType = 'all') => 
     }
 };
 
+// Get employee details by ID
+export const getEmployeeById = async (employeeId) => {
+    try {
+        if (!employeeId) {
+            throw new Error('Employee ID is required');
+        }
+        console.debug('Fetching employee details for ID:', employeeId);
+        const response = await axiosInstance.get(`/api/employee/${employeeId}`);
+        if (typeof response.data !== 'object' || response.data === null) {
+            throw new Error('Expected an employee object');
+        }
+        return response.data;
+    } catch (error) {
+        if (error.response?.status === 404) {
+            throw new Error('Employee not found');
+        } else if (error.response?.status === 400) {
+            throw new Error(error.response.data || 'Invalid employee ID');
+        } else if (error.response?.status === 429) {
+            throw new Error('Too many requests. Please try again later.');
+        } else if (error.response?.status >= 500) {
+            throw new Error('Server error. Please try again later.');
+        }
+        throw error.response?.data || error.message;
+    }
+};
+
 // Schedule a mock interview
 export const scheduleInterview = async ({
     empId,
@@ -315,6 +341,7 @@ export const getMockInterviewPerformance = async () => {
 // Export all functions as a single object
 export default {
     getEmployees,
+    getEmployeeById,
     scheduleInterview,
     updateMockInterviewFeedback,
     getUpcomingInterviews,

@@ -196,6 +196,7 @@ const DeliveryTeamDashboard = () => {
       let upcomingData = [];
       try {
         upcomingData = await getUpcomingInterviews();
+        console.log('Raw upcoming interviews data:', upcomingData);
         if (validateApiResponse(upcomingData, 'array', 'upcoming interviews')) {
           // Data is valid, keep it
         } else {
@@ -211,6 +212,7 @@ const DeliveryTeamDashboard = () => {
       let completedData = [];
       try {
         completedData = await getCompletedInterviews();
+        console.log('Raw completed interviews data:', completedData);
         if (validateApiResponse(completedData, 'array', 'completed interviews')) {
           // Data is valid, keep it
         } else {
@@ -222,23 +224,43 @@ const DeliveryTeamDashboard = () => {
         completedData = [];
       }
 
-      // Combine and process interview data
-      const allInterviews = [
-        ...upcomingData,
-        ...completedData,
-      ].map(interview => {
-        const employee = employeesData.find(e => e && e.empId === interview.employeeId);
-        return {
-          ...interview,
-          employeeName: employee?.user?.fullName || 'Unknown Employee',
-          employee: employee,
-          // Add additional employee details for better display
-          employeeId: employee?.empId || interview.employeeId,
-          employeeTechnology: employee?.technology || 'Unknown',
-          employeeResourceType: employee?.resourceType || 'Unknown',
-          employeeStatus: employee?.status || 'Unknown'
-        };
-      });
+      // Combine and process interview data with employee details
+      const allInterviews = [];
+      
+      for (const interview of [...upcomingData, ...completedData]) {
+        try {
+          // The interview object should already contain the employee details
+          const employee = interview.employee;
+          console.log(`Processing interview ${interview.id}:`, interview);
+          console.log('Interview employee object:', employee);
+          console.log('Employee user object:', employee?.user);
+          console.log('Employee user fullName:', employee?.user?.fullName);
+          
+          allInterviews.push({
+            ...interview,
+            employeeName: employee?.user?.fullName || 'Unknown Employee',
+            employee: employee,
+            // Add additional employee details for better display
+            employeeId: employee?.empId || 'Unknown',
+            employeeTechnology: employee?.technology || 'Unknown',
+            employeeResourceType: employee?.resourceType || 'Unknown',
+            employeeStatus: employee?.status || 'Unknown'
+          });
+        } catch (error) {
+          console.error(`Error processing interview ${interview.id}:`, error);
+          // Add interview with default values if processing fails
+          allInterviews.push({
+            ...interview,
+            employeeName: 'Unknown Employee',
+            employee: null,
+            employeeId: 'Unknown',
+            employeeTechnology: 'Unknown',
+            employeeResourceType: 'Unknown',
+            employeeStatus: 'Unknown'
+          });
+        }
+      }
+      
       setMockInterviews(allInterviews);
 
       // Process statistics
@@ -564,10 +586,21 @@ const DeliveryTeamDashboard = () => {
       if (response) {
         // Update the interviews list with the new interview
         setMockInterviews(prev => {
+          // The response should already contain the employee details
+          const employee = response.employee;
+          console.log('New interview response:', response);
+          console.log('New interview employee object:', employee);
+          console.log('Employee user object:', employee?.user);
+          console.log('Employee user fullName:', employee?.user?.fullName);
+          
           const newInterview = {
             ...response,
-            employeeName: employees.find(e => e.empId === response.employeeId)?.user?.fullName || 'Unknown Employee',
-            employee: employees.find(e => e.empId === response.employeeId)
+            employeeName: employee?.user?.fullName || 'Unknown Employee',
+            employee: employee,
+            employeeId: employee?.empId || 'Unknown',
+            employeeTechnology: employee?.technology || 'Unknown',
+            employeeResourceType: employee?.resourceType || 'Unknown',
+            employeeStatus: employee?.status || 'Unknown'
           };
           return [...prev, newInterview];
         });
@@ -633,17 +666,40 @@ const DeliveryTeamDashboard = () => {
       // Refresh data to get the latest state
       const completedData = await getCompletedInterviews();
       if (Array.isArray(completedData)) {
-        const allInterviews = [
-          ...mockInterviews.filter(i => i.status === 'scheduled'),
-          ...completedData
-        ].map(interview => {
-          const employee = employees.find(e => e && e.empId === interview.employeeId);
-          return {
-            ...interview,
-            employeeName: employee?.user?.fullName || 'Unknown Employee',
-            employee
-          };
-        });
+        const allInterviews = [];
+        
+        for (const interview of [...mockInterviews.filter(i => i.status === 'scheduled'), ...completedData]) {
+          try {
+            // The interview object should already contain the employee details
+            const employee = interview.employee;
+            console.log(`Processing interview ${interview.id}:`, interview);
+            console.log('Interview employee object:', employee);
+            console.log('Employee user object:', employee?.user);
+            console.log('Employee user fullName:', employee?.user?.fullName);
+            
+            allInterviews.push({
+              ...interview,
+              employeeName: employee?.user?.fullName || 'Unknown Employee',
+              employee: employee,
+              employeeId: employee?.empId || 'Unknown',
+              employeeTechnology: employee?.technology || 'Unknown',
+              employeeResourceType: employee?.resourceType || 'Unknown',
+              employeeStatus: employee?.status || 'Unknown'
+            });
+          } catch (error) {
+            console.error(`Error processing interview ${interview.id}:`, error);
+            allInterviews.push({
+              ...interview,
+              employeeName: 'Unknown Employee',
+              employee: null,
+              employeeId: 'Unknown',
+              employeeTechnology: 'Unknown',
+              employeeResourceType: 'Unknown',
+              employeeStatus: 'Unknown'
+            });
+          }
+        }
+        
         setMockInterviews(allInterviews);
       }
       return updatedInterview;
