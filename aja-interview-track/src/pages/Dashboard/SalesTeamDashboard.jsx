@@ -65,6 +65,7 @@ import {
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { debugAuthStatus, checkSalesTeamPermission } from "../../utils/authDebug";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -525,7 +526,20 @@ const FeedbackModal = ({ show, onClose, interview, onSubmit, salesUserData }) =>
 
   const hasUpdatePermission = () => {
     const role = salesUserData?.role;
-    return role === "ROLE_SALES_TEAM" || role === "ROLE_ADMIN";
+    const token = localStorage.getItem('jwt_token');
+    const userRole = localStorage.getItem('userRole');
+    
+    // Check both the component state and localStorage
+    const effectiveRole = role || userRole;
+    
+    console.log('Permission check:', {
+      componentRole: role,
+      localStorageRole: userRole,
+      effectiveRole,
+      hasToken: !!token
+    });
+    
+    return effectiveRole === "ROLE_SALES_TEAM" || effectiveRole === "ROLE_ADMIN";
   };
 
   const handleFileChange = (e) => {
@@ -1343,7 +1357,27 @@ const SalesTeamDashboard = () => {
   const handleUpdateFeedback = async (interviewId, feedbackData) => {
     setIsLoading(true);
     setError(null);
+    
+    // Check authentication before making the request
+    const token = localStorage.getItem('jwt_token');
+    const userRole = localStorage.getItem('userRole');
+    
+    if (!token) {
+      toast.error('Authentication required. Please log in again.');
+      setError('No authentication token found');
+      setIsLoading(false);
+      return;
+    }
+    
+    if (!userRole || (userRole !== 'ROLE_SALES_TEAM' && userRole !== 'ROLE_ADMIN')) {
+      toast.error('Insufficient permissions. You need SALES_TEAM or ADMIN role to update interviews.');
+      setError('Insufficient permissions');
+      setIsLoading(false);
+      return;
+    }
+    
     try {
+      console.log('Attempting to update feedback with role:', userRole);
       const response = await updateClientInterview(interviewId, feedbackData);
       
       if (response) {
@@ -1365,7 +1399,7 @@ const SalesTeamDashboard = () => {
       console.error('Error updating feedback:', error);
       
       // Handle specific error messages from backend
-      if (error.message.includes('additional permissions')) {
+      if (error.message.includes('Access denied')) {
         toast.error(error.message, {
           duration: 5000,
           action: {
@@ -1375,11 +1409,15 @@ const SalesTeamDashboard = () => {
             }
           }
         });
-      } else if (error.message.includes('not authorized')) {
-        toast.error(error.message, {
+      } else if (error.message.includes('Authentication required')) {
+        toast.error('Please log in again to continue.', {
           duration: 5000,
-          icon: '🔒'
+          icon: '🔐'
         });
+        // Redirect to login after a delay
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 3000);
       } else if (error.message.includes('Invalid data types')) {
         toast.error('Invalid data format. Please ensure all fields are in the correct format.');
       } else {
@@ -1782,7 +1820,20 @@ const SalesTeamDashboard = () => {
 
     const hasUpdatePermission = () => {
       const role = salesUserData?.role;
-      return role === "ROLE_SALES_TEAM" || role === "ROLE_ADMIN";
+      const token = localStorage.getItem('jwt_token');
+      const userRole = localStorage.getItem('userRole');
+      
+      // Check both the component state and localStorage
+      const effectiveRole = role || userRole;
+      
+      console.log('Permission check:', {
+        componentRole: role,
+        localStorageRole: userRole,
+        effectiveRole,
+        hasToken: !!token
+      });
+      
+      return effectiveRole === "ROLE_SALES_TEAM" || effectiveRole === "ROLE_ADMIN";
     };
 
     const toggleFeedback = (interviewId, e) => {
@@ -2414,6 +2465,18 @@ const SalesTeamDashboard = () => {
           <FiCalendar />
           <span>Interviews: {interviewCount}</span>
         </div>
+        <button
+          className={`${styles.button} ${styles.secondary}`}
+          onClick={() => {
+            debugAuthStatus();
+            const permission = checkSalesTeamPermission();
+            console.log('Permission check result:', permission);
+            toast.info(`Auth Debug: ${permission.reason}`);
+          }}
+          title="Debug Authentication"
+        >
+          <FiAlertCircle /> Debug Auth
+        </button>
         <button
           className={`${styles.button} ${styles.secondary}`}
           onClick={handleRefresh}

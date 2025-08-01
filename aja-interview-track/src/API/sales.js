@@ -152,13 +152,51 @@ export const updateClientInterview = async (interviewId, feedbackData) => {
       formData.append('file', feedbackData.file);
     }
 
+    // Debug logging
+    console.log('Updating client interview:', {
+      interviewId,
+      feedbackData: {
+        result: feedbackData.result,
+        feedback: feedbackData.feedback,
+        technicalScore: techScore,
+        communicationScore: commScore,
+        deployedStatus: feedbackData.deployedStatus,
+        hasFile: !!feedbackData.file
+      }
+    });
+
     const response = await axiosInstance.put(`${BASE_URL}/client-interviews/${interviewId}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
+    
+    console.log('Update client interview response:', response.data);
     return response.data;
   } catch (error) {
+    console.error('Error updating client interview:', error);
+    
+    // Enhanced error handling for 403 errors
+    if (error.response?.status === 403) {
+      const token = localStorage.getItem('jwt_token');
+      const userRole = localStorage.getItem('userRole');
+      console.error('403 Forbidden - Authentication details:', {
+        hasToken: !!token,
+        userRole,
+        tokenPreview: token ? `${token.substring(0, 20)}...` : 'No token'
+      });
+      
+      throw new Error('Access denied. You do not have permission to update client interviews. Please ensure you are logged in with the correct role (SALES_TEAM or ADMIN).');
+    }
+    
+    if (error.response?.status === 401) {
+      throw new Error('Authentication required. Please log in again.');
+    }
+    
+    if (error.response?.status === 400) {
+      throw new Error(error.response.data || 'Invalid request data');
+    }
+    
     throw handleApiError(error);
   }
 };
