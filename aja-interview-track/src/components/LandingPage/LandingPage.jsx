@@ -230,7 +230,7 @@ const LandingPage = () => {
       quote: "I went through 5 client interviews before landing my dream job. The AJA team supported me through every step.",
       author: "Rama Subba Reddy Badiredd",
       role: "DevOps engineer at DataSystems",
-      avatar: "/images/ram_png.jpeg"
+      avatar: "/images"
     },
     {
       quote: "The technical training and mock interviews were exactly what I needed to boost my confidence.",

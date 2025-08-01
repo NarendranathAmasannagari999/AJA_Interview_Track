@@ -101,7 +101,7 @@
   align-items: center;
   gap: 0.75rem;
   background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-  color: var(--text-primary);
+  color: #ffffff;
   padding: 0.75rem 1.5rem;
   border-radius: 50px;
   font-weight: 700;
@@ -109,10 +109,11 @@
   margin-bottom: 2rem;
   box-shadow: var(--shadow-glow);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   transition: var(--transition-normal);
   position: relative;
   overflow: hidden;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .heroBadge::before {
@@ -148,20 +149,16 @@
   font-weight: 900;
   margin-bottom: 2rem;
   line-height: 1.1;
-  background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary-color-light) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  text-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(59, 130, 246, 0.4);
   animation: textGlow 3s ease-in-out infinite alternate;
 }
 
 .highlight {
-  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #3b82f6;
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
   position: relative;
+  font-weight: 900;
 }
 
 .highlight::after {
@@ -178,11 +175,12 @@
 
 .heroSubtitle {
   font-size: clamp(1.1rem, 2.5vw, 1.4rem);
-  color: var(--text-secondary);
+  color: #e2e8f0;
   margin-bottom: 3rem;
   line-height: 1.8;
   max-width: 600px;
   animation: fadeInUp 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .ctaButtons {
@@ -394,13 +392,13 @@
 }
 
 .sectionSubtitle {
-  color: var(--primary-color);
+  color: #3b82f6;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 3px;
   font-size: 0.9rem;
   margin-bottom: 1.5rem;
-  text-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+  text-shadow: 0 2px 6px rgba(59, 130, 246, 0.5);
 }
 
 .sectionSubtitleLight {
@@ -418,10 +416,8 @@
   font-weight: 900;
   margin-bottom: 2rem;
   line-height: 1.2;
-  background: linear-gradient(135deg, var(--text-primary), var(--primary-color-light));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
 .sectionTitleLight {
@@ -429,17 +425,14 @@
   font-weight: 900;
   margin-bottom: 2rem;
   line-height: 1.2;
-  background: linear-gradient(135deg, var(--text-primary), rgba(255, 255, 255, 0.8));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(124, 58, 237, 0.4);
 }
 
 .highlightLight {
-  background: linear-gradient(135deg, var(--text-primary), var(--primary-color-light));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #3b82f6;
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  font-weight: 900;
 }
 
 /* Process Section */
@@ -500,14 +493,16 @@
 .processCard h3 {
   font-size: 1.8rem;
   margin-bottom: 1.5rem;
-  color: var(--text-primary);
+  color: #ffffff;
   font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .processCard p {
-  color: var(--text-secondary);
+  color: #e2e8f0;
   line-height: 1.7;
   margin-bottom: 2rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .stepNumber {
@@ -573,9 +568,10 @@
 }
 
 .techCard h3 {
-  color: var(--text-primary);
+  color: #ffffff;
   font-size: 1.4rem;
   font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 /* Testimonials */
@@ -637,10 +633,11 @@
 
 .testimonialText {
   font-size: 1.2rem;
-  color: var(--text-primary);
+  color: #ffffff;
   font-style: italic;
   margin-bottom: 2.5rem;
   line-height: 1.8;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .testimonialAuthor {
@@ -673,14 +670,16 @@
 .authorInfo h4 {
   font-size: 1.3rem;
   margin-bottom: 0.5rem;
-  color: var(--text-primary);
+  color: #ffffff;
   font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .authorInfo p {
-  color: var(--text-secondary);
+  color: #e2e8f0;
   font-size: 1rem;
   font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 /* CTA Section */
@@ -728,18 +727,13 @@
   font-weight: 900;
   margin-bottom: 2rem;
   line-height: 1.2;
-  background: linear-gradient(135deg, var(--text-primary), rgba(255, 255, 255, 0.8));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  text-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(124, 58, 237, 0.4);
 }
 
 .ctaTitle span {
-  background: linear-gradient(135deg, var(--text-primary), var(--primary-color-light));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #3b82f6;
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
   font-weight: 900;
   display: inline-block;
   padding: 0 4px;
@@ -761,7 +755,8 @@
   font-size: 1.3rem;
   margin-bottom: 3rem;
   line-height: 1.8;
-  opacity: 0.9;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .ctaButton {
