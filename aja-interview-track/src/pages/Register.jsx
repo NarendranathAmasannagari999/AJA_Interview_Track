@@ -63,7 +63,7 @@ const Register = () => {
                     role = 'EMPLOYEE';
                     break;
                 case 'sales-team':
-                    role = 'SALES_TEAM';
+                    role = 'SALES'; // Changed from 'SALES_TEAM' to 'SALES'
                     break;
                 case 'delivery_team':
                     role = 'DELIVERY'; // Changed from 'DELIVERY_TEAM' to 'DELIVERY'

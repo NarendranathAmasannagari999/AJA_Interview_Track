@@ -246,8 +246,8 @@ export const debugRoleMapping = () => {
         'ROLE_EMPLOYEE': 'EMPLOYEE',
         'ROLE_DELIVERY_TEAM': 'DELIVERY', // Legacy support
         'ROLE_DELIVERY': 'DELIVERY', // New expected role
-        'ROLE_SALES_TEAM': 'SALES',
-        'ROLE_SALES': 'SALES',
+        'ROLE_SALES_TEAM': 'SALES', // Legacy support
+        'ROLE_SALES': 'SALES', // New expected role
         'ROLE_ADMIN': 'ADMIN'
       };
       
@@ -284,7 +284,7 @@ export const testBackendRoleMapping = () => {
     { input: 'employee', expected: 'ROLE_EMPLOYEE' },
     { input: 'delivery_team', expected: 'ROLE_DELIVERY' }, // Updated: should be ROLE_DELIVERY
     { input: 'delivery', expected: 'ROLE_DELIVERY' },
-    { input: 'sales_team', expected: 'ROLE_SALES_TEAM' },
+    { input: 'sales_team', expected: 'ROLE_SALES' }, // Updated: should be ROLE_SALES
     { input: 'sales', expected: 'ROLE_SALES' },
     { input: 'admin', expected: 'ROLE_ADMIN' }
   ];
@@ -303,12 +303,12 @@ export const testBackendRoleMapping = () => {
   console.log('\nFrontend routing expectations:');
   console.log('- ROLE_EMPLOYEE -> /dashboard/employee');
   console.log('- ROLE_DELIVERY -> /dashboard/delivery-team'); // Updated
-  console.log('- ROLE_SALES_TEAM -> /dashboard/sales-team');
-  console.log('- ROLE_SALES -> /dashboard/sales-team');
+  console.log('- ROLE_SALES -> /dashboard/sales-team'); // Updated
+  console.log('- ROLE_SALES_TEAM -> /dashboard/sales-team'); // Legacy support
   
   console.log('\nFrontend registration mapping:');
   console.log('- delivery_team -> DELIVERY -> ROLE_DELIVERY');
-  console.log('- sales-team -> SALES_TEAM -> ROLE_SALES_TEAM');
+  console.log('- sales-team -> SALES -> ROLE_SALES'); // Updated
   console.log('- employee -> EMPLOYEE -> ROLE_EMPLOYEE');
   
   console.log('=== End Backend Role Mapping Test ===');
