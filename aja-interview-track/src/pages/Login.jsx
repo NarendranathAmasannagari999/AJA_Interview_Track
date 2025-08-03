@@ -1,5 +1,5 @@
 // AJA_Interview_Track\aja-interview-track\src\pages\Login.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -15,6 +15,7 @@ import { FiMail, FiKey } from 'react-icons/fi';
 import styles from './Login.module.css';
 import { loginUser } from '../API/auth';
 import { useAuth } from '../context/AuthContext';
+import { debugRoleMapping, testBackendRoleMapping } from '../utils/authDebug';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -26,6 +27,11 @@ const Login = () => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
+
+  // Debug role mapping on component mount
+  useEffect(() => {
+    testBackendRoleMapping();
+  }, []);
 
   const validateForm = () => {
     const newErrors = {};
@@ -67,26 +73,43 @@ const Login = () => {
       // Use the updated loginUser function that returns complete user data
       const userData = await loginUser(formData.email.trim(), formData.password);
       
+      // Debug role mapping
+      console.log('Login successful, user data:', userData);
+      debugRoleMapping();
+      testBackendRoleMapping(); // Added this line to call the new function
+      
       // Use the AuthContext login function to properly set the user and employee data
       await login(userData);
       
       // Normalize role for routing (remove 'ROLE_' prefix and convert to lowercase)
       const normalizedRole = userData.role.replace('ROLE_', '').toLowerCase();
+      console.log('Normalized role for routing:', normalizedRole);
       
-      // Redirect based on role
+      // Redirect based on role with fallback handling
+      let redirectPath = '/dashboard';
+      
       switch(normalizedRole.toLowerCase()) {
         case 'employee':
-          navigate('/dashboard/employee');
+          redirectPath = '/dashboard/employee';
           break;
+        case 'delivery_team':
         case 'delivery':
-          navigate('/dashboard/delivery-team');
+          redirectPath = '/dashboard/delivery-team';
           break;
+        case 'sales_team':
         case 'sales':
-          navigate('/dashboard/sales-team');
+          redirectPath = '/dashboard/sales-team';
+          break;
+        case 'admin':
+          redirectPath = '/dashboard/admin';
           break;
         default:
-          navigate('/dashboard');
+          console.warn('Unknown role:', userData.role, 'redirecting to /dashboard');
+          redirectPath = '/dashboard';
       }
+      
+      console.log('Redirecting to:', redirectPath);
+      navigate(redirectPath);
       
     } catch (err) {
       // Display the error message from the backend

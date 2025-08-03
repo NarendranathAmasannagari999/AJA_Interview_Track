@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
 
 const baseURL = 'http://localhost:8080';
 
@@ -9,6 +10,27 @@ const authAxios = axios.create({
     'Content-Type': 'application/json'
   }
 });
+
+/**
+ * Decode JWT token and extract user information
+ * @param {string} token - JWT token
+ * @returns {Object} Decoded token information
+ */
+const decodeToken = (token) => {
+  try {
+    const decoded = jwtDecode(token);
+    return {
+      email: decoded.sub || decoded.email,
+      role: decoded.role,
+      employeeId: decoded.employeeId,
+      exp: decoded.exp,
+      iat: decoded.iat
+    };
+  } catch (error) {
+    console.error('Failed to decode JWT token:', error);
+    return null;
+  }
+};
 
 /**
  * Register a new user
@@ -35,11 +57,23 @@ export const registerUser = async (userData) => {
     // Store the token in localStorage
     if (token) {
       localStorage.setItem('jwt_token', token);
-    }
-    
-    // Store user role
-    if (role) {
-      setUserRole(role);
+      
+      // Decode token to extract additional information
+      const tokenInfo = decodeToken(token);
+      if (tokenInfo) {
+        // Store role from token (more reliable than response)
+        setUserRole(tokenInfo.role);
+        
+        // Store employee ID if available in token
+        if (tokenInfo.employeeId) {
+          setEmployeeId(tokenInfo.employeeId);
+        }
+      } else {
+        // Fallback to response role
+        if (role) {
+          setUserRole(role);
+        }
+      }
     }
     
     return { token, role, user: response.data };
@@ -87,16 +121,26 @@ export const loginUser = async (email, password) => {
     // Store the token in localStorage
     if (token) {
       localStorage.setItem('jwt_token', token);
-    }
-    
-    // Store user role
-    if (role) {
-      setUserRole(role);
-    }
-    
-    // Store employee ID if available
-    if (employeeId) {
-      setEmployeeId(employeeId);
+      
+      // Decode token to extract additional information
+      const tokenInfo = decodeToken(token);
+      if (tokenInfo) {
+        // Store role from token (more reliable than response)
+        setUserRole(tokenInfo.role);
+        
+        // Store employee ID from token if available
+        if (tokenInfo.employeeId) {
+          setEmployeeId(tokenInfo.employeeId);
+        }
+      } else {
+        // Fallback to response data
+        if (role) {
+          setUserRole(role);
+        }
+        if (employeeId) {
+          setEmployeeId(employeeId);
+        }
+      }
     }
     
     return { token, role, user, employee, employeeId };
@@ -139,7 +183,25 @@ export const logoutUser = () => {
  */
 export const isAuthenticated = () => {
   const token = localStorage.getItem('jwt_token');
-  return !!token;
+  if (!token) return false;
+  
+  // Check if token is expired
+  try {
+    const tokenInfo = decodeToken(token);
+    if (tokenInfo && tokenInfo.exp) {
+      const now = Math.floor(Date.now() / 1000);
+      if (tokenInfo.exp < now) {
+        // Token is expired, clear it
+        logoutUser();
+        return false;
+      }
+    }
+    return true;
+  } catch (error) {
+    // Invalid token, clear it
+    logoutUser();
+    return false;
+  }
 };
 
 /**
@@ -151,10 +213,17 @@ export const getToken = () => {
 };
 
 /**
- * Get current user role
+ * Get current user role from token (preferred) or localStorage
  * @returns {string|null} User role or null
  */
 export const getUserRole = () => {
+  const token = localStorage.getItem('jwt_token');
+  if (token) {
+    const tokenInfo = decodeToken(token);
+    if (tokenInfo && tokenInfo.role) {
+      return tokenInfo.role;
+    }
+  }
   return localStorage.getItem('userRole');
 };
 
@@ -167,10 +236,17 @@ export const setUserRole = (role) => {
 };
 
 /**
- * Get employee ID from localStorage
+ * Get employee ID from token (preferred) or localStorage
  * @returns {string|null} Employee ID or null
  */
 export const getEmployeeId = () => {
+  const token = localStorage.getItem('jwt_token');
+  if (token) {
+    const tokenInfo = decodeToken(token);
+    if (tokenInfo && tokenInfo.employeeId) {
+      return tokenInfo.employeeId;
+    }
+  }
   return localStorage.getItem('employeeId');
 };
 
@@ -180,4 +256,39 @@ export const getEmployeeId = () => {
  */
 export const setEmployeeId = (employeeId) => {
   localStorage.setItem('employeeId', employeeId);
+};
+
+/**
+ * Get current user email from token
+ * @returns {string|null} User email or null
+ */
+export const getUserEmail = () => {
+  const token = localStorage.getItem('jwt_token');
+  if (token) {
+    const tokenInfo = decodeToken(token);
+    if (tokenInfo && tokenInfo.email) {
+      return tokenInfo.email;
+    }
+  }
+  return null;
+};
+
+/**
+ * Check if token is expired
+ * @returns {boolean} True if token is expired
+ */
+export const isTokenExpired = () => {
+  const token = localStorage.getItem('jwt_token');
+  if (!token) return true;
+  
+  try {
+    const tokenInfo = decodeToken(token);
+    if (tokenInfo && tokenInfo.exp) {
+      const now = Math.floor(Date.now() / 1000);
+      return tokenInfo.exp < now;
+    }
+    return true;
+  } catch (error) {
+    return true;
+  }
 }; 

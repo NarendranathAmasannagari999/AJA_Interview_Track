@@ -6,7 +6,9 @@ import {
   getEmployeeId, 
   setEmployeeId, 
   setUserRole,
-  logoutUser 
+  logoutUser,
+  getUserEmail,
+  isTokenExpired
 } from '../API/auth';
 import { getEmployeeDetails } from '../API/employee';
 import { jwtDecode } from 'jwt-decode';
@@ -33,25 +35,24 @@ export const AuthProvider = ({ children }) => {
         if (isAuthenticated()) {
           const token = getToken();
           const role = getUserRole();
+          const email = getUserEmail();
 
-          if (token && role) {
-            setUser({ token, role });
+          if (token && role && email) {
+            setUser({ token, role, email });
             
-            // Try to extract employee ID and role from JWT token first
+            // Extract employee ID from token
             let empId = null;
-            let userRole = null;
             try {
               const decodedToken = jwtDecode(token);
               empId = decodedToken.employeeId || getEmployeeId();
-              userRole = decodedToken.role || getUserRole();
+              
               // Update localStorage with role from token if available
-              if (userRole && userRole !== getUserRole()) {
-                setUserRole(userRole);
+              if (decodedToken.role && decodedToken.role !== getUserRole()) {
+                setUserRole(decodedToken.role);
               }
             } catch (error) {
               console.warn('Could not decode JWT token:', error.message);
               empId = getEmployeeId();
-              userRole = getUserRole();
             }
             
             // If we have an employee ID, fetch employee details
@@ -66,6 +67,10 @@ export const AuthProvider = ({ children }) => {
                 setEmployeeId(null);
               }
             }
+          } else {
+            // Invalid authentication state, clear everything
+            console.warn('Invalid authentication state detected, clearing data');
+            logoutUser();
           }
         }
       } catch (error) {
@@ -81,30 +86,49 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (userData) => {
     try {
-      setUser(userData);
-      setUserRole(userData.role);
+      const { token, role, user, employee, employeeId } = userData;
       
-      // If this is an employee and we have employee data, set it
-      if (userData.role === 'ROLE_EMPLOYEE' && userData.employee) {
-        setEmployee(userData.employee);
-        if (userData.employeeId) {
-          setEmployeeId(userData.employeeId);
-        }
-      } else if (userData.role === 'ROLE_EMPLOYEE' && userData.employeeId) {
-        // If we have employee ID but no employee data, fetch it
-        setEmployeeId(userData.employeeId);
-        const employeeData = await getEmployeeDetails(userData.employeeId);
-        setEmployee(employeeData);
-      } else if (userData.role === 'ROLE_EMPLOYEE') {
-        console.warn('Employee login but no employee data or ID provided');
+      // Extract email from token
+      let email = null;
+      try {
+        const decodedToken = jwtDecode(token);
+        email = decodedToken.sub || decodedToken.email;
+      } catch (error) {
+        console.warn('Could not decode JWT token during login:', error.message);
+        email = user?.email;
       }
       
-      // Also try to extract role from JWT token for consistency
+      setUser({ token, role, email });
+      setUserRole(role);
+      
+      // If this is an employee and we have employee data, set it
+      if (role === 'ROLE_EMPLOYEE') {
+        if (employee) {
+          setEmployee(employee);
+          if (employeeId) {
+            setEmployeeId(employeeId);
+          }
+        } else if (employeeId) {
+          // If we have employee ID but no employee data, fetch it
+          setEmployeeId(employeeId);
+          try {
+            const employeeData = await getEmployeeDetails(employeeId);
+            setEmployee(employeeData);
+          } catch (error) {
+            console.warn('Could not fetch employee details during login:', error.message);
+          }
+        } else {
+          console.warn('Employee login but no employee data or ID provided');
+        }
+      }
+      
+      // Verify role consistency between token and response
       try {
-        const decodedToken = jwtDecode(userData.token);
-        if (decodedToken.role && decodedToken.role !== userData.role) {
-          console.warn('Role mismatch between response and token:', userData.role, 'vs', decodedToken.role);
-          // Prefer the role from the response as it's more reliable
+        const decodedToken = jwtDecode(token);
+        if (decodedToken.role && decodedToken.role !== role) {
+          console.warn('Role mismatch between response and token:', role, 'vs', decodedToken.role);
+          // Prefer the role from the token as it's more secure
+          setUserRole(decodedToken.role);
         }
       } catch (error) {
         console.warn('Could not decode JWT token during login:', error.message);
@@ -140,8 +164,9 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     updateEmployeeData,
-    isAuthenticated: !!user,
-    getEmployeeId: () => employee?.id || getEmployeeId()
+    isAuthenticated: !!user && !isTokenExpired(),
+    getEmployeeId: () => employee?.id || getEmployeeId(),
+    getUserEmail: () => user?.email || getUserEmail()
   };
 
   return (

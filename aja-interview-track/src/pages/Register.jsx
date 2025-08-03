@@ -66,7 +66,7 @@ const Register = () => {
                     role = 'SALES_TEAM';
                     break;
                 case 'delivery_team':
-                    role = 'DELIVERY_TEAM';
+                    role = 'DELIVERY'; // Changed from 'DELIVERY_TEAM' to 'DELIVERY'
                     break;
                 default:
                     setError('Invalid role selected');

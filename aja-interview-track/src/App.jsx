@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import Navbar from "./components/Navbar/Navbar";
 import Footer from "./components/Footer/Footer";
@@ -14,8 +14,66 @@ import DeliveryTeamDashboard from "./pages/Dashboard/DeliveryTeamDashboard";
 import SalesTeamDashboard from "./pages/Dashboard/SalesTeamDashboard";
 import AdminDashboard from "./pages/Dashboard/AdminDashboard";
 import InterviewQuestions from './pages/InterviewQuestions/InterviewQuestions';
-import { AuthProvider } from "./context/AuthContext"; 
+import { AuthProvider, useAuth } from "./context/AuthContext"; 
 import "./assets/styles/global.css";
+
+// Dashboard Redirect Component
+const DashboardRedirect = () => {
+  const { user } = useAuth();
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  // Redirect based on user role
+  const role = user.role?.replace('ROLE_', '').toLowerCase();
+  
+  switch(role) {
+    case 'employee':
+      return <Navigate to="/dashboard/employee" replace />;
+    case 'delivery_team':
+    case 'delivery':
+      return <Navigate to="/dashboard/delivery-team" replace />;
+    case 'sales_team':
+    case 'sales':
+      return <Navigate to="/dashboard/sales-team" replace />;
+    case 'admin':
+      return <Navigate to="/dashboard/admin" replace />;
+    default:
+      console.warn('Unknown role for redirect:', user.role);
+      return <Navigate to="/login" replace />;
+  }
+};
+
+// Not Found Component
+const NotFound = () => {
+  return (
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      height: '100vh',
+      textAlign: 'center'
+    }}>
+      <h1>404 - Page Not Found</h1>
+      <p>The page you're looking for doesn't exist.</p>
+      <button 
+        onClick={() => window.history.back()}
+        style={{
+          padding: '10px 20px',
+          backgroundColor: '#007bff',
+          color: 'white',
+          border: 'none',
+          borderRadius: '5px',
+          cursor: 'pointer'
+        }}
+      >
+        Go Back
+      </button>
+    </div>
+  );
+};
 
 function AppContent() {
   const location = useLocation();
@@ -67,6 +125,8 @@ function AppContent() {
               <Route path="/dashboard/delivery-team" element={<DeliveryTeamDashboard />} />
               <Route path="/dashboard/sales-team" element={<SalesTeamDashboard />} />
               <Route path="/dashboard/admin" element={<AdminDashboard />} />
+              <Route path="/dashboard" element={<DashboardRedirect />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </AnimatePresence>
         </div>
